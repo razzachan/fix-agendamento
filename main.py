@@ -159,3 +159,18 @@ if __name__ == "__main__":
     logger.info("Iniciando servidor Fix FogÃµes Middleware...")
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+
+@app.post("/agendamento-inteligente")
+async def agendamento_inteligente(request: Request):
+    """Endpoint para agendamento inteligente via Clientechat"""
+    logger.info("Recebendo requisição no endpoint /agendamento-inteligente")
+    return await receber_dados(request)
+
+@app.get("/agendamento-inteligente")
+async def agendamento_inteligente_get():
+    """Endpoint para verificar se o serviço de agendamento inteligente está online"""
+    return {
+        "status": "online",
+        "message": "Serviço de agendamento inteligente está funcionando!",
+        "instructions": "Este endpoint aceita requisições POST com dados de agendamento."
+    }
