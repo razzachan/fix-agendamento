@@ -1,19 +1,42 @@
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from supabase_client import inserir_agendamento
+import uvicorn
 
-from flask import Flask, request, jsonify
-from supabase_client import registrar_agendamento
+app = FastAPI()
 
-app = Flask(__name__)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.route("/", methods=["POST"])
-def handle_agendamento():
-    data = request.json
-    response = registrar_agendamento(data)
+@app.post("/")
+async def receber_dados(request: Request):
+    dados = await request.json()
+    nome = dados.get("nome")
+    endereco = dados.get("endereco")
+    equipamento = dados.get("equipamento")
+    problema = dados.get("problema")
 
-    if response.status_code == 201:
-        nome = data.get("nome", "").split(" ")[0]
-        return jsonify({"mensagem": f"Perfeito, {nome}! Suas informações foram registradas. Em breve entraremos em contato para confirmar o melhor horário. 😊"})
+    # O técnico padrão é Paulo Cesar, exceto para coifas
+    tecnico = "Marcelo (marcelodsmoritz@gmail.com)" if "coifa" in equipamento.lower() else "Paulo Cesar (betonipaulo@gmail.com)"
+
+    inserido = inserir_agendamento(
+        nome=nome,
+        endereco=endereco,
+        equipamento=equipamento,
+        problema=problema,
+        urgente=False,
+        status="pendente",
+        tecnico=tecnico
+    )
+
+    if inserido:
+        return {"mensagem": f"Agendamento registrado com sucesso. Em breve nossa equipe irá roteirizar o melhor horário e retornará a confirmação 😊"}
     else:
-        return jsonify({"mensagem": "Tivemos um problema ao registrar seu agendamento. Por favor, tente novamente ou fale com um atendente."})
+        return {"mensagem": "Houve um erro ao registrar o agendamento. Por favor, tente novamente mais tarde."}
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)
