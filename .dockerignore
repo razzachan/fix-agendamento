@@ -1,0 +1,26 @@
+# Ignore problematic files
+main_backup.py
+middleware_updated.py
+middleware_supabase_integrado.zip
+
+# Ignore cache and temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+
+# Ignore logs
+*.log
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
