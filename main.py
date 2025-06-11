@@ -458,6 +458,165 @@ async def health_check():
         "environment": env_status
     }
 
+@app.get("/test-supabase")
+async def test_supabase():
+    """Endpoint para testar a conexão com o Supabase"""
+    try:
+        # Verificar variáveis de ambiente
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_KEY")
+
+        if not supabase_url or not supabase_key:
+            return {
+                "status": "error",
+                "message": "Variáveis de ambiente SUPABASE_URL e/ou SUPABASE_KEY não definidas",
+                "supabase_url_defined": bool(supabase_url),
+                "supabase_key_defined": bool(supabase_key)
+            }
+
+        # Testar conexão com o Supabase usando o cliente
+        try:
+            # Obter o cliente Supabase
+            client = get_supabase_client()
+
+            # Dados de teste
+            test_data = {
+                "nome": "TESTE API - Verificação de Ambiente",
+                "endereco": "Endereço de Teste API",
+                "equipamento": "Equipamento de Teste API",
+                "problema": "Problema de Teste - Verificação de API",
+                "urgente": False,
+                "status": "teste",
+                "tecnico": "Sistema (teste API)"
+            }
+
+            # Inserir no Supabase
+            response = client.table("agendamentos_ai").insert(test_data).execute()
+
+            # Verificar se a inserção foi bem-sucedida
+            if response.data and len(response.data) > 0:
+                return {
+                    "status": "success",
+                    "message": "Conexão com Supabase estabelecida com sucesso",
+                    "response": response.data
+                }
+            else:
+                return {
+                    "status": "warning",
+                    "message": "Conexão com Supabase estabelecida, mas a inserção não retornou dados",
+                    "response": response
+                }
+        except Exception as e:
+            logger.error(f"Erro ao testar cliente Supabase: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Erro ao conectar com Supabase: {str(e)}"
+            }
+    except Exception as e:
+        logger.exception("Erro ao testar conexão com Supabase")
+        return {
+            "status": "error",
+            "message": f"Erro ao testar conexão com Supabase: {str(e)}"
+        }
+
+@app.get("/api/agendamentos")
+async def get_agendamentos():
+    """Endpoint para buscar todos os agendamentos"""
+    try:
+        # Obter cliente Supabase
+        client = get_supabase_client()
+
+        # Buscar agendamentos
+        response = client.table("agendamentos_ai").select("*").order("created_at", desc=True).execute()
+
+        # Verificar se a busca foi bem-sucedida
+        if response.data is not None:
+            return response.data
+        else:
+            logger.warning("Resposta vazia do Supabase ao buscar agendamentos")
+            return []
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar agendamentos: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "sucesso": False,
+                "mensagem": f"Erro ao buscar agendamentos: {str(e)}"
+            }
+        )
+
+@app.post("/echo")
+async def echo_request(request: Request):
+    """Endpoint para ecoar os dados recebidos, útil para debug"""
+    try:
+        # Registrar os headers da requisição
+        headers = dict(request.headers.items())
+        # Remover informações sensíveis
+        if 'authorization' in headers:
+            headers['authorization'] = '***REDACTED***'
+        if 'apikey' in headers:
+            headers['apikey'] = '***REDACTED***'
+
+        # Tentar ler o corpo da requisição
+        try:
+            body = await request.body()
+            # Registrar o corpo bruto em hexadecimal
+            body_hex = body.hex()
+
+            # Tentar diferentes codificações
+            try:
+                body_text = body.decode('utf-8')
+            except UnicodeDecodeError:
+                try:
+                    body_text = body.decode('latin-1')
+                except UnicodeDecodeError:
+                    body_text = body.decode('iso-8859-1')
+
+            # Tentar processar como JSON
+            try:
+                import json
+                json_data = json.loads(body_text)
+                is_json = True
+            except:
+                json_data = None
+                is_json = False
+
+            # Tentar processar como form data
+            try:
+                from urllib.parse import parse_qs
+                form_data = parse_qs(body_text)
+                is_form = True
+            except:
+                form_data = None
+                is_form = False
+
+            return {
+                "success": True,
+                "message": "Dados recebidos com sucesso",
+                "headers": headers,
+                "body_hex": body_hex,
+                "body_text": body_text,
+                "is_json": is_json,
+                "json_data": json_data,
+                "is_form": is_form,
+                "form_data": form_data,
+                "content_type": headers.get("content-type", "Não especificado")
+            }
+        except Exception as e:
+            logger.error(f"Erro ao ler corpo da requisição: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Erro ao ler corpo da requisição: {str(e)}",
+                "headers": headers
+            }
+    except Exception as e:
+        logger.error(f"Erro ao processar requisição em /echo: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Erro interno do servidor: {str(e)}"
+        }
+
 if __name__ == "__main__":
     logger.info("Iniciando servidor Fix Fogões Middleware...")
     port = int(os.getenv("PORT", 8000))
