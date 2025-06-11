@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Fogões - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #ff6b00;
+            --secondary-color: #2c3e50;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+        }
+        
+        .navbar {
+            background-color: var(--primary-color);
+        }
+        
+        .navbar-brand {
+            font-weight: bold;
+            color: white !important;
+        }
+        
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card-header {
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 10px 10px 0 0 !important;
+            font-weight: bold;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: #e05e00;
+            border-color: #e05e00;
+        }
+        
+        .table th {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .badge-urgente {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .badge-normal {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .badge-pendente {
+            background-color: #ffc107;
+            color: black;
+        }
+        
+        .badge-concluido {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .badge-cancelado {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+        
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-fire"></i> Fix Fogões Dashboard
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#"><i class="bi bi-house-door"></i> Início</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="bi bi-calendar-check"></i> Agendamentos</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="bi bi-people"></i> Clientes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="bi bi-gear"></i> Configurações</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-calendar-check"></i> Agendamentos Recentes
+                    </div>
+                    <div class="card-body">
+                        <div id="loading" class="loading">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Carregando...</span>
+                            </div>
+                        </div>
+                        <div id="agendamentos-container" style="display: none;">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Cliente</th>
+                                            <th>Endereço</th>
+                                            <th>Equipamento</th>
+                                            <th>Problema</th>
+                                            <th>Urgência</th>
+                                            <th>Status</th>
+                                            <th>Técnico</th>
+                                            <th>Data</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="agendamentos-table">
+                                        <!-- Dados serão inseridos aqui via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="error-message" class="alert alert-danger" style="display: none;">
+                            Erro ao carregar os agendamentos. Por favor, tente novamente mais tarde.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchAgendamentos();
+        });
+
+        function fetchAgendamentos() {
+            fetch('/api/agendamentos')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erro ao carregar agendamentos');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    displayAgendamentos(data);
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('error-message').style.display = 'block';
+                });
+        }
+
+        function displayAgendamentos(agendamentos) {
+            const tableBody = document.getElementById('agendamentos-table');
+            tableBody.innerHTML = '';
+
+            if (agendamentos.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = '<td colspan="10" class="text-center">Nenhum agendamento encontrado</td>';
+                tableBody.appendChild(row);
+            } else {
+                agendamentos.forEach(agendamento => {
+                    const row = document.createElement('tr');
+                    
+                    // Formatar data
+                    const data = new Date(agendamento.created_at);
+                    const dataFormatada = data.toLocaleDateString('pt-BR') + ' ' + data.toLocaleTimeString('pt-BR');
+                    
+                    row.innerHTML = `
+                        <td>${agendamento.id}</td>
+                        <td>${agendamento.nome}</td>
+                        <td>${agendamento.endereco}</td>
+                        <td>${agendamento.equipamento}</td>
+                        <td>${agendamento.problema}</td>
+                        <td><span class="badge ${agendamento.urgente ? 'badge-urgente' : 'badge-normal'}">${agendamento.urgente ? 'Urgente' : 'Normal'}</span></td>
+                        <td><span class="badge badge-${agendamento.status.toLowerCase()}">${agendamento.status}</span></td>
+                        <td>${agendamento.tecnico || 'Não atribuído'}</td>
+                        <td>${dataFormatada}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editarAgendamento(${agendamento.id})">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="excluirAgendamento(${agendamento.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('agendamentos-container').style.display = 'block';
+        }
+
+        function editarAgendamento(id) {
+            alert(`Editar agendamento ${id} - Funcionalidade em desenvolvimento`);
+        }
+
+        function excluirAgendamento(id) {
+            if (confirm(`Tem certeza que deseja excluir o agendamento ${id}?`)) {
+                alert(`Agendamento ${id} excluído com sucesso - Funcionalidade em desenvolvimento`);
+            }
+        }
+    </script>
+</body>
+</html>

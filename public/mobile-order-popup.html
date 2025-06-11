@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalhes da Ordem - Mobile</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 16px;
+            line-height: 1.4;
+        }
+        
+        .popup-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            overflow: hidden;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .popup-header {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .popup-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .close-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        
+        .popup-content {
+            padding: 0;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6b7280;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e5e7eb;
+            border-radius: 50%;
+            border-top-color: #2563eb;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px;
+            text-align: center;
+        }
+        
+        /* Estilos para o iframe */
+        .order-iframe {
+            width: 100%;
+            border: none;
+            min-height: 500px;
+            background: white;
+        }
+        
+        /* Responsivo */
+        @media (max-width: 768px) {
+            body {
+                padding: 8px;
+            }
+            
+            .popup-container {
+                border-radius: 8px;
+                max-height: 95vh;
+            }
+            
+            .popup-header {
+                padding: 16px;
+            }
+            
+            .popup-title {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="popup-container">
+        <div class="popup-header">
+            <h1 class="popup-title" id="popupTitle">Carregando...</h1>
+            <button class="close-btn" onclick="closePopup()">✕</button>
+        </div>
+        
+        <div class="popup-content">
+            <div class="loading" id="loadingState">
+                <div class="loading-spinner"></div>
+                <p>Carregando detalhes da ordem...</p>
+            </div>
+            
+            <iframe 
+                id="orderFrame" 
+                class="order-iframe" 
+                style="display: none;"
+                onload="handleFrameLoad()"
+            ></iframe>
+        </div>
+    </div>
+
+    <script>
+        // Obter parâmetros da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('orderId');
+        const orderNumber = urlParams.get('orderNumber');
+        const clientName = urlParams.get('clientName');
+        const equipment = urlParams.get('equipment');
+        const description = urlParams.get('description');
+        const status = urlParams.get('status');
+        const createdAt = urlParams.get('createdAt');
+        const technicianName = urlParams.get('technicianName');
+        
+        // Atualizar título
+        if (orderNumber && clientName) {
+            document.getElementById('popupTitle').textContent = `OS #${orderNumber} - ${clientName}`;
+        } else if (orderId) {
+            document.getElementById('popupTitle').textContent = `Ordem ${orderId}`;
+        }
+        
+        function closePopup() {
+            // Se foi aberto como popup, fechar
+            if (window.opener) {
+                window.close();
+            } else {
+                // Se foi aberto como página normal, voltar
+                window.history.back();
+            }
+        }
+        
+        function handleFrameLoad() {
+            const frame = document.getElementById('orderFrame');
+            const loading = document.getElementById('loadingState');
+            
+            // Ocultar loading e mostrar iframe
+            loading.style.display = 'none';
+            frame.style.display = 'block';
+            
+            // Ajustar altura do iframe baseado no conteúdo
+            try {
+                const frameDoc = frame.contentDocument || frame.contentWindow.document;
+                const height = frameDoc.body.scrollHeight;
+                frame.style.height = Math.max(height, 500) + 'px';
+            } catch (e) {
+                // Se não conseguir acessar o conteúdo, usar altura padrão
+                frame.style.height = '600px';
+            }
+        }
+        
+        function showError(message) {
+            const loading = document.getElementById('loadingState');
+            loading.innerHTML = `
+                <div class="error">
+                    <p>Erro ao carregar detalhes</p>
+                    <p style="font-size: 12px; margin-top: 4px;">${message}</p>
+                    <button onclick="location.reload()" style="margin-top: 8px; padding: 8px 16px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Tentar Novamente
+                    </button>
+                </div>
+            `;
+        }
+        
+        // Carregar a ordem - usar dados da URL diretamente se disponíveis
+        if (orderId && clientName && equipment) {
+            // Se temos dados suficientes na URL, usar diretamente
+            console.log('Usando dados da URL diretamente');
+            displayFallbackDetails(orderId);
+        } else if (orderId) {
+            // Tentar carregar dados da API
+            loadOrderDetails(orderId);
+        } else {
+            showError('ID da ordem não fornecido');
+        }
+
+        async function loadOrderDetails(orderId) {
+            try {
+                // Tentar carregar dados reais primeiro
+                const response = await fetch(`/api/service-orders/${orderId}`);
+
+                if (response.ok) {
+                    const orderData = await response.json();
+                    displayOrderDetails(orderData);
+                } else {
+                    // Se não encontrar na API, tentar usar iframe com rota React
+                    loadWithIframe(orderId);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar da API:', error);
+                // Fallback para iframe
+                loadWithIframe(orderId);
+            }
+        }
+
+        function loadWithIframe(orderId) {
+            const frame = document.getElementById('orderFrame');
+            frame.src = `/orders/${orderId}`;
+
+            // Timeout para mostrar fallback se não carregar
+            setTimeout(() => {
+                const loading = document.getElementById('loadingState');
+                if (loading.style.display !== 'none') {
+                    console.log('Iframe não carregou, usando dados de fallback');
+                    displayFallbackDetails(orderId);
+                }
+            }, 3000);
+        }
+
+        function displayOrderDetails(order) {
+            const loading = document.getElementById('loadingState');
+            const frame = document.getElementById('orderFrame');
+
+            loading.style.display = 'none';
+
+            // Criar visualização customizada dos dados
+            const detailsHtml = createOrderDetailsHtml(order);
+
+            // Substituir iframe por conteúdo customizado
+            frame.style.display = 'none';
+            const container = frame.parentElement;
+            container.innerHTML = detailsHtml;
+        }
+
+        function displayFallbackDetails(orderId) {
+            const loading = document.getElementById('loadingState');
+
+            // Usar dados passados via URL ou fallback
+            const fallbackData = {
+                id: orderId,
+                clientName: clientName || 'Cliente não informado',
+                equipment: equipment || 'Equipamento não especificado',
+                description: description || 'Detalhes não disponíveis no momento',
+                status: status || 'pending',
+                createdAt: createdAt || new Date().toISOString(),
+                technicianName: technicianName || null
+            };
+
+            displayOrderDetails(fallbackData);
+        }
+
+        function createOrderDetailsHtml(order) {
+            const createdDate = order.createdAt ? new Date(order.createdAt).toLocaleDateString('pt-BR') : 'Não informado';
+            const createdTime = order.createdAt ? new Date(order.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+
+            return `
+                <div style="padding: 20px; background: white;">
+                    <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+                        <h2 style="color: #1f2937; margin-bottom: 8px;">📋 Informações Gerais</h2>
+                        <div style="display: grid; gap: 12px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #6b7280;">Número:</span>
+                                <span>#${orderNumber}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #6b7280;">Status:</span>
+                                <span style="background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 20px; font-size: 12px;">${getStatusText(order.status)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #6b7280;">Criado em:</span>
+                                <span>${createdDate} ${createdTime}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+                        <h2 style="color: #1f2937; margin-bottom: 8px;">👤 Cliente</h2>
+                        <div style="display: grid; gap: 12px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #6b7280;">Nome:</span>
+                                <span>${order.clientName}</span>
+                            </div>
+                            ${order.clientPhone ? `
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #6b7280;">Telefone:</span>
+                                <span>${order.clientPhone}</span>
+                            </div>
+                            ` : ''}
+                            ${order.clientEmail ? `
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #6b7280;">Email:</span>
+                                <span>${order.clientEmail}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+                        <h2 style="color: #1f2937; margin-bottom: 8px;">🔧 Equipamento</h2>
+                        <div style="display: grid; gap: 12px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #6b7280;">Tipo:</span>
+                                <span>${order.equipmentType || order.equipment}</span>
+                            </div>
+                            ${order.equipmentModel ? `
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #6b7280;">Modelo:</span>
+                                <span>${order.equipmentModel}</span>
+                            </div>
+                            ` : ''}
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <span style="font-weight: 600; color: #6b7280;">Problema:</span>
+                                <span style="text-align: right; max-width: 60%;">${order.description}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${order.technicianName ? `
+                    <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+                        <h2 style="color: #1f2937; margin-bottom: 8px;">👨‍🔧 Técnico</h2>
+                        <div style="display: grid; gap: 12px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #6b7280;">Responsável:</span>
+                                <span>${order.technicianName}</span>
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <div style="margin-bottom: 24px;">
+                        <h2 style="color: #1f2937; margin-bottom: 8px;">🔍 Sistema</h2>
+                        <div style="display: grid; gap: 12px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #6b7280;">ID:</span>
+                                <span style="font-family: monospace; font-size: 0.9em; background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">${order.id}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; padding: 20px; background: #f9fafb; border-radius: 8px; margin-top: 24px;">
+                        <p style="color: #6b7280; font-size: 14px;">EletroFix Hub Pro</p>
+                        <p style="color: #9ca3af; font-size: 12px;">Sistema de Gestão de Ordens de Serviço</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getStatusText(status) {
+            switch(status) {
+                case 'pending': return 'Pendente';
+                case 'scheduled': return 'Agendado';
+                case 'completed': return 'Concluído';
+                case 'workshop': return 'Na Oficina';
+                default: return 'Pendente';
+            }
+        }
+        
+        // Fechar com ESC
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closePopup();
+            }
+        });
+        
+        // Ajustar altura do iframe periodicamente
+        setInterval(() => {
+            const frame = document.getElementById('orderFrame');
+            if (frame.style.display !== 'none') {
+                try {
+                    const frameDoc = frame.contentDocument || frame.contentWindow.document;
+                    const height = frameDoc.body.scrollHeight;
+                    frame.style.height = Math.max(height, 500) + 'px';
+                } catch (e) {
+                    // Ignorar erros de cross-origin
+                }
+            }
+        }, 2000);
+    </script>
+</body>
+</html>

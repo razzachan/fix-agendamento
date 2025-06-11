@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Fogões - Ordens de Serviço</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+            min-height: 100vh;
+            line-height: 1.5;
+            color: #1f2937;
+            padding: 16px;
+            -webkit-font-smoothing: antialiased;
+            overscroll-behavior: contain;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+            padding: 24px;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border-radius: 16px;
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 12px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .btn {
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 12px 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin: 16px auto;
+            display: block;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .search-container {
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 16px 24px 16px 48px;
+            border: 2px solid #e5e7eb;
+            border-radius: 16px;
+            font-size: 16px;
+            background: white;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            font-size: 18px;
+        }
+
+        .filters-container {
+            margin-bottom: 24px;
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+
+        .filter-tab {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            background: white;
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 80px;
+            white-space: nowrap;
+        }
+
+        .filter-tab:hover {
+            border-color: #3b82f6;
+            color: #2563eb;
+        }
+
+        .filter-tab.active {
+            border-color: #2563eb;
+            background: #2563eb;
+            color: white;
+        }
+
+        .filter-count {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 4px 8px;
+            font-size: 12px;
+            font-weight: 700;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .filter-tab:not(.active) .filter-count {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .order-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #2563eb;
+            transition: all 0.2s ease;
+        }
+
+        .order-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .client-name {
+            font-weight: 600;
+            font-size: 18px;
+            color: #1f2937;
+        }
+
+        .order-number {
+            font-size: 12px;
+            color: #6b7280;
+            background: #f3f4f6;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .equipment {
+            font-size: 14px;
+            color: #4b5563;
+            margin-bottom: 8px;
+        }
+
+        .description {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-scheduled {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-workshop {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .card-action-btn {
+            padding: 8px 12px;
+            font-size: 12px;
+            border-radius: 8px;
+            flex: 1;
+            min-width: 80px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 16px;
+        }
+
+        .loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 16px 0;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 32px;
+            padding: 16px;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            padding: 16px;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .modal-close {
+            background: #f3f4f6;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #6b7280;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: #e5e7eb;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        /* Sidebar Mobile */
+        .mobile-sidebar {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(135deg, #1f2937, #374151);
+            color: white;
+            z-index: 2000;
+            transition: left 0.3s ease;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .mobile-sidebar.open {
+            left: 0;
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .sidebar-header {
+            padding: 24px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .sidebar-logo {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .sidebar-subtitle {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .sidebar-nav {
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-left-color: #3b82f6;
+        }
+
+        .nav-icon {
+            width: 20px;
+            margin-right: 12px;
+            text-align: center;
+        }
+
+        .menu-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(37, 99, 235, 0.9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Cards mais detalhados */
+        .order-detail-row {
+            display: flex;
+            align-items: center;
+            margin: 6px 0;
+            font-size: 13px;
+        }
+
+        .detail-icon {
+            width: 16px;
+            margin-right: 8px;
+            color: #6b7280;
+        }
+
+        .detail-text {
+            color: #4b5563;
+            flex: 1;
+        }
+
+        .detail-value {
+            font-weight: 500;
+            color: #1f2937;
+        }
+
+        .order-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 12px 0;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .meta-label {
+            color: #6b7280;
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+
+        .meta-value {
+            color: #1f2937;
+            font-weight: 500;
+        }
+
+        .priority-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .priority-high {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
+        .priority-medium {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .priority-low {
+            background: #f0fdf4;
+            color: #16a34a;
+        }
+    </style>
+</head>
+<body>
+    <!-- Menu Toggle Button -->
+    <button class="menu-toggle" onclick="toggleSidebar()">
+        <span style="font-size: 18px;">☰</span>
+    </button>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- Mobile Sidebar -->
+    <div class="mobile-sidebar" id="mobileSidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">EletroFix Hub Pro</div>
+            <div class="sidebar-subtitle">Sistema de Gestão</div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="/dashboard" class="nav-item">
+                <span class="nav-icon">📊</span>
+                Dashboard
+            </a>
+            <a href="/orders" class="nav-item">
+                <span class="nav-icon">📋</span>
+                Ordens de Serviço
+            </a>
+            <a href="/mobile-orders.html" class="nav-item active">
+                <span class="nav-icon">📱</span>
+                Mobile Orders
+            </a>
+            <a href="/calendar" class="nav-item">
+                <span class="nav-icon">📅</span>
+                Calendário
+            </a>
+            <a href="/main-calendar" class="nav-item">
+                <span class="nav-icon">🗓️</span>
+                Calendário Principal
+            </a>
+            <a href="/schedules" class="nav-item">
+                <span class="nav-icon">⏰</span>
+                Pré-Agendamentos
+            </a>
+            <a href="/clients" class="nav-item">
+                <span class="nav-icon">👥</span>
+                Clientes
+            </a>
+            <a href="/technicians" class="nav-item">
+                <span class="nav-icon">🔧</span>
+                Técnicos
+            </a>
+            <a href="/workshops" class="nav-item">
+                <span class="nav-icon">🏭</span>
+                Oficinas
+            </a>
+            <a href="/tracking" class="nav-item">
+                <span class="nav-icon">📍</span>
+                Rastreamento
+            </a>
+            <a href="/finance" class="nav-item">
+                <span class="nav-icon">💰</span>
+                Financeiro
+            </a>
+            <a href="/settings" class="nav-item">
+                <span class="nav-icon">⚙️</span>
+                Configurações
+            </a>
+        </nav>
+    </div>
+
+    <div class="header">
+        <h1>Fix Fogões</h1>
+        <p>Ordens de Serviço - Mobile</p>
+        <div class="connection-status" id="connectionStatus">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Conectado</span>
+        </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="loadOrders()">
+        <span>🔄</span>
+        <span>Carregar Ordens</span>
+    </button>
+
+    <div class="search-container">
+        <span class="search-icon">🔍</span>
+        <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="Buscar por cliente ou equipamento..."
+            onkeyup="filterOrders()"
+        />
+    </div>
+
+    <div class="filters-container">
+        <div class="filter-tabs">
+            <button class="filter-tab active" data-status="all" onclick="filterByStatus('all')">
+                <span class="filter-count" id="count-all">0</span>
+                <span>Todas</span>
+            </button>
+            <button class="filter-tab" data-status="pending" onclick="filterByStatus('pending')">
+                <span class="filter-count" id="count-pending">0</span>
+                <span>Pendentes</span>
+            </button>
+            <button class="filter-tab" data-status="scheduled" onclick="filterByStatus('scheduled')">
+                <span class="filter-count" id="count-scheduled">0</span>
+                <span>Agendadas</span>
+            </button>
+            <button class="filter-tab" data-status="completed" onclick="filterByStatus('completed')">
+                <span class="filter-count" id="count-completed">0</span>
+                <span>Concluídas</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="content">
+        <div class="loading">
+            <div class="loading-spinner"></div>
+            <p>Carregando ordens de serviço...</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>EletroFix Hub Pro</p>
+        <p>Sistema de Gestão de Assistência Técnica</p>
+    </div>
+
+    <!-- Modal de Detalhes -->
+    <div class="modal-overlay" id="orderModal" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 class="modal-title">Detalhes da Ordem</h2>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-body" id="modalContent">
+                <!-- Conteúdo será inserido dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variáveis globais
+        let allOrders = [];
+        let currentStatusFilter = 'all';
+        let currentSearchTerm = '';
+
+        // Dados de exemplo para fallback
+        const fallbackOrders = [
+            {
+                id: "c1ad0284-2583-4ff2-b84c-d960aa6cd259",
+                clientName: "João Santos",
+                equipment: "Não especificado",
+                description: "Sem descrição",
+                status: "scheduled"
+            },
+            {
+                id: "ae85ff2d-3fb1-4a89-ba54-194ecd164a3b",
+                clientName: "Alexandro Corrêa",
+                equipment: "Não especificado",
+                description: "Sem descrição",
+                status: "scheduled"
+            }
+        ];
+
+        async function loadOrders() {
+            const content = document.getElementById('content');
+            content.innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Carregando ordens reais...</p>
+                </div>
+            `;
+
+            updateConnectionStatus(false, 'Conectando...');
+
+            try {
+                // Carregar dados diretamente do Supabase
+                const supabaseUrl = 'https://hdyucwabemspehokoiks.supabase.co';
+                const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkeXVjd2FiZW1zcGVob2tvaWtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQwNDA3NjksImV4cCI6MjA1OTYxNjc2OX0.koJXDLh4_rEGGMFB_7JrtXj9S7JTSGxPtrozhjWoS3M';
+
+                const response = await fetch(`${supabaseUrl}/rest/v1/service_orders?select=*&limit=50&order=created_at.desc`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && Array.isArray(data) && data.length > 0) {
+                        const realOrders = data.slice(0, 20).map((order, index) => ({
+                            id: order.id,
+                            clientName: order.client_name || 'Cliente não informado',
+                            equipment: order.equipment_type || 'Equipamento não especificado',
+                            description: order.description || order.client_description || 'Sem descrição',
+                            status: order.status || 'pending',
+                            createdAt: order.created_at,
+                            technicianName: order.technician_name
+                        }));
+
+                        allOrders = realOrders;
+                        updateStatusCounts();
+                        applyFilters();
+                        updateConnectionStatus(true, `${realOrders.length} ordens`);
+                        return;
+                    }
+                }
+                throw new Error('Dados não disponíveis');
+            } catch (error) {
+                console.error('Erro ao carregar ordens:', error);
+                setTimeout(() => {
+                    allOrders = fallbackOrders;
+                    updateStatusCounts();
+                    applyFilters();
+                    updateConnectionStatus(false, 'Modo offline');
+                }, 2000);
+            }
+        }
+
+        function updateConnectionStatus(isConnected, message = '') {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            statusDot.className = 'status-dot';
+            if (isConnected) {
+                statusDot.style.background = '#10b981';
+                statusText.textContent = message || 'Conectado';
+            } else {
+                statusDot.style.background = '#ef4444';
+                statusText.textContent = message || 'Modo offline';
+            }
+        }
+
+        function updateStatusCounts() {
+            const counts = {
+                all: allOrders.length,
+                pending: allOrders.filter(o => o.status === 'pending').length,
+                scheduled: allOrders.filter(o => o.status === 'scheduled').length,
+                completed: allOrders.filter(o => o.status === 'completed').length
+            };
+
+            document.getElementById('count-all').textContent = counts.all;
+            document.getElementById('count-pending').textContent = counts.pending;
+            document.getElementById('count-scheduled').textContent = counts.scheduled;
+            document.getElementById('count-completed').textContent = counts.completed;
+        }
+
+        function applyFilters() {
+            let filteredOrders = [...allOrders];
+
+            if (currentStatusFilter !== 'all') {
+                filteredOrders = filteredOrders.filter(order => order.status === currentStatusFilter);
+            }
+
+            if (currentSearchTerm) {
+                filteredOrders = filteredOrders.filter(order =>
+                    order.clientName.toLowerCase().includes(currentSearchTerm) ||
+                    order.equipment.toLowerCase().includes(currentSearchTerm) ||
+                    order.description.toLowerCase().includes(currentSearchTerm)
+                );
+            }
+
+            renderOrders(filteredOrders);
+        }
+
+        function renderOrders(orders) {
+            const content = document.getElementById('content');
+
+            if (!orders || orders.length === 0) {
+                content.innerHTML = `
+                    <div class="error">
+                        <p>Nenhuma ordem encontrada</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = orders.map((order, index) => {
+                const createdDate = order.createdAt ? new Date(order.createdAt).toLocaleDateString('pt-BR') : 'Data não informada';
+                const scheduledDate = order.scheduledDate ? new Date(order.scheduledDate).toLocaleDateString('pt-BR') : 'Não agendado';
+                const priority = order.priority || 'medium';
+                const location = order.currentLocation || 'workshop';
+                const attendanceType = order.serviceAttendanceType || 'em_domicilio';
+
+                return `
+                <div class="order-card" onclick="openOrderModal(${JSON.stringify(order).replace(/"/g, '&quot;')}, ${index + 1})">
+                    <div class="order-header">
+                        <div class="client-name">${order.clientName}</div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="priority-badge priority-${priority}">
+                                ${priority === 'high' ? 'Alta' : priority === 'low' ? 'Baixa' : 'Média'}
+                            </span>
+                            <div class="order-number">#${index + 1}</div>
+                        </div>
+                    </div>
+
+                    <div class="equipment" style="font-weight: 500; color: #1f2937; margin-bottom: 8px;">
+                        🔧 ${order.equipment}
+                    </div>
+
+                    <div class="description" style="margin-bottom: 12px;">
+                        ${order.description}
+                    </div>
+
+                    <div class="order-detail-row">
+                        <span class="detail-icon">📅</span>
+                        <span class="detail-text">Criado em:</span>
+                        <span class="detail-value">${createdDate}</span>
+                    </div>
+
+                    ${order.scheduledDate ? `
+                        <div class="order-detail-row">
+                            <span class="detail-icon">⏰</span>
+                            <span class="detail-text">Agendado para:</span>
+                            <span class="detail-value">${scheduledDate}</span>
+                        </div>
+                    ` : ''}
+
+                    ${order.technicianName ? `
+                        <div class="order-detail-row">
+                            <span class="detail-icon">👨‍🔧</span>
+                            <span class="detail-text">Técnico:</span>
+                            <span class="detail-value">${order.technicianName}</span>
+                        </div>
+                    ` : ''}
+
+                    <div class="order-detail-row">
+                        <span class="detail-icon">📍</span>
+                        <span class="detail-text">Localização:</span>
+                        <span class="detail-value">
+                            ${location === 'workshop' ? 'Na Oficina' :
+                              location === 'client' ? 'Com Cliente' :
+                              location === 'technician' ? 'Com Técnico' : 'Não informado'}
+                        </span>
+                    </div>
+
+                    <div class="order-detail-row">
+                        <span class="detail-icon">🏠</span>
+                        <span class="detail-text">Tipo de Atendimento:</span>
+                        <span class="detail-value">
+                            ${attendanceType === 'em_domicilio' ? 'Em Domicílio' :
+                              attendanceType === 'na_oficina' ? 'Na Oficina' :
+                              attendanceType === 'coleta_entrega' ? 'Coleta/Entrega' : 'Não informado'}
+                        </span>
+                    </div>
+
+                    <div class="order-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Status</span>
+                            <span class="meta-value">
+                                <span class="status ${getStatusClass(order.status)}">
+                                    ${getStatusText(order.status)}
+                                </span>
+                            </span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">ID da Ordem</span>
+                            <span class="meta-value" style="font-family: monospace; font-size: 10px;">
+                                ${order.id.substring(0, 8)}...
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="card-actions">
+                        <button class="btn btn-secondary card-action-btn" onclick="openOrderDetails('${order.id}'); event.stopPropagation();">
+                            🔍 Ver Completo
+                        </button>
+                        <button class="btn btn-secondary card-action-btn" onclick="shareOrder('${order.id}'); event.stopPropagation();">
+                            📤 Compartilhar
+                        </button>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            content.innerHTML = html;
+        }
+
+        function getStatusClass(status) {
+            const statusMap = {
+                'pending': 'status-pending',
+                'scheduled': 'status-scheduled',
+                'completed': 'status-completed',
+                'workshop': 'status-workshop'
+            };
+            return statusMap[status] || 'status-pending';
+        }
+
+        function getStatusText(status) {
+            const statusMap = {
+                'pending': 'Pendente',
+                'scheduled': 'Agendado',
+                'completed': 'Concluído',
+                'workshop': 'Na Oficina'
+            };
+            return statusMap[status] || 'Pendente';
+        }
+
+        function filterByStatus(status) {
+            currentStatusFilter = status;
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`[data-status="${status}"]`).classList.add('active');
+            applyFilters();
+        }
+
+        function filterOrders() {
+            const searchInput = document.getElementById('searchInput');
+            currentSearchTerm = searchInput.value.toLowerCase();
+            applyFilters();
+        }
+
+        function openOrderModal(order, orderNumber) {
+            const modal = document.getElementById('orderModal');
+            const modalContent = document.getElementById('modalContent');
+
+            modalContent.innerHTML = `
+                <div style="margin-bottom: 16px;">
+                    <h3 style="color: #1f2937; margin-bottom: 8px;">OS #${orderNumber}</h3>
+                    <p><strong>Cliente:</strong> ${order.clientName}</p>
+                    <p><strong>Equipamento:</strong> ${order.equipment}</p>
+                    <p><strong>Descrição:</strong> ${order.description}</p>
+                    <p><strong>Status:</strong> <span class="status ${getStatusClass(order.status)}">${getStatusText(order.status)}</span></p>
+                </div>
+                <button class="btn btn-primary" onclick="openOrderDetails('${order.id}')" style="width: 100%;">
+                    Ver Detalhes Completos
+                </button>
+            `;
+
+            modal.classList.add('active');
+        }
+
+        function openOrderDetails(orderId) {
+            const currentHost = window.location.hostname;
+            const reactPort = '8081';
+            const iframeUrl = `http://${currentHost}:${reactPort}/orders/${orderId}`;
+            window.open(iframeUrl, '_blank');
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('orderModal').classList.remove('active');
+        }
+
+        // Funções do Sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('mobileSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
+
+        function closeSidebar() {
+            const sidebar = document.getElementById('mobileSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            sidebar.classList.remove('open');
+            overlay.classList.remove('active');
+        }
+
+        // Função de compartilhar ordem
+        function shareOrder(orderId) {
+            const order = allOrders.find(o => o.id === orderId);
+            if (!order) return;
+
+            const shareText = `📋 Ordem de Serviço
+👤 Cliente: ${order.clientName}
+🔧 Equipamento: ${order.equipment}
+📝 Problema: ${order.description}
+📊 Status: ${getStatusText(order.status)}
+📅 Criado em: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString('pt-BR') : 'Data não informada'}
+${order.technicianName ? `👨‍🔧 Técnico: ${order.technicianName}` : ''}
+
+EletroFix Hub Pro - Sistema de Gestão`;
+
+            if (navigator.share) {
+                navigator.share({
+                    title: `Ordem de Serviço - ${order.clientName}`,
+                    text: shareText
+                }).catch(console.error);
+            } else {
+                // Fallback para copiar para clipboard
+                navigator.clipboard.writeText(shareText).then(() => {
+                    showToast('📋 Informações copiadas para a área de transferência!', 'success');
+                }).catch(() => {
+                    showToast('❌ Não foi possível compartilhar. Tente novamente.', 'error');
+                });
+            }
+        }
+
+        // Sistema de Toast Notifications
+        function showToast(message, type = 'info', duration = 3000) {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+                color: white;
+                padding: 12px 16px;
+                border-radius: 8px;
+                font-size: 14px;
+                z-index: 3000;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+            `;
+            toast.textContent = message;
+
+            document.body.appendChild(toast);
+
+            // Animar entrada
+            setTimeout(() => {
+                toast.style.transform = 'translateX(0)';
+            }, 100);
+
+            // Remover após duração
+            setTimeout(() => {
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, duration);
+        }
+
+        // Fechar sidebar ao clicar em links
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('nav-item')) {
+                closeSidebar();
+            }
+        });
+
+        // Carregar quando a página estiver pronta
+        document.addEventListener('DOMContentLoaded', loadOrders);
+    </script>
+</body>
+</html>

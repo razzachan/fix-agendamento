@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Análise de Conversas WhatsApp - Fix Fogões</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/daterangepicker@3.1.0/daterangepicker.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker@3.1.0/daterangepicker.css">
+    <style>
+        :root {
+            --primary-color: #25D366;
+            --secondary-color: #128C7E;
+            --dark-color: #075E54;
+            --light-color: #DCF8C6;
+            --accent-color: #34B7F1;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            padding-top: 20px;
+        }
+
+        .dashboard-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card-header {
+            background-color: var(--secondary-color);
+            color: white;
+            border-radius: 10px 10px 0 0 !important;
+        }
+
+        .conversation-card {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .message {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+
+        .message-client {
+            background-color: #f1f0f0;
+            margin-right: auto;
+        }
+
+        .message-me {
+            background-color: var(--light-color);
+            margin-left: auto;
+        }
+
+        .message-time {
+            font-size: 0.7rem;
+            color: #888;
+            text-align: right;
+        }
+
+        .stats-card {
+            text-align: center;
+            padding: 15px;
+        }
+
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--dark-color);
+        }
+
+        .stats-label {
+            font-size: 1rem;
+            color: #666;
+        }
+
+        .service-tag {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 2px;
+            border-radius: 15px;
+            background-color: var(--accent-color);
+            color: white;
+            font-size: 0.8rem;
+        }
+
+        #wordCloudContainer {
+            height: 300px;
+            position: relative;
+        }
+
+        .conversation-filter {
+            margin-bottom: 15px;
+        }
+
+        .highlight {
+            background-color: yellow;
+            padding: 2px;
+            border-radius: 3px;
+        }
+
+        /* Melhoria 1: Modo escuro */
+        .dark-mode {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+
+        .dark-mode .card {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+        }
+
+        .dark-mode .stats-number {
+            color: var(--light-color);
+        }
+
+        .dark-mode .stats-label {
+            color: #b0b0b0;
+        }
+
+        .dark-mode .message-client {
+            background-color: #2a2a2a;
+            color: #e0e0e0;
+        }
+
+        /* Melhoria 2: Animações e transições */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        /* Melhoria 3: Melhorias visuais para os cards */
+        .stats-card {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stats-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .stats-card:hover::before {
+            opacity: 1;
+        }
+
+        /* Melhoria 4: Barra de pesquisa */
+        .search-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .search-container input {
+            padding-left: 35px;
+            border-radius: 20px;
+            border: 1px solid #ddd;
+            transition: all 0.3s ease;
+        }
+
+        .search-container input:focus {
+            box-shadow: 0 0 0 0.25rem rgba(37, 211, 102, 0.25);
+            border-color: var(--primary-color);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #888;
+        }
+
+        /* Melhoria 5: Botão de modo escuro */
+        .theme-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: var(--secondary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        /* Melhoria 6: Indicadores de status coloridos */
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .status-agendado { background-color: #25D366; }
+        .status-orcamento { background-color: #34B7F1; }
+        .status-aguardando { background-color: #FFA500; }
+        .status-concluido { background-color: #075E54; }
+        .status-cancelado { background-color: #FF4136; }
+
+        /* Melhoria 7: Filtro de data */
+        .date-filter {
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            background-color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dark-mode .date-filter {
+            background-color: #2a2a2a;
+            color: #e0e0e0;
+            border-color: #444;
+        }
+
+        /* Melhoria 8: Tooltips personalizados */
+        .custom-tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .custom-tooltip .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .custom-tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Melhoria 9: Melhorias para responsividade em dispositivos móveis */
+        @media (max-width: 768px) {
+            .stats-number {
+                font-size: 1.8rem;
+            }
+
+            .stats-label {
+                font-size: 0.8rem;
+            }
+
+            .card-header h5 {
+                font-size: 1rem;
+            }
+
+            .conversation-preview {
+                max-height: 200px;
+                overflow-y: auto;
+            }
+        }
+
+        /* Melhoria 10: Skeleton loading */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite;
+            border-radius: 4px;
+            height: 20px;
+            margin-bottom: 10px;
+        }
+
+        @keyframes skeleton-loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Botão de alternar tema (Melhoria 5) -->
+    <div class="theme-toggle" id="themeToggle">
+        <i class="bi bi-moon-fill"></i>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-header text-center animate-fade-in">
+            <h1><i class="bi bi-whatsapp"></i> Dashboard de Análise de Conversas WhatsApp</h1>
+            <p class="lead">EletroFix Hub Pro - Análise das últimas 30 conversas com clientes</p>
+
+            <!-- Filtro de data (Melhoria 7) -->
+            <div class="mt-3">
+                <button class="date-filter" id="dateFilter">
+                    <i class="bi bi-calendar3"></i>
+                    <span>Últimos 30 dias</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Cards de estatísticas com tooltips (Melhoria 8) -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card stats-card animate-fade-in" style="animation-delay: 0.1s;">
+                    <div class="custom-tooltip">
+                        <div class="stats-number" id="totalConversations">30</div>
+                        <div class="stats-label">Conversas Analisadas</div>
+                        <span class="tooltip-text">Total de conversas analisadas no período selecionado</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card animate-fade-in" style="animation-delay: 0.2s;">
+                    <div class="custom-tooltip">
+                        <div class="stats-number" id="responseRate">78%</div>
+                        <div class="stats-label">Taxa de Resposta</div>
+                        <span class="tooltip-text">Porcentagem de mensagens de clientes que foram respondidas</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card animate-fade-in" style="animation-delay: 0.3s;">
+                    <div class="custom-tooltip">
+                        <div class="stats-number" id="scheduledServices">12</div>
+                        <div class="stats-label">Agendamentos</div>
+                        <span class="tooltip-text">Número de serviços agendados no período</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card animate-fade-in" style="animation-delay: 0.4s;">
+                    <div class="custom-tooltip">
+                        <div class="stats-number" id="responseTime">5.2</div>
+                        <div class="stats-label">Tempo Médio de Resposta (min)</div>
+                        <span class="tooltip-text">Tempo médio entre a mensagem do cliente e sua resposta</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card animate-fade-in" style="animation-delay: 0.5s;">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Tipos de Serviços Solicitados</h5>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" id="servicesChartOptions" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-gear-fill"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="servicesChartOptions">
+                                <li><a class="dropdown-item" href="#" onclick="toggleChartType('services', 'pie')">Gráfico de Pizza</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="toggleChartType('services', 'doughnut')">Gráfico de Rosca</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="toggleChartType('services', 'bar')">Gráfico de Barras</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="servicesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card animate-fade-in" style="animation-delay: 0.6s;">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Horários de Maior Atividade</h5>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" id="timeChartOptions" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-gear-fill"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="timeChartOptions">
+                                <li><a class="dropdown-item" href="#" onclick="toggleChartType('time', 'bar')">Gráfico de Barras</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="toggleChartType('time', 'line')">Gráfico de Linha</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="timeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card animate-fade-in" style="animation-delay: 0.7s;">
+                    <div class="card-header">
+                        <h5>Palavras-chave Mais Frequentes</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="wordCloudContainer">
+                            <canvas id="wordCloudChart"></canvas>
+                        </div>
+                        <!-- Legenda interativa para palavras-chave -->
+                        <div class="mt-3 d-flex flex-wrap justify-content-center gap-2">
+                            <span class="badge bg-primary px-3 py-2" style="cursor: pointer;" onclick="highlightKeyword('fogão')">fogão (25)</span>
+                            <span class="badge bg-success px-3 py-2" style="cursor: pointer;" onclick="highlightKeyword('conserto')">conserto (20)</span>
+                            <span class="badge bg-info px-3 py-2" style="cursor: pointer;" onclick="highlightKeyword('orçamento')">orçamento (15)</span>
+                            <span class="badge bg-warning px-3 py-2" style="cursor: pointer;" onclick="highlightKeyword('agendamento')">agendamento (18)</span>
+                            <span class="badge bg-danger px-3 py-2" style="cursor: pointer;" onclick="highlightKeyword('garantia')">garantia (12)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card animate-fade-in" style="animation-delay: 0.8s;">
+                    <div class="card-header">
+                        <h5>Status das Conversas</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="statusChart"></canvas>
+                        <!-- Legenda interativa para status -->
+                        <div class="mt-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="status-indicator status-agendado"></span>
+                                <span>Agendado (12)</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="status-indicator status-orcamento"></span>
+                                <span>Orçamento Enviado (8)</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="status-indicator status-aguardando"></span>
+                                <span>Aguardando Resposta (5)</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="status-indicator status-concluido"></span>
+                                <span>Concluído (3)</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="status-indicator status-cancelado"></span>
+                                <span>Cancelado (2)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Conversas Recentes</h5>
+                        <div class="conversation-filter">
+                            <select class="form-select" id="conversationFilter">
+                                <option value="all">Todas as conversas</option>
+                                <option value="fogao">Fogões</option>
+                                <option value="lava-loucas">Lava-louças</option>
+                                <option value="micro-ondas">Micro-ondas</option>
+                                <option value="geladeira">Geladeiras</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body conversation-card">
+                        <div id="conversationsList">
+                            <!-- Conversation 1 -->
+                            <div class="conversation-item mb-4 border-bottom pb-3">
+                                <h6 class="d-flex justify-content-between">
+                                    <span>Gilberto cliente Fix</span>
+                                    <small class="text-muted">12/05/2025 15:32</small>
+                                </h6>
+                                <div class="conversation-preview">
+                                    <div class="message message-client">
+                                        <div class="message-content">Como funciona a visita técnica?</div>
+                                        <div class="message-time">15:28</div>
+                                    </div>
+                                    <div class="message message-me">
+                                        <div class="message-content">Para que eu possa te ajudar melhor, você poderia me informar qual equipamento você precisa de assistência e qual o problema apresentado?</div>
+                                        <div class="message-time">15:29</div>
+                                    </div>
+                                    <div class="message message-client">
+                                        <div class="message-content">O problema é nas bocas do fogão, de 4 apenas 1 está funcionando</div>
+                                        <div class="message-time">15:30</div>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <span class="service-tag">Fogão</span>
+                                    <span class="service-tag">Orçamento: R$280,00</span>
+                                    <span class="service-tag">Aguardando Agendamento</span>
+                                </div>
+                            </div>
+
+                            <!-- Conversation 2 -->
+                            <div class="conversation-item mb-4 border-bottom pb-3">
+                                <h6 class="d-flex justify-content-between">
+                                    <span>Voar Eventos e Hospedagens LTDA</span>
+                                    <small class="text-muted">12/05/2025 11:07</small>
+                                </h6>
+                                <div class="conversation-preview">
+                                    <div class="message message-me">
+                                        <div class="message-content">Pode ser pra quarta entre 10 e 11hs?</div>
+                                        <div class="message-time">11:06</div>
+                                    </div>
+                                    <div class="message message-client">
+                                        <div class="message-content">Sim</div>
+                                        <div class="message-time">11:06</div>
+                                    </div>
+                                    <div class="message message-me">
+                                        <div class="message-content">Ótimo! Então, agendamos a coleta da sua lava-louças para quarta-feira, entre 10h e 11h.</div>
+                                        <div class="message-time">11:07</div>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <span class="service-tag">Lava-louças</span>
+                                    <span class="service-tag">Coleta: R$350,00</span>
+                                    <span class="service-tag">Agendado</span>
+                                </div>
+                            </div>
+
+                            <!-- Conversation 3 -->
+                            <div class="conversation-item mb-4 border-bottom pb-3">
+                                <h6 class="d-flex justify-content-between">
+                                    <span>Leonardo</span>
+                                    <small class="text-muted">12/05/2025 12:39</small>
+                                </h6>
+                                <div class="conversation-preview">
+                                    <div class="message message-client">
+                                        <div class="message-content">Você faz manutenção em lava louças?</div>
+                                        <div class="message-time">12:34</div>
+                                    </div>
+                                    <div class="message message-me">
+                                        <div class="message-content">Realizamos manutenção em lava louças sim</div>
+                                        <div class="message-time">12:35</div>
+                                    </div>
+                                    <div class="message message-me">
+                                        <div class="message-content">Coletamos, diagnosticamos Consertamos e entregamos em até 5 dias úteis. O valor da coleta diagnóstico fica em 350$ (por equipamento).</div>
+                                        <div class="message-time">12:39</div>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <span class="service-tag">Lava-louças</span>
+                                    <span class="service-tag">Coleta: R$350,00</span>
+                                    <span class="service-tag">Aguardando Resposta</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Gráfico de tipos de serviços
+        const servicesCtx = document.getElementById('servicesChart').getContext('2d');
+        const servicesChart = new Chart(servicesCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Fogões', 'Lava-louças', 'Micro-ondas', 'Geladeiras', 'Outros'],
+                datasets: [{
+                    data: [12, 8, 5, 3, 2],
+                    backgroundColor: [
+                        '#25D366',
+                        '#128C7E',
+                        '#075E54',
+                        '#34B7F1',
+                        '#DCF8C6'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                    }
+                }
+            }
+        });
+
+        // Gráfico de horários
+        const timeCtx = document.getElementById('timeChart').getContext('2d');
+        const timeChart = new Chart(timeCtx, {
+            type: 'bar',
+            data: {
+                labels: ['8-10h', '10-12h', '12-14h', '14-16h', '16-18h', '18-20h'],
+                datasets: [{
+                    label: 'Número de Mensagens',
+                    data: [5, 8, 12, 15, 10, 7],
+                    backgroundColor: '#128C7E'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Gráfico de status
+        const statusCtx = document.getElementById('statusChart').getContext('2d');
+        const statusChart = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Agendado', 'Orçamento Enviado', 'Aguardando Resposta', 'Concluído', 'Cancelado'],
+                datasets: [{
+                    data: [12, 8, 5, 3, 2],
+                    backgroundColor: [
+                        '#25D366',
+                        '#128C7E',
+                        '#34B7F1',
+                        '#075E54',
+                        '#DCF8C6'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                    }
+                }
+            }
+        });
+
+        // Simulação de nuvem de palavras
+        const wordCloudCtx = document.getElementById('wordCloudChart').getContext('2d');
+        const wordCloudChart = new Chart(wordCloudCtx, {
+            type: 'bubble',
+            data: {
+                datasets: [{
+                    label: 'Palavras-chave',
+                    data: [
+                        { x: 0, y: 0, r: 25 },
+                        { x: 1, y: 1, r: 20 },
+                        { x: 0.5, y: 0.5, r: 15 },
+                        { x: -0.5, y: 0.5, r: 18 },
+                        { x: -1, y: -0.5, r: 12 },
+                        { x: 0.2, y: -0.8, r: 10 },
+                        { x: -0.8, y: 0.2, r: 8 }
+                    ],
+                    backgroundColor: [
+                        '#25D366',
+                        '#128C7E',
+                        '#075E54',
+                        '#34B7F1',
+                        '#DCF8C6',
+                        '#25D366',
+                        '#128C7E'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const words = ['fogão', 'conserto', 'orçamento', 'agendamento', 'garantia', 'visita', 'técnico'];
+                                const counts = [25, 20, 15, 18, 12, 10, 8];
+                                return words[context.dataIndex] + ': ' + counts[context.dataIndex] + ' ocorrências';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: false,
+                        min: -1.5,
+                        max: 1.5
+                    },
+                    y: {
+                        display: false,
+                        min: -1.5,
+                        max: 1.5
+                    }
+                }
+            }
+        });
+
+        // Filtro de conversas
+        document.getElementById('conversationFilter').addEventListener('change', function() {
+            const filter = this.value;
+            const conversations = document.querySelectorAll('.conversation-item');
+
+            conversations.forEach(conv => {
+                const tags = conv.querySelectorAll('.service-tag');
+                let shouldShow = filter === 'all';
+
+                tags.forEach(tag => {
+                    if (filter === 'fogao' && tag.textContent.toLowerCase().includes('fogão')) {
+                        shouldShow = true;
+                    } else if (filter === 'lava-loucas' && tag.textContent.toLowerCase().includes('lava-louças')) {
+                        shouldShow = true;
+                    } else if (filter === 'micro-ondas' && tag.textContent.toLowerCase().includes('micro-ondas')) {
+                        shouldShow = true;
+                    } else if (filter === 'geladeira' && tag.textContent.toLowerCase().includes('geladeira')) {
+                        shouldShow = true;
+                    }
+                });
+
+                conv.style.display = shouldShow ? 'block' : 'none';
+            });
+        });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

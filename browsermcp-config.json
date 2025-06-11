@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "browsermcp": {
+      "command": "npx",
+      "args": ["@browsermcp/mcp@latest"]
+    }
+  },
+  "augment.enableBrowserMCP": true,
+  "augment.browserMCPPort": 9009,
+  "augment.browserMCPHost": "localhost"
+}
