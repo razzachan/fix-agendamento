@@ -1,0 +1,2 @@
+Force update to clear Railway cache - UTF-8 fix
+Timestamp: 2025-01-11 17:50:00
