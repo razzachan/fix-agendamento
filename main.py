@@ -63,9 +63,86 @@ async def receber_dados(request: Request):
     }
     """
     try:
-        # Obter dados da requisição
-        dados = await request.json()
-        logger.info(f"Dados recebidos: {dados}")
+        # Obter dados da requisição com tratamento robusto de encoding
+        try:
+            body = await request.body()
+            logger.info(f"Corpo da requisição (hex): {body.hex()}")
+
+            # Função para tentar múltiplas codificações de forma robusta
+            def decode_body_safely(body_bytes):
+                encodings = [
+                    ('utf-8', 'strict'),
+                    ('utf-8', 'replace'),
+                    ('utf-8-sig', 'strict'),
+                    ('latin-1', 'strict'),
+                    ('iso-8859-1', 'strict'),
+                    ('cp1252', 'strict')
+                ]
+
+                for encoding, error_handling in encodings:
+                    try:
+                        decoded = body_bytes.decode(encoding, errors=error_handling)
+                        logger.info(f"Corpo decodificado com sucesso usando {encoding} ({error_handling})")
+                        return decoded, encoding
+                    except UnicodeDecodeError as e:
+                        logger.debug(f"Falha na decodificação com {encoding} ({error_handling}): {str(e)}")
+                        continue
+
+                # Se todas as tentativas falharem, usar UTF-8 com 'replace' como último recurso
+                try:
+                    decoded = body_bytes.decode('utf-8', errors='replace')
+                    logger.warning("Usando UTF-8 com 'replace' como último recurso")
+                    return decoded, 'utf-8-replace'
+                except Exception as e:
+                    logger.error(f"Falha total na decodificação: {str(e)}")
+                    return None, None
+
+            # Tentar decodificar o corpo
+            body_text, used_encoding = decode_body_safely(body)
+
+            if body_text is None:
+                logger.error("Não foi possível decodificar o corpo da requisição")
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "sucesso": False,
+                        "mensagem": "Erro de codificação: não foi possível processar os dados recebidos"
+                    }
+                )
+
+            # Processar o JSON com tratamento robusto
+            import json
+            import re
+
+            # Limpar o texto antes de processar
+            cleaned_body = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', body_text)
+            cleaned_body = cleaned_body.strip()
+
+            logger.info(f"Corpo limpo para processamento: {cleaned_body}")
+
+            try:
+                dados = json.loads(cleaned_body)
+                logger.info(f"Dados recebidos (JSON) com encoding {used_encoding}: {dados}")
+
+            except json.JSONDecodeError as json_error:
+                logger.error(f"Erro ao processar JSON: {str(json_error)}")
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "sucesso": False,
+                        "mensagem": f"Erro ao processar dados JSON: {str(json_error)}"
+                    }
+                )
+
+        except Exception as e:
+            logger.error(f"Erro ao ler corpo da requisição: {str(e)}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "sucesso": False,
+                    "mensagem": f"Erro ao ler dados da requisição: {str(e)}"
+                }
+            )
 
         # Validar campos obrigatórios
         campos_obrigatorios = ["nome", "endereco", "equipamento", "problema"]
