@@ -63,9 +63,86 @@ async def receber_dados(request: Request):
     }
     """
     try:
-        # Obter dados da requisição
-        dados = await request.json()
-        logger.info(f"Dados recebidos: {dados}")
+        # Obter dados da requisição com tratamento robusto de encoding
+        try:
+            body = await request.body()
+            logger.info(f"Corpo da requisição (hex): {body.hex()}")
+
+            # Função para tentar múltiplas codificações de forma robusta
+            def decode_body_safely(body_bytes):
+                encodings = [
+                    ('utf-8', 'strict'),
+                    ('utf-8', 'replace'),
+                    ('utf-8-sig', 'strict'),
+                    ('latin-1', 'strict'),
+                    ('iso-8859-1', 'strict'),
+                    ('cp1252', 'strict')
+                ]
+
+                for encoding, error_handling in encodings:
+                    try:
+                        decoded = body_bytes.decode(encoding, errors=error_handling)
+                        logger.info(f"Corpo decodificado com sucesso usando {encoding} ({error_handling})")
+                        return decoded, encoding
+                    except UnicodeDecodeError as e:
+                        logger.debug(f"Falha na decodificação com {encoding} ({error_handling}): {str(e)}")
+                        continue
+
+                # Se todas as tentativas falharem, usar UTF-8 com 'replace' como último recurso
+                try:
+                    decoded = body_bytes.decode('utf-8', errors='replace')
+                    logger.warning("Usando UTF-8 com 'replace' como último recurso")
+                    return decoded, 'utf-8-replace'
+                except Exception as e:
+                    logger.error(f"Falha total na decodificação: {str(e)}")
+                    return None, None
+
+            # Tentar decodificar o corpo
+            body_text, used_encoding = decode_body_safely(body)
+
+            if body_text is None:
+                logger.error("Não foi possível decodificar o corpo da requisição")
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "sucesso": False,
+                        "mensagem": "Erro de codificação: não foi possível processar os dados recebidos"
+                    }
+                )
+
+            # Processar o JSON com tratamento robusto
+            import json
+            import re
+
+            # Limpar o texto antes de processar
+            cleaned_body = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', body_text)
+            cleaned_body = cleaned_body.strip()
+
+            logger.info(f"Corpo limpo para processamento: {cleaned_body}")
+
+            try:
+                dados = json.loads(cleaned_body)
+                logger.info(f"Dados recebidos (JSON) com encoding {used_encoding}: {dados}")
+
+            except json.JSONDecodeError as json_error:
+                logger.error(f"Erro ao processar JSON: {str(json_error)}")
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "sucesso": False,
+                        "mensagem": f"Erro ao processar dados JSON: {str(json_error)}"
+                    }
+                )
+
+        except Exception as e:
+            logger.error(f"Erro ao ler corpo da requisição: {str(e)}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "sucesso": False,
+                    "mensagem": f"Erro ao ler dados da requisição: {str(e)}"
+                }
+            )
 
         # Validar campos obrigatórios
         campos_obrigatorios = ["nome", "endereco", "equipamento", "problema"]
@@ -114,12 +191,14 @@ async def receber_dados(request: Request):
             )
 
     except Exception as e:
-        logger.error(f"Erro ao processar requisição: {str(e)}")
+        logger.error(f"Erro ao processar requisição no endpoint principal: {str(e)}")
+        logger.exception("Detalhes completos do erro:")
         return JSONResponse(
             status_code=500,
             content={
                 "sucesso": False,
-                "mensagem": "Erro interno do servidor. Por favor, tente novamente mais tarde."
+                "mensagem": "Erro interno do servidor. Por favor, tente novamente mais tarde.",
+                "erro_detalhado": str(e) if logger.level <= logging.DEBUG else None
             }
         )
 
@@ -149,22 +228,47 @@ async def agendamento_inteligente(request: Request):
             # Registrar o corpo bruto em hexadecimal para debug
             logger.info(f"Corpo da requisição (hex): {body.hex()}")
 
-            # Tentar diferentes codificações
-            try:
-                body_text = body.decode('utf-8')
-                logger.info("Corpo decodificado com UTF-8")
-            except UnicodeDecodeError:
-                try:
-                    body_text = body.decode('latin-1')
-                    logger.info("Corpo decodificado com latin-1")
-                except UnicodeDecodeError:
+            # Função para tentar múltiplas codificações de forma robusta
+            def decode_body_safely(body_bytes):
+                encodings = [
+                    ('utf-8', 'strict'),
+                    ('utf-8', 'replace'),
+                    ('utf-8-sig', 'strict'),
+                    ('latin-1', 'strict'),
+                    ('iso-8859-1', 'strict'),
+                    ('cp1252', 'strict')
+                ]
+
+                for encoding, error_handling in encodings:
                     try:
-                        body_text = body.decode('iso-8859-1')
-                        logger.info("Corpo decodificado com iso-8859-1")
-                    except UnicodeDecodeError:
-                        # Último recurso: ignorar erros de codificação
-                        body_text = body.decode('utf-8', errors='ignore')
-                        logger.warning("Corpo decodificado com UTF-8 ignorando erros de codificação")
+                        decoded = body_bytes.decode(encoding, errors=error_handling)
+                        logger.info(f"Corpo decodificado com sucesso usando {encoding} ({error_handling})")
+                        return decoded, encoding
+                    except UnicodeDecodeError as e:
+                        logger.debug(f"Falha na decodificação com {encoding} ({error_handling}): {str(e)}")
+                        continue
+
+                # Se todas as tentativas falharem, usar UTF-8 com 'replace' como último recurso
+                try:
+                    decoded = body_bytes.decode('utf-8', errors='replace')
+                    logger.warning("Usando UTF-8 com 'replace' como último recurso")
+                    return decoded, 'utf-8-replace'
+                except Exception as e:
+                    logger.error(f"Falha total na decodificação: {str(e)}")
+                    return None, None
+
+            # Tentar decodificar o corpo
+            body_text, used_encoding = decode_body_safely(body)
+
+            if body_text is None:
+                logger.error("Não foi possível decodificar o corpo da requisição")
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "sucesso": False,
+                        "mensagem": "Erro de codificação: não foi possível processar os dados recebidos"
+                    }
+                )
 
             logger.info(f"Corpo da requisição (raw): {body_text}")
 
@@ -181,53 +285,86 @@ async def agendamento_inteligente(request: Request):
                 }
                 logger.info(f"Usando dados de teste: {dados}")
             else:
-                # Tentar processar o JSON manualmente
+                # Tentar processar o JSON com tratamento robusto
                 import json
+                import re
+
+                # Limpar o texto antes de processar
+                # Remover caracteres de controle que podem causar problemas
+                cleaned_body = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', body_text)
+                # Remover espaços extras
+                cleaned_body = cleaned_body.strip()
+
+                logger.info(f"Corpo limpo para processamento: {cleaned_body}")
+
                 try:
                     # Tentar processar o JSON normalmente
-                    dados = json.loads(body_text)
-                    logger.info(f"Dados recebidos (JSON): {dados}")
+                    dados = json.loads(cleaned_body)
+                    logger.info(f"Dados recebidos (JSON) com encoding {used_encoding}: {dados}")
+
+                except json.JSONDecodeError as json_error:
+                    logger.error(f"Erro ao processar JSON: {str(json_error)}")
+                    logger.error(f"Posição do erro: {json_error.pos if hasattr(json_error, 'pos') else 'N/A'}")
+
+                    # Tentar uma segunda limpeza mais agressiva
+                    try:
+                        # Manter apenas caracteres ASCII imprimíveis e alguns caracteres especiais comuns
+                        ascii_body = re.sub(r'[^\x20-\x7E\u00C0-\u017F]', '', body_text)
+                        logger.info(f"Tentando com corpo ASCII: {ascii_body}")
+                        dados = json.loads(ascii_body)
+                        logger.info(f"Dados recebidos após limpeza ASCII: {dados}")
+
+                    except Exception as ascii_error:
+                        logger.error(f"Erro após limpeza ASCII: {str(ascii_error)}")
+
+                        # Tentar processar como form data
+                        try:
+                            from urllib.parse import parse_qs
+                            form_data = parse_qs(cleaned_body)
+                            logger.info(f"Dados recebidos (form data): {form_data}")
+
+                            # Converter form data para o formato esperado
+                            dados = {}
+                            for key, value in form_data.items():
+                                dados[key] = value[0] if value and len(value) > 0 else ""
+
+                            logger.info(f"Dados convertidos de form data: {dados}")
+
+                        except Exception as form_error:
+                            logger.error(f"Erro ao processar como form data: {str(form_error)}")
+                            return JSONResponse(
+                                status_code=400,
+                                content={
+                                    "sucesso": False,
+                                    "mensagem": f"Erro ao processar dados: formato inválido",
+                                    "detalhes": {
+                                        "json_error": str(json_error),
+                                        "ascii_error": str(ascii_error),
+                                        "form_error": str(form_error),
+                                        "encoding_used": used_encoding
+                                    }
+                                }
+                            )
+
                 except Exception as e:
-                    logger.error(f"Erro ao processar JSON manualmente: {str(e)}")
-
-                    # Tentar processar o JSON com codificação especial
-                    try:
-                        # Remover caracteres não-ASCII que podem estar causando problemas
-                        import re
-                        cleaned_body = re.sub(r'[^\x00-\x7F]+', ' ', body_text)
-                        logger.info(f"Tentando processar JSON com corpo limpo: {cleaned_body}")
-                        dados = json.loads(cleaned_body)
-                        logger.info(f"Dados recebidos após limpeza: {dados}")
-                    except Exception as clean_error:
-                        logger.error(f"Erro ao processar JSON após limpeza: {str(clean_error)}")
-
-                    # Tentar processar como form data
-                    try:
-                        from urllib.parse import parse_qs
-                        form_data = parse_qs(body_text)
-                        logger.info(f"Dados recebidos (form data): {form_data}")
-
-                        # Converter form data para o formato esperado
-                        dados = {}
-                        for key, value in form_data.items():
-                            dados[key] = value[0] if value and len(value) > 0 else ""
-
-                        logger.info(f"Dados convertidos de form data: {dados}")
-                    except Exception as form_error:
-                        logger.error(f"Erro ao processar como form data: {str(form_error)}")
-                        return JSONResponse(
-                            status_code=400,
-                            content={
-                                "mensagem": f"Erro ao processar dados: {str(e)}",
-                                "form_error": str(form_error),
-                                "body": body_text
-                            }
-                        )
+                    logger.error(f"Erro inesperado ao processar dados: {str(e)}")
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "sucesso": False,
+                            "mensagem": f"Erro inesperado ao processar dados: {str(e)}",
+                            "encoding_used": used_encoding
+                        }
+                    )
         except Exception as e:
             logger.error(f"Erro ao ler corpo da requisição: {str(e)}")
+            logger.exception("Detalhes completos do erro de leitura:")
             return JSONResponse(
                 status_code=400,
-                content={"mensagem": f"Erro ao ler corpo da requisição: {str(e)}"}
+                content={
+                    "sucesso": False,
+                    "mensagem": f"Erro ao ler corpo da requisição: {str(e)}"
+                }
             )
 
         # Verificar variáveis de ambiente
@@ -457,6 +594,165 @@ async def health_check():
         "status": "healthy",
         "environment": env_status
     }
+
+@app.get("/test-supabase")
+async def test_supabase():
+    """Endpoint para testar a conexão com o Supabase"""
+    try:
+        # Verificar variáveis de ambiente
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_KEY")
+
+        if not supabase_url or not supabase_key:
+            return {
+                "status": "error",
+                "message": "Variáveis de ambiente SUPABASE_URL e/ou SUPABASE_KEY não definidas",
+                "supabase_url_defined": bool(supabase_url),
+                "supabase_key_defined": bool(supabase_key)
+            }
+
+        # Testar conexão com o Supabase usando o cliente
+        try:
+            # Obter o cliente Supabase
+            client = get_supabase_client()
+
+            # Dados de teste
+            test_data = {
+                "nome": "TESTE API - Verificação de Ambiente",
+                "endereco": "Endereço de Teste API",
+                "equipamento": "Equipamento de Teste API",
+                "problema": "Problema de Teste - Verificação de API",
+                "urgente": False,
+                "status": "teste",
+                "tecnico": "Sistema (teste API)"
+            }
+
+            # Inserir no Supabase
+            response = client.table("agendamentos_ai").insert(test_data).execute()
+
+            # Verificar se a inserção foi bem-sucedida
+            if response.data and len(response.data) > 0:
+                return {
+                    "status": "success",
+                    "message": "Conexão com Supabase estabelecida com sucesso",
+                    "response": response.data
+                }
+            else:
+                return {
+                    "status": "warning",
+                    "message": "Conexão com Supabase estabelecida, mas a inserção não retornou dados",
+                    "response": response
+                }
+        except Exception as e:
+            logger.error(f"Erro ao testar cliente Supabase: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Erro ao conectar com Supabase: {str(e)}"
+            }
+    except Exception as e:
+        logger.exception("Erro ao testar conexão com Supabase")
+        return {
+            "status": "error",
+            "message": f"Erro ao testar conexão com Supabase: {str(e)}"
+        }
+
+@app.get("/api/agendamentos")
+async def get_agendamentos():
+    """Endpoint para buscar todos os agendamentos"""
+    try:
+        # Obter cliente Supabase
+        client = get_supabase_client()
+
+        # Buscar agendamentos
+        response = client.table("agendamentos_ai").select("*").order("created_at", desc=True).execute()
+
+        # Verificar se a busca foi bem-sucedida
+        if response.data is not None:
+            return response.data
+        else:
+            logger.warning("Resposta vazia do Supabase ao buscar agendamentos")
+            return []
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar agendamentos: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "sucesso": False,
+                "mensagem": f"Erro ao buscar agendamentos: {str(e)}"
+            }
+        )
+
+@app.post("/echo")
+async def echo_request(request: Request):
+    """Endpoint para ecoar os dados recebidos, útil para debug"""
+    try:
+        # Registrar os headers da requisição
+        headers = dict(request.headers.items())
+        # Remover informações sensíveis
+        if 'authorization' in headers:
+            headers['authorization'] = '***REDACTED***'
+        if 'apikey' in headers:
+            headers['apikey'] = '***REDACTED***'
+
+        # Tentar ler o corpo da requisição
+        try:
+            body = await request.body()
+            # Registrar o corpo bruto em hexadecimal
+            body_hex = body.hex()
+
+            # Tentar diferentes codificações
+            try:
+                body_text = body.decode('utf-8')
+            except UnicodeDecodeError:
+                try:
+                    body_text = body.decode('latin-1')
+                except UnicodeDecodeError:
+                    body_text = body.decode('iso-8859-1')
+
+            # Tentar processar como JSON
+            try:
+                import json
+                json_data = json.loads(body_text)
+                is_json = True
+            except:
+                json_data = None
+                is_json = False
+
+            # Tentar processar como form data
+            try:
+                from urllib.parse import parse_qs
+                form_data = parse_qs(body_text)
+                is_form = True
+            except:
+                form_data = None
+                is_form = False
+
+            return {
+                "success": True,
+                "message": "Dados recebidos com sucesso",
+                "headers": headers,
+                "body_hex": body_hex,
+                "body_text": body_text,
+                "is_json": is_json,
+                "json_data": json_data,
+                "is_form": is_form,
+                "form_data": form_data,
+                "content_type": headers.get("content-type", "Não especificado")
+            }
+        except Exception as e:
+            logger.error(f"Erro ao ler corpo da requisição: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Erro ao ler corpo da requisição: {str(e)}",
+                "headers": headers
+            }
+    except Exception as e:
+        logger.error(f"Erro ao processar requisição em /echo: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Erro interno do servidor: {str(e)}"
+        }
 
 if __name__ == "__main__":
     logger.info("Iniciando servidor Fix Fogões Middleware...")
