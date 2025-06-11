@@ -1,7 +1,14 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Fix Fogões Middleware - Backup Version
+API para receber dados de agendamentos do WhatsApp e inserir no Supabase
+"""
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from supabase_client import inserir_agendamento, get_supabase_client
+from supabase_client import inserir_agendamento, atualizar_agendamento, buscar_agendamento, listar_agendamentos, get_supabase_client
 import uvicorn
 import logging
 import sys
@@ -32,13 +39,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Montar arquivos estáticos
-# app.mount("/static", StaticFiles(directory="static"), name="static")
-
 @app.get("/")
 async def root():
     """Endpoint principal que serve a interface web"""
-    return {"message": "API Fix Agendamento"}
+    return {"message": "API Fix Agendamento - Versão Atualizada"}
 
 @app.get("/api/status")
 async def api_status():
@@ -249,9 +253,26 @@ async def agendamento_inteligente(request: Request):
             equipamento = dados.get("equipamento")
             problema = dados.get("problema")
             urgente = dados.get("urgente", False)
+            data_agendada = dados.get("data_agendada")
+            telefone = dados.get("telefone")
+            cpf = dados.get("cpf")
+            email = dados.get("email")
+            
+            # Novos parâmetros para múltiplos equipamentos
+            equipamento_2 = dados.get("equipamento_2")
+            problema_2 = dados.get("problema_2")
+            equipamento_3 = dados.get("equipamento_3")
+            problema_3 = dados.get("problema_3")
+            
+            # Novos parâmetros para tipos de atendimento
+            tipo_atendimento_1 = dados.get("tipo_atendimento_1", "em_domicilio")
+            tipo_atendimento_2 = dados.get("tipo_atendimento_2")
+            tipo_atendimento_3 = dados.get("tipo_atendimento_3")
 
             # Log para debug
-            logger.info(f"Dados recebidos: nome={nome}, endereco={endereco}, equipamento={equipamento}, problema={problema}, urgente={urgente} (tipo: {type(urgente).__name__})")
+            logger.info(f"Dados recebidos: nome={nome}, endereco={endereco}, equipamento={equipamento}, problema={problema}, urgente={urgente} (tipo: {type(urgente).__name__}), data_agendada={data_agendada}, telefone={telefone}, cpf={cpf}, email={email}")
+            logger.info(f"Equipamentos adicionais: equipamento_2={equipamento_2}, problema_2={problema_2}, equipamento_3={equipamento_3}, problema_3={problema_3}")
+            logger.info(f"Tipos de atendimento: tipo_1={tipo_atendimento_1}, tipo_2={tipo_atendimento_2}, tipo_3={tipo_atendimento_3}")
 
             # Verificar se os valores são templates não substituídos
             campos_para_verificar = {
@@ -269,6 +290,27 @@ async def agendamento_inteligente(request: Request):
                         content={
                             "sucesso": False,
                             "mensagem": f"Erro: variáveis de template não substituídas no campo '{campo}'. Verifique a configuração do Clientechat."
+                        }
+                    )
+
+            # Validar formato da data_agendada se fornecida
+            if data_agendada:
+                try:
+                    from datetime import datetime
+                    # Tentar converter para verificar se é uma data válida
+                    if 'T' in data_agendada:
+                        # Formato ISO com timezone
+                        datetime.fromisoformat(data_agendada.replace('Z', '+00:00'))
+                    else:
+                        # Formato de data simples
+                        datetime.strptime(data_agendada, "%Y-%m-%d")
+                except ValueError:
+                    logger.error(f"Formato de data inválido: {data_agendada}")
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "sucesso": False,
+                            "mensagem": "Formato de data inválido. Use o formato ISO (YYYY-MM-DDTHH:MM:SS) ou data simples (YYYY-MM-DD)"
                         }
                     )
 
@@ -291,6 +333,28 @@ async def agendamento_inteligente(request: Request):
             logger.info(f"Urgente: {urgente} (tipo: {type(urgente).__name__})")
             logger.info(f"Técnico: {tecnico} (tipo: {type(tecnico).__name__})")
 
+            # Processar equipamentos, problemas e tipos de atendimento
+            equipamentos = []
+            problemas = []
+            tipos_atendimento = []
+
+            # Equipamento principal (sempre presente)
+            if equipamento:
+                equipamentos.append(equipamento)
+                problemas.append(problema)
+                tipos_atendimento.append(tipo_atendimento_1)
+
+            # Equipamentos adicionais
+            if equipamento_2:
+                equipamentos.append(equipamento_2)
+                problemas.append(problema_2 or 'Não especificado')
+                tipos_atendimento.append(tipo_atendimento_2 or 'em_domicilio')
+
+            if equipamento_3:
+                equipamentos.append(equipamento_3)
+                problemas.append(problema_3 or 'Não especificado')
+                tipos_atendimento.append(tipo_atendimento_3 or 'em_domicilio')
+
             # Inserir agendamento no Supabase
             try:
                 inserido = inserir_agendamento(
@@ -299,8 +363,15 @@ async def agendamento_inteligente(request: Request):
                     equipamento=equipamento,
                     problema=problema,
                     urgente=urgente,
-                    status="pendente",
-                    tecnico=tecnico
+                    status="pendente",  # Status inicial para pré-agendamentos
+                    tecnico=tecnico,
+                    data_agendada=data_agendada,
+                    telefone=telefone,
+                    cpf=cpf,
+                    email=email,
+                    equipamentos=equipamentos,
+                    problemas=problemas,
+                    tipos_atendimento=tipos_atendimento
                 )
                 logger.info(f"Resultado da inserção: {inserido}")
             except Exception as e:
@@ -386,231 +457,6 @@ async def health_check():
         "status": "healthy",
         "environment": env_status
     }
-
-@app.get("/test-supabase")
-async def test_supabase():
-    """Endpoint para testar a conexão com o Supabase"""
-    try:
-        # Verificar variáveis de ambiente
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_KEY")
-
-        if not supabase_url or not supabase_key:
-            return {
-                "status": "error",
-                "message": "Variáveis de ambiente SUPABASE_URL e/ou SUPABASE_KEY não definidas",
-                "supabase_url_defined": bool(supabase_url),
-                "supabase_key_defined": bool(supabase_key)
-            }
-
-        # Testar conexão com o Supabase usando o cliente
-        try:
-            # Obter o cliente Supabase
-            client = get_supabase_client()
-
-            # Dados de teste
-            test_data = {
-                "nome": "TESTE API - Verificação de Ambiente",
-                "endereco": "Endereço de Teste API",
-                "equipamento": "Equipamento de Teste API",
-                "problema": "Problema de Teste - Verificação de API",
-                "urgente": False,
-                "status": "teste",
-                "tecnico": "Sistema (teste API)"
-            }
-
-            # Inserir no Supabase
-            response = client.table("agendamentos_ai").insert(test_data).execute()
-
-            # Verificar se a inserção foi bem-sucedida
-            if response.data and len(response.data) > 0:
-                return {
-                    "status": "success",
-                    "message": "Conexão com Supabase estabelecida com sucesso",
-                    "response": response.data
-                }
-            else:
-                return {
-                    "status": "warning",
-                    "message": "Conexão com Supabase estabelecida, mas a inserção não retornou dados",
-                    "response": response
-                }
-        except Exception as e:
-            logger.error(f"Erro ao testar cliente Supabase: {str(e)}")
-
-            # Tentar método alternativo com requests
-            logger.info("Tentando método alternativo com requests...")
-            import requests
-
-            # Construir a URL para a tabela agendamentos_ai
-            api_url = f"{supabase_url}/rest/v1/agendamentos_ai"
-
-            # Configurar os headers
-            headers = {
-                "apikey": supabase_key,
-                "Authorization": f"Bearer {supabase_key}",
-                "Content-Type": "application/json",
-                "Prefer": "return=representation"
-            }
-
-            # Dados de teste
-            test_data = {
-                "nome": "TESTE API - Verificação de Ambiente (Método Alternativo)",
-                "endereco": "Endereço de Teste API",
-                "equipamento": "Equipamento de Teste API",
-                "problema": "Problema de Teste - Verificação de API",
-                "urgente": False,
-                "status": "teste",
-                "tecnico": "Sistema (teste API)"
-            }
-
-            # Fazer a requisição
-            response = requests.post(api_url, headers=headers, json=test_data)
-
-            # Verificar o status da resposta
-            if response.status_code in [200, 201]:
-                return {
-                    "status": "success",
-                    "message": "Conexão com Supabase estabelecida com sucesso (método alternativo)",
-                    "response": response.json(),
-                    "client_error": str(e)
-                }
-            else:
-                return {
-                    "status": "error",
-                    "message": f"Erro ao conectar com Supabase. Status code: {response.status_code}",
-                    "response": response.text,
-                    "headers_sent": headers,
-                    "url": api_url,
-                    "client_error": str(e)
-                }
-    except Exception as e:
-        logger.exception("Erro ao testar conexão com Supabase")
-        return {
-            "status": "error",
-            "message": f"Erro ao testar conexão com Supabase: {str(e)}"
-        }
-
-@app.post("/echo")
-async def echo_request(request: Request):
-    """Endpoint para ecoar os dados recebidos, útil para debug"""
-    try:
-        # Registrar os headers da requisição
-        headers = dict(request.headers.items())
-        # Remover informações sensíveis
-        if 'authorization' in headers:
-            headers['authorization'] = '***REDACTED***'
-        if 'apikey' in headers:
-            headers['apikey'] = '***REDACTED***'
-
-        # Tentar ler o corpo da requisição
-        try:
-            body = await request.body()
-            # Registrar o corpo bruto em hexadecimal
-            body_hex = body.hex()
-
-            # Tentar diferentes codificações
-            try:
-                body_text = body.decode('utf-8')
-            except UnicodeDecodeError:
-                try:
-                    body_text = body.decode('latin-1')
-                except UnicodeDecodeError:
-                    body_text = body.decode('iso-8859-1')
-
-            # Tentar processar como JSON
-            try:
-                import json
-                json_data = json.loads(body_text)
-                is_json = True
-            except:
-                json_data = None
-                is_json = False
-
-            # Tentar processar como form data
-            try:
-                from urllib.parse import parse_qs
-                form_data = parse_qs(body_text)
-                is_form = True
-            except:
-                form_data = None
-                is_form = False
-
-            return {
-                "success": True,
-                "message": "Dados recebidos com sucesso",
-                "headers": headers,
-                "body_hex": body_hex,
-                "body_text": body_text,
-                "is_json": is_json,
-                "json_data": json_data,
-                "is_form": is_form,
-                "form_data": form_data,
-                "content_type": headers.get("content-type", "Não especificado")
-            }
-        except Exception as e:
-            logger.error(f"Erro ao ler corpo da requisição: {str(e)}")
-            return {
-                "success": False,
-                "message": f"Erro ao ler corpo da requisição: {str(e)}",
-                "headers": headers
-            }
-    except Exception as e:
-        logger.error(f"Erro ao processar requisição em /echo: {str(e)}")
-        return {
-            "success": False,
-            "message": f"Erro interno do servidor: {str(e)}"
-        }
-
-@app.get("/env-check")
-async def env_check():
-    """Endpoint para verificar as variáveis de ambiente (apenas para diagnóstico)"""
-    # Listar todas as variáveis de ambiente (exceto as sensíveis)
-    env_vars = {}
-    for key, value in os.environ.items():
-        if "KEY" in key or "SECRET" in key or "TOKEN" in key or "PASSWORD" in key:
-            env_vars[key] = "***REDACTED***"
-        else:
-            env_vars[key] = value
-
-    # Verificar variáveis específicas
-    supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_KEY")
-
-    return {
-        "environment_variables": env_vars,
-        "supabase_status": {
-            "SUPABASE_URL": "Definida" if supabase_url else "NÃO DEFINIDA",
-            "SUPABASE_KEY": "Definida" if supabase_key else "NÃO DEFINIDA"
-        }
-    }
-
-@app.get("/api/agendamentos")
-async def get_agendamentos():
-    """Endpoint para buscar todos os agendamentos"""
-    try:
-        # Obter cliente Supabase
-        client = get_supabase_client()
-
-        # Buscar agendamentos
-        response = client.table("agendamentos_ai").select("*").order("created_at", desc=True).execute()
-
-        # Verificar se a busca foi bem-sucedida
-        if response.data is not None:
-            return response.data
-        else:
-            logger.warning("Resposta vazia do Supabase ao buscar agendamentos")
-            return []
-
-    except Exception as e:
-        logger.error(f"Erro ao buscar agendamentos: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "sucesso": False,
-                "mensagem": f"Erro ao buscar agendamentos: {str(e)}"
-            }
-        )
 
 if __name__ == "__main__":
     logger.info("Iniciando servidor Fix Fogões Middleware...")
