@@ -9,7 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { FileText, MapPin, Calendar, User, Check, AlertCircle, Clock } from 'lucide-react';
+import { FileText, MapPin, Calendar, User, Check, AlertCircle, Clock, Package, Merge, Split } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AgendamentoAI } from '@/services/agendamentos';
@@ -21,11 +21,29 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage, Form } from '
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { orderLifecycleService } from '@/services/orderLifecycle/OrderLifecycleService';
 
 interface CreateServiceOrderDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (agendamentoId: string, scheduledDate: string | null, scheduledTime: string | null, existingClientId?: string) => void;
+  onConfirm: (
+    agendamentoId: string,
+    scheduledDate: string | null,
+    scheduledTime: string | null,
+    existingClientId?: string,
+    multipleEquipmentData?: {
+      hasMultipleEquipments: boolean;
+      creationMode: 'single' | 'multiple';
+      suggestedGroups: Array<{
+        equipments: string[];
+        problems: string[];
+        attendanceType: 'em_domicilio' | 'coleta_conserto' | 'coleta_diagnostico';
+        reasoning: string;
+      }>;
+    }
+  ) => void;
   agendamento: AgendamentoAI | null;
 }
 
@@ -44,6 +62,16 @@ const CreateServiceOrderDialog: React.FC<CreateServiceOrderDialogProps> = ({
   const [existingClient, setExistingClient] = useState<Client | null>(null);
   const [isSearchingClient, setIsSearchingClient] = useState(false);
   const [useExistingClient, setUseExistingClient] = useState(true);
+
+  // Estados para múltiplos equipamentos
+  const [hasMultipleEquipments, setHasMultipleEquipments] = useState(false);
+  const [creationMode, setCreationMode] = useState<'single' | 'multiple'>('single');
+  const [suggestedGroups, setSuggestedGroups] = useState<Array<{
+    equipments: string[];
+    problems: string[];
+    attendanceType: 'em_domicilio' | 'coleta_conserto' | 'coleta_diagnostico';
+    reasoning: string;
+  }>>([]);
 
   // Inicializar o formulário
   const form = useForm<z.infer<typeof formSchema>>({
@@ -73,9 +101,22 @@ const CreateServiceOrderDialog: React.FC<CreateServiceOrderDialogProps> = ({
   }, [agendamento, isOpen, form]);
 
   useEffect(() => {
-    // Buscar cliente existente quando o diálogo for aberto
-    const searchForExistingClient = async () => {
+    // Buscar cliente existente e verificar múltiplos equipamentos quando o diálogo for aberto
+    const initializeDialog = async () => {
       if (!agendamento || !isOpen) return;
+
+      // Verificar múltiplos equipamentos
+      const hasMultiple = orderLifecycleService.hasMultipleEquipments(agendamento);
+      setHasMultipleEquipments(hasMultiple);
+
+      if (hasMultiple) {
+        // Obter sugestões de agrupamento
+        const groups = orderLifecycleService.suggestEquipmentGrouping(agendamento);
+        setSuggestedGroups(groups);
+
+        // Definir modo padrão baseado nas sugestões
+        setCreationMode(groups.length > 1 ? 'multiple' : 'single');
+      }
 
       setIsSearchingClient(true);
       try {
@@ -95,7 +136,7 @@ const CreateServiceOrderDialog: React.FC<CreateServiceOrderDialogProps> = ({
       }
     };
 
-    searchForExistingClient();
+    initializeDialog();
   }, [agendamento, isOpen]);
 
   if (!agendamento) return null;
@@ -107,14 +148,29 @@ const CreateServiceOrderDialog: React.FC<CreateServiceOrderDialogProps> = ({
 
   // Função para confirmar a criação da ordem de serviço
   const handleConfirm = (values: z.infer<typeof formSchema>) => {
-    // Usar os valores do agendamento confirmado, não do formulário
-    // Isso garante consistência entre o agendamento e a ordem de serviço
-    onConfirm(
-      agendamento.id,
-      null, // Passar null para usar a data do agendamento
-      null, // Passar null para usar a hora do agendamento
-      useExistingClient ? existingClient?.id : undefined
-    );
+    // Para múltiplos equipamentos, incluir informações sobre o modo de criação
+    if (hasMultipleEquipments) {
+      // Adicionar informações sobre múltiplos equipamentos no callback
+      onConfirm(
+        agendamento.id,
+        values.scheduledDate,
+        values.scheduledTime,
+        useExistingClient ? existingClient?.id : undefined,
+        {
+          hasMultipleEquipments: true,
+          creationMode,
+          suggestedGroups
+        }
+      );
+    } else {
+      // Comportamento original para equipamento único
+      onConfirm(
+        agendamento.id,
+        values.scheduledDate,
+        values.scheduledTime,
+        useExistingClient ? existingClient?.id : undefined
+      );
+    }
   };
 
   return (
@@ -124,12 +180,102 @@ const CreateServiceOrderDialog: React.FC<CreateServiceOrderDialogProps> = ({
           <form onSubmit={form.handleSubmit(handleConfirm)}>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-green-600" />
-                Criar Ordem de Serviço
+                {hasMultipleEquipments ? (
+                  <Package className="h-5 w-5 text-[#e5b034]" />
+                ) : (
+                  <FileText className="h-5 w-5 text-green-600" />
+                )}
+                {hasMultipleEquipments ? 'Múltiplos Equipamentos Detectados' : 'Criar Ordem de Serviço'}
               </AlertDialogTitle>
               <AlertDialogDescription className="pb-2">
-                Você está prestes a criar uma ordem de serviço para este agendamento. Por favor, defina a data e hora para o atendimento.
+                {hasMultipleEquipments ? (
+                  <>
+                    Este pré-agendamento possui múltiplos equipamentos.
+                    Escolha como deseja criar as ordens de serviço.
+                  </>
+                ) : (
+                  'Você está prestes a criar uma ordem de serviço para este agendamento. Por favor, defina a data e hora para o atendimento.'
+                )}
               </AlertDialogDescription>
+
+              {/* Seção de múltiplos equipamentos */}
+              {hasMultipleEquipments && (
+                <div className="space-y-4 my-4">
+                  <div className="text-sm font-medium text-gray-700">
+                    Como deseja criar as ordens de serviço?
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Opção: OS Única */}
+                    <Card
+                      className={`cursor-pointer transition-all ${
+                        creationMode === 'single'
+                          ? 'border-[#e5b034] bg-[#e5b034]/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setCreationMode('single')}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Merge className="h-5 w-5 text-blue-600" />
+                          <h5 className="font-medium">OS Única</h5>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">
+                          Criar uma única ordem de serviço com todos os equipamentos
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">1 OS</Badge>
+                          <Badge variant="outline">Mesmo técnico</Badge>
+                          <Badge variant="outline">Mesmo tipo</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Opção: Múltiplas OS */}
+                    <Card
+                      className={`cursor-pointer transition-all ${
+                        creationMode === 'multiple'
+                          ? 'border-[#e5b034] bg-[#e5b034]/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setCreationMode('multiple')}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Split className="h-5 w-5 text-green-600" />
+                          <h5 className="font-medium">Múltiplas OS</h5>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">
+                          Criar uma OS para cada equipamento com tipos específicos
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{suggestedGroups.length} OS</Badge>
+                          <Badge variant="outline">Tipos específicos</Badge>
+                          <Badge variant="outline">Flexível</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Preview dos agrupamentos sugeridos */}
+                  {creationMode === 'multiple' && suggestedGroups.length > 0 && (
+                    <div className="mt-4 p-3 border rounded-lg bg-gray-50">
+                      <h6 className="text-sm font-medium text-gray-700 mb-2">
+                        Agrupamentos Sugeridos:
+                      </h6>
+                      <div className="space-y-2">
+                        {suggestedGroups.map((group, index) => (
+                          <div key={index} className="text-xs text-gray-600 p-2 bg-white rounded border">
+                            <div className="font-medium">OS #{index + 1} - {group.attendanceType}</div>
+                            <div>Equipamentos: {group.equipments.join(', ')}</div>
+                            <div className="text-gray-500">{group.reasoning}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Campos de data e hora */}
               <div className="grid grid-cols-2 gap-4 mt-4 mb-4 p-4 border rounded-md bg-muted/20">
@@ -354,7 +500,13 @@ const CreateServiceOrderDialog: React.FC<CreateServiceOrderDialogProps> = ({
                 type="submit"
                 className="bg-green-500 hover:bg-green-600"
               >
-                Criar Ordem de Serviço
+                {hasMultipleEquipments ? (
+                  creationMode === 'single'
+                    ? 'Criar OS Única'
+                    : `Criar ${suggestedGroups.length} Ordens de Serviço`
+                ) : (
+                  'Criar Ordem de Serviço'
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </form>

@@ -21,6 +21,7 @@ import { StatusChangePhotoPrompt } from '../CapturePhoto';
 import { ServiceOrderProgressHistory } from '@/components/ServiceOrders/ProgressHistory/ServiceOrderProgressHistory';
 import WarrantyInfo from '../WarrantyInfo';
 import CreateWarrantyOrderDialog from '../CreateWarrantyOrderDialog';
+import QRCodeDisplay from '@/components/qrcode/QRCodeDisplay';
 import { serviceOrderService } from '@/services';
 
 interface OrderDetailsProps {
@@ -207,6 +208,12 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, refreshKey = 0, on
               </div>
             </>
           )}
+
+          {/* QR Code de Rastreamento */}
+          <Separator />
+          <div className="pt-2">
+            <QRCodeDisplay serviceOrder={currentOrder} />
+          </div>
 
           {/* Histórico de progresso da ordem de serviço */}
           <Separator />

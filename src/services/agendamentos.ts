@@ -20,6 +20,7 @@ export interface AgendamentoAI {
   cpf?: string;
   problema?: string;
   equipamento?: string;
+  equipamentos?: any[]; // Array de equipamentos para múltiplos equipamentos
   // Novos campos para controle de ciclo de vida
   processado?: boolean;
   data_conversao?: string;
@@ -201,7 +202,11 @@ class AgendamentosService {
           logistica: item.logistica as 'A' | 'B' | 'C' | undefined,
           created_at: item.created_at,
           updated_at: item.updated_at,
-          ordem_servico_id: item.ordem_servico_id
+          ordem_servico_id: item.ordem_servico_id,
+          equipamentos: item.equipamentos || [], // Incluir array de equipamentos
+          problema: item.problema,
+          email: item.email,
+          cpf: item.cpf
         }));
       } else {
         console.log('Nenhum agendamento encontrado no Supabase, usando dados mock');
@@ -217,19 +222,32 @@ class AgendamentosService {
   // Obter agendamento por ID
   async getById(id: string | number): Promise<AgendamentoAI | undefined> {
     try {
-      const numericId = typeof id === 'string' ? parseInt(id) : id;
+      console.log(`🔍 [getById] Buscando agendamento com ID:`, id, 'tipo:', typeof id);
+
+      // Validar se o ID é válido
+      if (id === null || id === undefined || id === '') {
+        console.error(`❌ [getById] ID inválido:`, id);
+        return undefined;
+      }
+
+      // Usar o ID diretamente (pode ser UUID string ou número)
+      const searchId = id;
+
+      console.log(`🔍 [getById] ID para busca:`, searchId);
 
       // Buscar do Supabase
       const { data, error } = await supabase
         .from('agendamentos_ai')
         .select('*')
-        .eq('id', numericId)
+        .eq('id', searchId)
         .single();
 
       if (error) {
-        console.error(`Erro ao buscar agendamento ${numericId} do Supabase:`, error);
+        console.error(`Erro ao buscar agendamento ${searchId} do Supabase:`, error);
         // Fallback para dados mock em caso de erro
-        return this.agendamentos.find(a => a.id === numericId);
+        // Para dados mock, tentar converter para número se possível
+        const fallbackId = typeof searchId === 'string' && !isNaN(parseInt(searchId)) ? parseInt(searchId) : searchId;
+        return this.agendamentos.find(a => a.id === fallbackId);
       }
 
       if (data) {
@@ -251,17 +269,23 @@ class AgendamentosService {
           processado: data.processado || false,
           data_conversao: data.data_conversao,
           motivo_processamento: data.motivo_processamento,
-          tecnico_atribuido: data.tecnico_atribuido
+          tecnico_atribuido: data.tecnico_atribuido,
+          equipamentos: data.equipamentos || [], // Incluir array de equipamentos
+          problema: data.problema,
+          email: data.email,
+          cpf: data.cpf
         };
       } else {
         // Fallback para dados mock se não encontrar no Supabase
-        return this.agendamentos.find(a => a.id === numericId);
+        // Para dados mock, tentar converter para número se possível
+        const fallbackId = typeof searchId === 'string' && !isNaN(parseInt(searchId)) ? parseInt(searchId) : searchId;
+        return this.agendamentos.find(a => a.id === fallbackId);
       }
     } catch (error) {
       console.error(`Erro ao buscar agendamento ${id}:`, error);
       // Fallback para dados mock em caso de erro
-      const numericId = typeof id === 'string' ? parseInt(id) : id;
-      return this.agendamentos.find(a => a.id === numericId);
+      const fallbackId = typeof id === 'string' && !isNaN(parseInt(id)) ? parseInt(id) : id;
+      return this.agendamentos.find(a => a.id === fallbackId);
     }
   }
 
@@ -343,20 +367,21 @@ class AgendamentosService {
   // Atualizar agendamento
   async update(id: string | number, agendamento: Partial<AgendamentoAI>): Promise<AgendamentoAI | undefined> {
     try {
-      const numericId = typeof id === 'string' ? parseInt(id) : id;
+      // Usar o ID diretamente (pode ser UUID string ou número)
+      const searchId = id;
 
-      console.log(`Atualizando agendamento ${numericId} no Supabase:`, agendamento);
+      console.log(`Atualizando agendamento ${searchId} no Supabase:`, agendamento);
 
       // Verificar se o status está sendo atualizado para confirmado
       const isConfirmingAppointment = agendamento.status === 'confirmado';
       if (isConfirmingAppointment) {
-        console.log(`Confirmando agendamento ${numericId} e atualizando status para 'confirmado'`);
+        console.log(`Confirmando agendamento ${searchId} e atualizando status para 'confirmado'`);
       }
 
       // Verificar se está sendo associado a uma ordem de serviço
       const isAssigningServiceOrder = agendamento.ordem_servico_id !== undefined;
       if (isAssigningServiceOrder) {
-        console.log(`Associando agendamento ${numericId} à ordem de serviço ${agendamento.ordem_servico_id}`);
+        console.log(`Associando agendamento ${searchId} à ordem de serviço ${agendamento.ordem_servico_id}`);
       }
 
       // Preparar dados para atualização no Supabase
@@ -377,12 +402,12 @@ class AgendamentosService {
       let error;
 
       while (attempt <= 3) {
-        console.log(`Tentativa ${attempt} de atualizar agendamento ${numericId} no Supabase`);
+        console.log(`Tentativa ${attempt} de atualizar agendamento ${searchId} no Supabase`);
 
         const result = await supabase
           .from('agendamentos_ai')
           .update(updateData)
-          .eq('id', numericId)
+          .eq('id', searchId)
           .select()
           .single();
 
@@ -391,7 +416,7 @@ class AgendamentosService {
 
         if (!error) break;
 
-        console.error(`Erro na tentativa ${attempt} ao atualizar agendamento ${numericId}:`, error);
+        console.error(`Erro na tentativa ${attempt} ao atualizar agendamento ${searchId}:`, error);
         attempt++;
 
         if (attempt <= 3) {
@@ -401,9 +426,10 @@ class AgendamentosService {
       }
 
       if (error) {
-        console.error(`Todas as tentativas falharam ao atualizar agendamento ${numericId} no Supabase:`, error);
+        console.error(`Todas as tentativas falharam ao atualizar agendamento ${searchId} no Supabase:`, error);
         // Fallback para dados mock em caso de erro
-        const index = this.agendamentos.findIndex(a => a.id === numericId);
+        const fallbackId = typeof searchId === 'string' && !isNaN(parseInt(searchId)) ? parseInt(searchId) : searchId;
+        const index = this.agendamentos.findIndex(a => a.id === fallbackId);
 
         if (index === -1) return undefined;
 
@@ -433,7 +459,8 @@ class AgendamentosService {
         };
       } else {
         // Fallback para dados mock se não encontrar no Supabase
-        const index = this.agendamentos.findIndex(a => a.id === numericId);
+        const fallbackId = typeof searchId === 'string' && !isNaN(parseInt(searchId)) ? parseInt(searchId) : searchId;
+        const index = this.agendamentos.findIndex(a => a.id === fallbackId);
 
         if (index === -1) return undefined;
 
@@ -447,8 +474,8 @@ class AgendamentosService {
     } catch (error) {
       console.error(`Erro ao atualizar agendamento ${id}:`, error);
       // Fallback para dados mock em caso de erro
-      const numericId = typeof id === 'string' ? parseInt(id) : id;
-      const index = this.agendamentos.findIndex(a => a.id === numericId);
+      const fallbackId = typeof id === 'string' && !isNaN(parseInt(id)) ? parseInt(id) : id;
+      const index = this.agendamentos.findIndex(a => a.id === fallbackId);
 
       if (index === -1) return undefined;
 
@@ -534,7 +561,11 @@ class AgendamentosService {
           processado: item.status === 'convertido', // Derivar do status
           data_conversao: item.data_conversao,
           motivo_processamento: item.motivo_processamento,
-          tecnico_atribuido: item.tecnico
+          tecnico_atribuido: item.tecnico,
+          equipamentos: item.equipamentos || [], // Incluir array de equipamentos
+          problema: item.problema,
+          email: item.email,
+          cpf: item.cpf
         }));
       }
 
@@ -552,18 +583,20 @@ class AgendamentosService {
   // Excluir agendamento
   async delete(id: string | number): Promise<boolean> {
     try {
-      const numericId = typeof id === 'string' ? parseInt(id) : id;
+      // Usar o ID diretamente (pode ser UUID string ou número)
+      const searchId = id;
 
       // Excluir do Supabase
       const { error } = await supabase
         .from('agendamentos_ai')
         .delete()
-        .eq('id', numericId);
+        .eq('id', searchId);
 
       if (error) {
-        console.error(`Erro ao excluir agendamento ${numericId} do Supabase:`, error);
+        console.error(`Erro ao excluir agendamento ${searchId} do Supabase:`, error);
         // Fallback para dados mock em caso de erro
-        const index = this.agendamentos.findIndex(a => a.id === numericId);
+        const fallbackId = typeof searchId === 'string' && !isNaN(parseInt(searchId)) ? parseInt(searchId) : searchId;
+        const index = this.agendamentos.findIndex(a => a.id === fallbackId);
 
         if (index === -1) return false;
 
@@ -572,7 +605,8 @@ class AgendamentosService {
       }
 
       // Também remover dos dados mock para manter consistência
-      const index = this.agendamentos.findIndex(a => a.id === numericId);
+      const fallbackId = typeof searchId === 'string' && !isNaN(parseInt(searchId)) ? parseInt(searchId) : searchId;
+      const index = this.agendamentos.findIndex(a => a.id === fallbackId);
       if (index !== -1) {
         this.agendamentos.splice(index, 1);
       }
@@ -581,8 +615,8 @@ class AgendamentosService {
     } catch (error) {
       console.error(`Erro ao excluir agendamento ${id}:`, error);
       // Fallback para dados mock em caso de erro
-      const numericId = typeof id === 'string' ? parseInt(id) : id;
-      const index = this.agendamentos.findIndex(a => a.id === numericId);
+      const fallbackId = typeof id === 'string' && !isNaN(parseInt(id)) ? parseInt(id) : id;
+      const index = this.agendamentos.findIndex(a => a.id === fallbackId);
 
       if (index === -1) return false;
 

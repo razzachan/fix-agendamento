@@ -12,11 +12,13 @@ import { cancelOrderService } from '@/services/serviceOrder/cancelOrderService';
 interface ServiceProgressTrackerProps {
   serviceOrder: ServiceOrder;
   onUpdateStatus: (serviceOrderId: string, status: string) => Promise<boolean>;
+  relatedOrders?: ServiceOrder[];
 }
 
 export const ServiceProgressTracker: React.FC<ServiceProgressTrackerProps> = ({
   serviceOrder,
   onUpdateStatus,
+  relatedOrders = [],
 }) => {
   const handleCancelOrder = async (orderId: string, cancellationReason: string) => {
     console.log('🎯 [ServiceProgressTracker] Processando cancelamento:', { orderId, cancellationReason });
@@ -37,7 +39,11 @@ export const ServiceProgressTracker: React.FC<ServiceProgressTrackerProps> = ({
 
         {/* Botões de ação */}
         <div className="flex flex-col gap-3">
-          <NextStatusButton serviceOrder={serviceOrder} onUpdateStatus={onUpdateStatus} />
+          <NextStatusButton
+            serviceOrder={serviceOrder}
+            onUpdateStatus={onUpdateStatus}
+            relatedOrders={relatedOrders}
+          />
 
           {/* Botão de cancelamento */}
           <div className="flex justify-center">

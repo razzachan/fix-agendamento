@@ -32,9 +32,10 @@ import { CustomerRatingService } from '@/services/customerRatingService';
 interface NextStatusButtonProps {
   serviceOrder: ServiceOrder;
   onUpdateStatus: (serviceOrderId: string, status: string, notes?: string) => Promise<boolean>;
+  relatedOrders?: ServiceOrder[];
 }
 
-const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpdateStatus }) => {
+const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpdateStatus, relatedOrders = [] }) => {
   const { user } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -44,6 +45,7 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
   const [showWorkshopSelection, setShowWorkshopSelection] = useState(false);
   const [showStatusAdvanceDialog, setShowStatusAdvanceDialog] = useState(false);
   const [showServiceCompletionDialog, setShowServiceCompletionDialog] = useState(false);
+  const [showBatchProgressionDialog, setShowBatchProgressionDialog] = useState(false);
 
   // Debug: Monitorar mudanças de estado
   useEffect(() => {
@@ -70,6 +72,54 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
 
   const nextStatus = getNextStatus();
   const nextStep = nextStatus ? serviceFlow.find(step => step.status === nextStatus) : null;
+
+  // Analisar ordens relacionadas para progressão em lote
+  const analyzeRelatedOrders = () => {
+    if (relatedOrders.length === 0) return null;
+
+    const allOrders = [serviceOrder, ...relatedOrders];
+
+    // Agrupar por status atual
+    const statusGroups: { [status: string]: ServiceOrder[] } = {};
+    allOrders.forEach(order => {
+      if (!statusGroups[order.status]) {
+        statusGroups[order.status] = [];
+      }
+      statusGroups[order.status].push(order);
+    });
+
+    // Verificar quantas ordens podem avançar para o mesmo próximo status
+    const canAdvanceToSameStatus = allOrders.filter(order => {
+      const orderAttendanceType = order.serviceAttendanceType || "em_domicilio";
+      const orderValidType = ["em_domicilio", "coleta_conserto", "coleta_diagnostico"].includes(orderAttendanceType)
+        ? orderAttendanceType as "em_domicilio" | "coleta_conserto" | "coleta_diagnostico"
+        : "em_domicilio";
+
+      const orderServiceFlow = getServiceFlow(orderValidType);
+      const orderCurrentStatusIndex = orderServiceFlow.findIndex(step => step.status === order.status);
+      const orderNextStatus = orderCurrentStatusIndex !== -1 && orderCurrentStatusIndex < orderServiceFlow.length - 1
+        ? orderServiceFlow[orderCurrentStatusIndex + 1].status
+        : null;
+
+      return orderNextStatus === nextStatus;
+    });
+
+    // Para progressão em lote, incluir TODAS as ordens que podem avançar
+    // A validação será feita no momento da execução, não na filtragem
+    const canBatchProcess = canAdvanceToSameStatus;
+
+    return {
+      totalOrders: allOrders.length,
+      statusGroups,
+      canAdvanceToSameStatus: canAdvanceToSameStatus.length,
+      canBatchProcess: canBatchProcess.length,
+      ordersToAdvance: canBatchProcess, // Usar apenas as que podem ser processadas em lote
+      nextStatus,
+      nextStatusLabel: translateStatus(nextStatus)
+    };
+  };
+
+  const batchAnalysis = analyzeRelatedOrders();
 
   // Verificar se o próximo status requer notas adicionais
   const requiresNotes = (status: string): boolean => {
@@ -374,6 +424,7 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
     return (
       <div className="flex flex-col gap-2">
         <div className="flex justify-center">
+          {/* Botão principal - sempre individual */}
           <Button
             onClick={() => {
               console.log('🎯 [NextStatusButton] ===== BOTÃO CLICADO =====');
@@ -385,6 +436,23 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
             {isUpdating ? 'Atualizando...' : `Avançar para ${nextStep?.label || translateStatus(nextStatus)}`}
           </Button>
         </div>
+
+        {/* Botão de progressão em lote (se aplicável) */}
+        {batchAnalysis && batchAnalysis.canAdvanceToSameStatus > 1 && (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              onClick={() => setShowBatchProgressionDialog(true)}
+              disabled={isUpdating}
+              className="w-full text-[#e5b034] border-[#e5b034] hover:bg-[#e5b034]/10"
+            >
+              Processar {batchAnalysis.canAdvanceToSameStatus} Ordens em Lote
+              <span className="text-xs ml-1">
+                (com validações individuais)
+              </span>
+            </Button>
+          </div>
+        )}
 
         {/* Botão de Reverter */}
         <div className="flex justify-center">
@@ -429,12 +497,15 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
             onOpenChange={setShowStatusAdvanceDialog}
             serviceOrder={{
               id: serviceOrder.id,
+              order_number: serviceOrder.orderNumber, // ✅ Incluir order_number
               client_name: serviceOrder.clientName,
               equipment_type: serviceOrder.equipmentType,
               equipment_model: serviceOrder.equipmentModel,
+              equipment_serial: serviceOrder.equipmentSerial,
               service_attendance_type: validType,
               status: serviceOrder.status,
-              final_cost: serviceOrder.finalCost
+              final_cost: serviceOrder.finalCost,
+              pickup_address: serviceOrder.pickupAddress
             }}
             nextStatus={nextStatus}
             nextStatusLabel={nextStep?.label || translateStatus(nextStatus)}
@@ -456,6 +527,186 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
             // Aqui podemos adicionar lógica específica se necessário
           }}
         />
+
+        {/* Dialog de Progressão em Lote */}
+        {batchAnalysis && (
+          <Dialog open={showBatchProgressionDialog} onOpenChange={setShowBatchProgressionDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Progressão em Lote</DialogTitle>
+                <DialogDescription>
+                  Avançar múltiplas ordens do mesmo endereço simultaneamente
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="py-4 space-y-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <h4 className="font-medium text-amber-900 mb-2">
+                    🎯 Processamento em Lote Inteligente
+                  </h4>
+                  <p className="text-sm text-amber-800 mb-3">
+                    Cada ordem será processada individualmente com todas as validações necessárias:
+                  </p>
+                  <ul className="text-xs text-amber-700 space-y-1">
+                    <li>• Confirmações de pagamento (se necessário)</li>
+                    <li>• Fotos obrigatórias (se necessário)</li>
+                    <li>• Seleções de oficina (se necessário)</li>
+                    <li>• Outras validações específicas</li>
+                  </ul>
+                  <p className="text-sm font-medium text-amber-900 mt-3">
+                    {batchAnalysis.canAdvanceToSameStatus} ordens serão processadas para: {nextStep?.label || translateStatus(nextStatus)}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h5 className="font-medium text-gray-700">Ordens que serão processadas:</h5>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {batchAnalysis.ordersToAdvance.map(order => (
+                      <div key={order.id} className="text-sm bg-gray-50 p-2 rounded">
+                        <span className="font-medium">OS #{order.id.slice(-8)}</span> - {order.equipmentType} {order.equipmentModel}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowBatchProgressionDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={async () => {
+                    console.log('🎯 [NextStatusButton] Iniciando processamento em lote inteligente...');
+                    setIsUpdating(true);
+                    setShowBatchProgressionDialog(false);
+
+                    try {
+                      let successCount = 0;
+                      let skippedCount = 0;
+                      const results: { orderId: string; success: boolean; reason?: string }[] = [];
+
+                      for (const order of batchAnalysis.ordersToAdvance) {
+                        try {
+                          console.log(`🔄 Processando ordem ${order.id}...`);
+
+                          // Simular a mesma lógica do handleUpdateStatus individual
+                          const orderAttendanceType = order.serviceAttendanceType || "em_domicilio";
+                          const orderValidType = ["em_domicilio", "coleta_conserto", "coleta_diagnostico"].includes(orderAttendanceType)
+                            ? orderAttendanceType as "em_domicilio" | "coleta_conserto" | "coleta_diagnostico"
+                            : "em_domicilio";
+
+                          // Verificar se precisa de seleção de oficina
+                          if (nextStatus === 'at_workshop') {
+                            console.log(`⚠️ Ordem ${order.id} requer seleção de oficina - pulando`);
+                            results.push({ orderId: order.id, success: false, reason: 'Requer seleção de oficina' });
+                            skippedCount++;
+                            continue;
+                          }
+
+                          // Verificar se precisa de dialog de conclusão com estoque
+                          if (nextStatus === 'completed') {
+                            console.log(`⚠️ Ordem ${order.id} requer dialog de conclusão - pulando`);
+                            results.push({ orderId: order.id, success: false, reason: 'Requer dialog de conclusão' });
+                            skippedCount++;
+                            continue;
+                          }
+
+                          // Verificar se precisa de pagamento por etapas
+                          const orderForPayment = {
+                            id: order.id,
+                            service_attendance_type: orderValidType,
+                            final_cost: order.finalCost || 0,
+                            status: order.status
+                          };
+
+                          // Verificar se precisa de pagamento por etapas (usando a mesma lógica do handleUpdateStatus)
+                          let needsPaymentDialog = false;
+
+                          if (nextStatus === 'collected' || nextStatus === 'collected_for_diagnosis') {
+                            const collectionConfig = PaymentStageService.calculateCollectionPayment(orderForPayment);
+                            needsPaymentDialog = !!collectionConfig;
+                          } else if (nextStatus === 'completed' || nextStatus === 'delivered') {
+                            if (orderValidType === 'em_domicilio') {
+                              needsPaymentDialog = !!PaymentStageService.calculateFullPayment(orderForPayment);
+                            } else {
+                              const config = await PaymentStageService.calculateDeliveryPayment(orderForPayment);
+                              needsPaymentDialog = !!config;
+                            }
+                          } else if (nextStatus === 'payment_pending') {
+                            if (orderValidType !== 'em_domicilio') {
+                              const config = await PaymentStageService.calculateDeliveryPayment(orderForPayment);
+                              needsPaymentDialog = !!config;
+                            }
+                          }
+                          if (needsPaymentDialog) {
+                            console.log(`⚠️ Ordem ${order.id} requer confirmação de pagamento - pulando`);
+                            results.push({ orderId: order.id, success: false, reason: 'Requer confirmação de pagamento' });
+                            skippedCount++;
+                            continue;
+                          }
+
+                          // Verificar se requer ações obrigatórias
+                          const actionConfig = getRequiredActionConfig(order.status, nextStatus, orderValidType);
+                          if (actionConfig) {
+                            console.log(`⚠️ Ordem ${order.id} requer ações obrigatórias: ${actionConfig.title} - pulando`);
+                            results.push({ orderId: order.id, success: false, reason: `Requer: ${actionConfig.title}` });
+                            skippedCount++;
+                            continue;
+                          }
+
+                          // Verificar se requer notas
+                          if (requiresNotes(nextStatus)) {
+                            console.log(`⚠️ Ordem ${order.id} requer notas adicionais - pulando`);
+                            results.push({ orderId: order.id, success: false, reason: 'Requer notas adicionais' });
+                            skippedCount++;
+                            continue;
+                          }
+
+                          // Se chegou até aqui, pode processar automaticamente
+                          const success = await onUpdateStatus(order.id, nextStatus, `Processamento em lote - ${batchAnalysis.canAdvanceToSameStatus} ordens`);
+                          if (success) {
+                            successCount++;
+                            results.push({ orderId: order.id, success: true });
+                            console.log(`✅ Ordem ${order.id} processada com sucesso`);
+                          } else {
+                            results.push({ orderId: order.id, success: false, reason: 'Erro na atualização' });
+                          }
+                        } catch (error) {
+                          console.error(`❌ Erro ao processar ordem ${order.id}:`, error);
+                          results.push({ orderId: order.id, success: false, reason: 'Erro técnico' });
+                        }
+                      }
+
+                      // Feedback detalhado
+                      if (successCount > 0 && skippedCount === 0) {
+                        toast.success(`✅ ${successCount} ordens processadas com sucesso!`);
+                      } else if (successCount > 0 && skippedCount > 0) {
+                        toast.warning(`⚠️ ${successCount} ordens processadas, ${skippedCount} requerem ação individual`);
+                      } else if (skippedCount > 0) {
+                        toast.info(`ℹ️ Todas as ${skippedCount} ordens requerem ação individual`);
+                      } else {
+                        toast.error('❌ Nenhuma ordem pôde ser processada automaticamente');
+                      }
+
+                      // Log detalhado dos resultados
+                      console.log('🎯 [NextStatusButton] Resultados do processamento em lote:', results);
+
+                    } catch (error) {
+                      console.error('❌ Erro no processamento em lote:', error);
+                      toast.error('Erro no processamento em lote');
+                    } finally {
+                      setIsUpdating(false);
+                    }
+                  }}
+                  disabled={isUpdating}
+                  className="bg-[#e5b034] hover:bg-[#d4a02a]"
+                >
+                  {isUpdating ? 'Processando...' : `Processar ${batchAnalysis.canAdvanceToSameStatus} Ordens`}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     );
   }
@@ -545,12 +796,15 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
           onOpenChange={setShowStatusAdvanceDialog}
           serviceOrder={{
             id: serviceOrder.id,
+            order_number: serviceOrder.orderNumber, // ✅ Incluir order_number
             client_name: serviceOrder.clientName,
             equipment_type: serviceOrder.equipmentType,
             equipment_model: serviceOrder.equipmentModel,
+            equipment_serial: serviceOrder.equipmentSerial,
             service_attendance_type: validType,
             status: serviceOrder.status,
-            final_cost: serviceOrder.finalCost
+            final_cost: serviceOrder.finalCost,
+            pickup_address: serviceOrder.pickupAddress
           }}
           nextStatus={nextStatus}
           nextStatusLabel={nextStep?.label || translateStatus(nextStatus)}

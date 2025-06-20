@@ -125,20 +125,21 @@ export function useBadgeFilters() {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+    // Simplificar filtros para evitar consultas OR complexas que causam erro 400
     const filters: Record<string, string> = {
-      urgent_orders: `status.eq.pending,and(status.eq.scheduled,scheduled_date.lte.${today})`,
-      
-      delayed_repairs: `and(status.eq.in_progress,updated_at.lte.${fiveDaysAgo.toISOString()}),and(status.eq.at_workshop,updated_at.lte.${sevenDaysAgo.toISOString()}),status.eq.quote_approved`,
-      
-      pending_quotes: `and(status.eq.quote_sent,created_at.lte.${twoDaysAgo.toISOString()}),status.eq.diagnosis_completed`,
-      
-      urgent_deliveries: `and(status.eq.ready_for_pickup,updated_at.lte.${twoDaysAgo.toISOString()}),and(status.eq.scheduled_delivery,scheduled_date.lte.${today})`,
-      
-      financial_problems: `and(status.in.(completed,ready_for_pickup,delivered),payment_status.is.null,updated_at.lte.${threeDaysAgo.toISOString()}),and(status.in.(completed,ready_for_pickup),final_cost.gte.500,payment_status.is.null),payment_status.eq.partial`,
-      
-      workshop_bottlenecks: `and(status.eq.at_workshop,updated_at.lte.${sevenDaysAgo.toISOString()}),and(status.eq.diagnosis_pending,updated_at.lte.${threeDaysAgo.toISOString()})`,
-      
-      sla_violations: `and(status.eq.pending,created_at.lte.${oneDayAgo.toISOString()}),and(status.eq.scheduled,scheduled_date.lt.${today}),and(status.in.(in_progress,at_workshop),updated_at.lte.${sevenDaysAgo.toISOString()}),and(status.eq.ready_for_pickup,updated_at.lte.${fiveDaysAgo.toISOString()})`
+      urgent_orders: `status.eq.pending`,
+
+      delayed_repairs: `status.eq.in_progress,created_at.lte.${fiveDaysAgo.toISOString()}`,
+
+      pending_quotes: `status.eq.diagnosis_completed`,
+
+      urgent_deliveries: `status.eq.ready_for_pickup,created_at.lte.${twoDaysAgo.toISOString()}`,
+
+      financial_problems: `status.eq.completed,final_cost.gte.500`,
+
+      workshop_bottlenecks: `status.eq.at_workshop,created_at.lte.${sevenDaysAgo.toISOString()}`,
+
+      sla_violations: `status.eq.pending,created_at.lte.${oneDayAgo.toISOString()}`
     };
 
     return filters[filterKey] || '';

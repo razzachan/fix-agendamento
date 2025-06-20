@@ -39,7 +39,10 @@ import {
   CreditCard,
   Truck,
   Wifi,
-  WifiOff
+  WifiOff,
+  BarChart3,
+  Smartphone,
+  Brain
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -185,14 +188,17 @@ const AppSidebar: React.FC = () => {
       emoji: '📍',
       items: [
         { to: '/tracking', icon: MapPin, label: 'Rastreamento', emoji: '📍' },
-        { to: '/finance', icon: DollarSign, label: 'Financeiro', emoji: '💰' }
+        { to: '/finance', icon: DollarSign, label: 'Financeiro', emoji: '💰' },
+        { to: '/reports', icon: BarChart3, label: 'Relatórios Avançados', emoji: '📊' },
+        { to: '/ai', icon: Brain, label: 'Inteligência Artificial', emoji: '🤖' }
       ]
     },
     {
       category: 'Sistema',
       emoji: '⚙️',
       items: [
-        { to: '/settings', icon: Settings, label: 'Configurações', emoji: '⚙️' }
+        { to: '/settings', icon: Settings, label: 'Configurações', emoji: '⚙️' },
+        { to: '/pwa-settings', icon: Smartphone, label: 'PWA & Mobile', emoji: '📱' }
       ]
     }
   ];

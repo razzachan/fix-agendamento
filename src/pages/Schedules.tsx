@@ -3,20 +3,18 @@ import React, { useState } from 'react';
 import { useAppData } from '@/hooks/useAppData';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import SchedulesFilters from '@/components/schedules/SchedulesFilters';
-import AgendamentosTable from '@/components/schedules/AgendamentosTable';
+import PreAgendamentosView from '@/components/schedules/PreAgendamentosView';
+import PreAgendamentosStats from '@/components/schedules/PreAgendamentosStats';
 import SchedulesMap from '@/components/schedules/SchedulesMap';
 import UnifiedRoutingPanel from '@/components/schedules/UnifiedRoutingPanel';
-import ConfirmationDialog from '@/components/schedules/ConfirmationDialog';
-import RoutingDialog from '@/components/schedules/RoutingDialog';
-import CreateServiceOrderDialog from '@/components/schedules/CreateServiceOrderDialog';
 import useSchedulesLogic from '@/hooks/schedules/useSchedulesLogic';
 import { Toaster } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { MapPin, List, Route } from 'lucide-react';
 
 const Schedules: React.FC = () => {
-  const { agendamentos, isLoading, updateAgendamento } = useAppData();
-  const [viewMode, setViewMode] = useState<'table' | 'map' | 'routing'>('table');
+  const { agendamentos, isLoading } = useAppData();
+  const [viewMode, setViewMode] = useState<'list' | 'map' | 'routing'>('list');
 
   const {
     selectedDate,
@@ -25,9 +23,6 @@ const Schedules: React.FC = () => {
     selectedUrgency,
     searchQuery,
     filteredAgendamentos,
-    confirmationDialog,
-    routingDialog,
-    createOrderDialog,
     handleDateChange,
     handleStatusChange,
     handleTechnicianChange,
@@ -35,21 +30,8 @@ const Schedules: React.FC = () => {
     handleSearchChange,
     handleClearDateFilter,
     handleClearSearchFilter,
-    openConfirmDialog,
-    openRescheduleDialog,
-    openCancelDialog,
-    openRoutingDialog,
-    openCreateOrderDialog,
-    closeDialog,
-    closeRoutingDialog,
-    closeCreateOrderDialog,
-    performRouting,
-    performCreateServiceOrder,
-    isToday,
-    getUrgencyClass,
-    getStatusButtonClass,
     getTechnicians
-  } = useSchedulesLogic(agendamentos, updateAgendamento);
+  } = useSchedulesLogic(agendamentos, () => {});
 
   if (isLoading) {
     return (
@@ -63,12 +45,18 @@ const Schedules: React.FC = () => {
     <div className="container mx-auto py-6">
       <Toaster richColors position="top-right" />
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Pré-Agendamentos</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Pré-Agendamentos</h1>
+          <p className="text-muted-foreground mt-1">
+            Visualize e gerencie as solicitações de serviço recebidas
+          </p>
+        </div>
         <div className="flex space-x-2">
           <Button
-            variant={viewMode === 'table' ? 'default' : 'outline'}
+            variant={viewMode === 'list' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setViewMode('table')}
+            onClick={() => setViewMode('list')}
+            className="bg-[#e5b034] hover:bg-[#d4a02a] text-white border-[#e5b034]"
           >
             <List className="h-4 w-4 mr-2" />
             Lista
@@ -77,6 +65,7 @@ const Schedules: React.FC = () => {
             variant={viewMode === 'map' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewMode('map')}
+            className={viewMode === 'map' ? 'bg-[#e5b034] hover:bg-[#d4a02a] text-white border-[#e5b034]' : ''}
           >
             <MapPin className="h-4 w-4 mr-2" />
             Mapa
@@ -85,6 +74,7 @@ const Schedules: React.FC = () => {
             variant={viewMode === 'routing' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewMode('routing')}
+            className={viewMode === 'routing' ? 'bg-[#e5b034] hover:bg-[#d4a02a] text-white border-[#e5b034]' : ''}
           >
             <Route className="h-4 w-4 mr-2" />
             Roteirização
@@ -92,11 +82,11 @@ const Schedules: React.FC = () => {
         </div>
       </div>
 
-      <Card className="shadow-md border-0">
-        <CardHeader className="border-b bg-muted/30">
-          <CardTitle>Solicitações de Serviço</CardTitle>
-          <CardDescription>
-            Gerencie as solicitações de serviço para confirmação e roteirização
+      <Card className="shadow-lg border-0 bg-white">
+        <CardHeader className="border-b bg-gradient-to-r from-[#e5b034]/10 to-[#e5b034]/5">
+          <CardTitle className="text-xl text-gray-900">Solicitações de Serviço</CardTitle>
+          <CardDescription className="text-gray-600">
+            Visualize as solicitações recebidas. Use a roteirização para agendar efetivamente.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
@@ -116,24 +106,16 @@ const Schedules: React.FC = () => {
             technicians={getTechnicians()}
           />
 
-          {viewMode === 'table' ? (
-            <AgendamentosTable
-              filteredAgendamentos={filteredAgendamentos}
-              getStatusButtonClass={getStatusButtonClass}
-              getUrgencyClass={getUrgencyClass}
-              isToday={isToday}
-              openConfirmDialog={openConfirmDialog}
-              openRescheduleDialog={openRescheduleDialog}
-              openCancelDialog={openCancelDialog}
-              openRoutingDialog={openRoutingDialog}
-              openCreateOrderDialog={openCreateOrderDialog}
-            />
+          {viewMode === 'list' ? (
+            <div className="mt-6">
+              <PreAgendamentosStats agendamentos={filteredAgendamentos} />
+              <PreAgendamentosView agendamentos={filteredAgendamentos} />
+            </div>
           ) : viewMode === 'map' ? (
             <div className="mt-6">
               <SchedulesMap
                 agendamentos={filteredAgendamentos}
                 onMarkerClick={(agendamento) => {
-                  // Opcional: fazer algo quando um marcador é clicado
                   console.log('Marcador clicado:', agendamento);
                 }}
               />
@@ -148,49 +130,13 @@ const Schedules: React.FC = () => {
                 selectedDate={selectedDate}
                 onRouteCreated={(routeData) => {
                   console.log('Rota criada:', routeData);
-                  // Opcional: atualizar dados ou navegar
                 }}
                 onAgendamentosUpdated={() => {
-                  // Opcional: recarregar agendamentos
                   window.location.reload();
                 }}
               />
             </div>
           )}
-
-          {/* Diálogo de confirmação */}
-          <ConfirmationDialog
-            isOpen={confirmationDialog.isOpen}
-            onClose={closeDialog}
-            onConfirm={confirmationDialog.onConfirm}
-            title={confirmationDialog.title}
-            description={confirmationDialog.description}
-            actionText={confirmationDialog.actionText}
-            agendamentoNome={confirmationDialog.agendamentoNome}
-            agendamentoEndereco={confirmationDialog.agendamentoEndereco}
-            actionType={confirmationDialog.actionType}
-          />
-
-          {/* Diálogo de roteirização */}
-          <RoutingDialog
-            isOpen={routingDialog.isOpen}
-            onClose={closeRoutingDialog}
-            onConfirm={performRouting}
-            title={routingDialog.title}
-            description={routingDialog.description}
-            actionText={routingDialog.actionText}
-            agendamentoId={routingDialog.agendamentoId}
-            agendamentoNome={routingDialog.agendamentoNome}
-            agendamentoEndereco={routingDialog.agendamentoEndereco}
-          />
-
-          {/* Diálogo de criação de ordem de serviço */}
-          <CreateServiceOrderDialog
-            isOpen={createOrderDialog.isOpen}
-            onClose={closeCreateOrderDialog}
-            onConfirm={performCreateServiceOrder}
-            agendamento={createOrderDialog.agendamento}
-          />
         </CardContent>
       </Card>
     </div>

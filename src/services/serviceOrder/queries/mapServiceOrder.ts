@@ -107,18 +107,23 @@ export function mapServiceOrder(order: any): ServiceOrder {
 
     // Diagnóstico do equipamento (se disponível)
     // Mapeia os dados do formato do banco de dados (snake_case) para o formato do frontend (camelCase)
-    diagnosis: order.diagnosis ? {
-      id: order.diagnosis.id,
-      createdAt: order.diagnosis.created_at, // Mapeia created_at para createdAt
-      updatedAt: order.diagnosis.updated_at, // Mapeia updated_at para updatedAt
-      serviceOrderId: order.diagnosis.service_order_id, // Mapeia service_order_id para serviceOrderId
-      workshopUserId: order.diagnosis.workshop_user_id, // Mapeia workshop_user_id para workshopUserId
-      diagnosisDetails: order.diagnosis.diagnosis_details, // Mapeia diagnosis_details para diagnosisDetails
-      recommendedService: order.diagnosis.recommended_service || null, // Mapeia recommended_service para recommendedService
-      estimatedCost: order.diagnosis.estimated_cost || null, // Mapeia estimated_cost para estimatedCost
-      estimatedCompletionDate: order.diagnosis.estimated_completion_date || null, // Mapeia estimated_completion_date para estimatedCompletionDate
-      partsPurchaseLink: order.diagnosis.parts_purchase_link || null // Mapeia parts_purchase_link para partsPurchaseLink
-    } : undefined
+    diagnosis: (() => {
+      // Se diagnosis é um array, pegar o primeiro (mais recente)
+      const diagnosisData = Array.isArray(order.diagnosis) ? order.diagnosis[0] : order.diagnosis;
+
+      return diagnosisData ? {
+        id: diagnosisData.id,
+        createdAt: diagnosisData.created_at, // Mapeia created_at para createdAt
+        updatedAt: diagnosisData.updated_at, // Mapeia updated_at para updatedAt
+        serviceOrderId: diagnosisData.service_order_id, // Mapeia service_order_id para serviceOrderId
+        workshopUserId: diagnosisData.workshop_user_id, // Mapeia workshop_user_id para workshopUserId
+        diagnosisDetails: diagnosisData.diagnosis_details, // Mapeia diagnosis_details para diagnosisDetails
+        recommendedService: diagnosisData.recommended_service || null, // Mapeia recommended_service para recommendedService
+        estimatedCost: diagnosisData.estimated_cost || null, // Mapeia estimated_cost para estimatedCost
+        estimatedCompletionDate: diagnosisData.estimated_completion_date || null, // Mapeia estimated_completion_date para estimatedCompletionDate
+        partsPurchaseLink: diagnosisData.parts_purchase_link || null // Mapeia parts_purchase_link para partsPurchaseLink
+      } : undefined;
+    })()
   };
 
   console.log(`Order ID: ${mappedOrder.id}, Final Mapped Service Attendance Type: ${mappedOrder.serviceAttendanceType}`);

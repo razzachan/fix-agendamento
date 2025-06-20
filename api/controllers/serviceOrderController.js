@@ -605,6 +605,7 @@ const serviceOrderController = {
 function mapServiceOrder(data) {
   return {
     id: data.id,
+    order_number: data.order_number, // ✅ Incluir order_number
     clientId: data.client_id,
     clientName: data.client_name,
     clientEmail: data.client_email,
@@ -634,7 +635,14 @@ function mapServiceOrder(data) {
     pickupZipCode: data.pickup_zip_code,
     archived: data.archived,
     cancellationReason: data.cancellation_reason,
-    lastProgressId: data.last_progress_id
+    lastProgressId: data.last_progress_id,
+    // Campos adicionais para o dashboard do técnico
+    client_name: data.client_name,
+    equipment_type: data.equipment_type,
+    equipment_model: data.equipment_model,
+    equipment_serial: data.equipment_serial,
+    service_attendance_type: data.service_attendance_type,
+    final_cost: data.final_cost
   };
 }
 

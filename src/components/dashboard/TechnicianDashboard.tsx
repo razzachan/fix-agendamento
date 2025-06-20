@@ -26,13 +26,17 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { format, isToday, isTomorrow } from 'date-fns';
 import { getServiceFlow, getNextStatus, getCurrentStepIndex } from '@/utils/serviceFlowUtils';
-import { isActiveOrder, isScheduledOrder, isInProgressOrder, sortOrdersByHybridPriority } from '@/utils/statusMappingUtils';
+import { isActiveOrder, isScheduledOrder, isInProgressOrder, sortOrdersByHybridPriority, isTechnicianActiveOrder, sortTechnicianOrdersByPriority } from '@/utils/statusMappingUtils';
 import NextStatusButton from '@/components/ServiceOrders/ProgressTracker/NextStatusButton';
 import ServiceTimelineDropdown from '@/components/ServiceOrders/ProgressTracker/ServiceTimelineDropdown';
 import { ptBR } from 'date-fns/locale';
 import { MetricCard } from './MetricCard';
 import { SimpleChart } from './SimpleChart';
 import { ActiveOrderCard } from './ActiveOrderCard';
+import { SuperActiveOrderCard } from './SuperActiveOrderCard';
+import { QuickActionPanel } from './QuickActionPanel';
+import { OverdueOrdersAlert } from './OverdueOrdersAlert';
+import { CollectedEquipmentCard } from './CollectedEquipmentCard';
 import { WeatherCard } from './WeatherCard';
 import { ProductivityDashboard } from '@/components/technician/ProductivityDashboard';
 import OrderDetailsModal from './OrderDetailsModal';
@@ -71,15 +75,42 @@ const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
   // Filtrar ordens usando utilitários unificados
   const pendingOrders = technicianOrders.filter(order => order.status === 'pending');
-  const activeOrders = technicianOrders.filter(order => isActiveOrder(order.status));
+  const activeOrders = technicianOrders.filter(order => isTechnicianActiveOrder(order.status)); // Usar função específica do técnico
   const inProgressOrders = technicianOrders.filter(order => isInProgressOrder(order.status));
   const scheduledOrders = technicianOrders.filter(order => isScheduledOrder(order.status));
   const completedOrders = technicianOrders.filter(order =>
     order.status === 'completed' || order.status === 'cancelled'
   );
 
-  // Ordenar ordens ativas por prioridade híbrida (status primeiro, depois horário)
-  const sortedActiveOrders = sortOrdersByHybridPriority(activeOrders);
+  // Função para detectar ordens atrasadas
+  const isOrderOverdue = (order: ServiceOrder): boolean => {
+    if (!order.scheduledDate) return false;
+
+    const now = new Date();
+    const scheduledDateTime = new Date(order.scheduledDate);
+
+    // Se tem horário específico, usar ele
+    if (order.scheduledTime) {
+      const [hours, minutes] = order.scheduledTime.split(':').map(Number);
+      scheduledDateTime.setHours(hours, minutes, 0, 0);
+    }
+
+    // Considerar atrasado se passou mais de 1 hora do horário agendado
+    const oneHourLater = new Date(scheduledDateTime.getTime() + 60 * 60 * 1000);
+    return now > oneHourLater;
+  };
+
+  // Separar ordens atuais e atrasadas
+  const overdueOrders = activeOrders.filter(order => isOrderOverdue(order));
+  const currentActiveOrders = activeOrders.filter(order => !isOrderOverdue(order));
+
+  // Filtrar ordens coletadas que precisam ser deixadas na oficina
+  const collectedOrders = technicianOrders.filter(order =>
+    order.status === 'collected' || order.status === 'collected_for_diagnosis'
+  );
+
+  // Ordenar ordens ativas por prioridade específica do técnico (ordens coletadas vão para o final)
+  const sortedActiveOrders = sortTechnicianOrdersByPriority([...currentActiveOrders, ...overdueOrders]);
 
   // Ordens de hoje
   const todayOrders = technicianOrders.filter(order =>
@@ -290,13 +321,46 @@ const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
         </Card>
       </div>
 
-      {/* Ordem em andamento moderna */}
-      <ActiveOrderCard
-        order={activeOrder}
-        onViewOrder={() => activeOrder && onSelectOrder?.(activeOrder.id)}
-        onNavigate={() => activeOrder?.pickupAddress && window.open(`https://maps.google.com/maps?q=${encodeURIComponent(activeOrder.pickupAddress)}`)}
-        onUpdateStatus={onStatusUpdate}
-      />
+      {/* Alerta de Ordens Atrasadas */}
+      {overdueOrders.length > 0 && (
+        <OverdueOrdersAlert
+          overdueOrders={overdueOrders}
+          onNavigate={(address) => window.open(`https://maps.google.com/maps?q=${encodeURIComponent(address)}`)}
+          onCallClient={(phone) => window.open(`tel:${phone}`)}
+          onViewOrder={(orderId) => onSelectOrder?.(orderId)}
+        />
+      )}
+
+      {/* Card de Equipamentos Coletados */}
+      {collectedOrders.length > 0 && (
+        <CollectedEquipmentCard
+          collectedOrders={collectedOrders}
+          onUpdateStatus={onStatusUpdate}
+        />
+      )}
+
+      {/* Layout Melhorado - Super Card + Quick Actions */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Super Card de Ordens Ativas - 2/3 da largura */}
+        <div className="lg:col-span-2">
+          <SuperActiveOrderCard
+            orders={sortedActiveOrders} // Usar ordens ordenadas por prioridade
+            onViewOrder={(orderId) => onSelectOrder?.(orderId)}
+            onNavigate={(address) => window.open(`https://maps.google.com/maps?q=${encodeURIComponent(address)}`)}
+            onUpdateStatus={onStatusUpdate}
+          />
+        </div>
+
+        {/* Quick Action Panel - 1/3 da largura */}
+        <div className="lg:col-span-1">
+          <QuickActionPanel
+            orders={sortedActiveOrders} // Usar ordens ordenadas por prioridade
+            onNavigateToAll={() => handleNavigate('active')}
+            onCallClient={(phone) => window.open(`tel:${phone}`)}
+            onViewRoute={() => handleQuickAction('route')}
+          />
+        </div>
+      </div>
 
       {/* Próxima ordem */}
       {nextOrder && (

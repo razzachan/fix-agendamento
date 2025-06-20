@@ -137,7 +137,8 @@ class RouteApplicationService {
         .from('agendamentos_ai')
         .select('id, nome, data_agendada')
         .eq('status', 'agendado')
-        .like('data_agendada', `${selectedDate}%`);
+        .gte('data_agendada', `${selectedDate}T00:00:00`)
+        .lt('data_agendada', `${selectedDate}T23:59:59`);
 
       if (error) {
         console.error('Erro ao buscar agendamentos existentes:', error);
@@ -419,7 +420,8 @@ class RouteApplicationService {
         .from('agendamentos_ai')
         .select('*')
         .eq('status', 'agendado')
-        .like('data_agendada', `${date}%`)
+        .gte('data_agendada', `${date}T00:00:00`)
+        .lt('data_agendada', `${date}T23:59:59`)
         .order('created_at');
 
       if (error) {

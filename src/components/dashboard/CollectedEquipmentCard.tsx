@@ -1,0 +1,202 @@
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ServiceOrder, ServiceOrderStatus } from '@/types';
+import {
+  Package,
+  Clock,
+  MapPin,
+  User,
+  Wrench,
+  AlertTriangle,
+  Factory,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { DisplayNumber } from '@/components/common/DisplayNumber';
+import NextStatusButton from '@/components/ServiceOrders/ProgressTracker/NextStatusButton';
+
+interface CollectedEquipmentCardProps {
+  collectedOrders: ServiceOrder[];
+  onUpdateStatus?: (orderId: string, newStatus: ServiceOrderStatus, notes?: string) => Promise<void>;
+  className?: string;
+}
+
+export const CollectedEquipmentCard: React.FC<CollectedEquipmentCardProps> = ({
+  collectedOrders,
+  onUpdateStatus,
+  className
+}) => {
+  const [isExpanded, setIsExpanded] = useState(true); // Expandido por padrão para visibilidade
+
+  if (!collectedOrders || collectedOrders.length === 0) {
+    return null; // Não mostrar o card se não há equipamentos coletados
+  }
+
+  const getCollectionTime = (order: ServiceOrder): string => {
+    // Tentar pegar o horário da última atualização ou usar horário atual como fallback
+    if (order.updatedAt) {
+      return format(new Date(order.updatedAt), 'HH:mm', { locale: ptBR });
+    }
+    if (order.scheduledDate) {
+      return format(new Date(order.scheduledDate), 'HH:mm', { locale: ptBR });
+    }
+    return 'Horário não disponível';
+  };
+
+  return (
+    <>
+      <Card className={cn('border-orange-200 bg-orange-50/50', className)}>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-orange-600" />
+              <span className="text-orange-800">
+                Equipamentos para Oficina
+              </span>
+              <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-200">
+                {collectedOrders.length} pendente{collectedOrders.length > 1 ? 's' : ''}
+              </Badge>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="h-auto p-1"
+            >
+              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        
+        <CardContent className="space-y-3">
+          {/* Alerta de Ação Necessária */}
+          <div className="flex items-center gap-2 p-2 bg-orange-100 border border-orange-200 rounded-lg">
+            <AlertTriangle className="w-4 h-4 text-orange-600" />
+            <div className="text-xs text-orange-700">
+              <span className="font-medium">{collectedOrders.length} equipamento{collectedOrders.length > 1 ? 's' : ''}</span> aguardando definição de oficina responsável
+            </div>
+          </div>
+
+          {/* Lista de Equipamentos Coletados */}
+          {isExpanded && (
+            <div className="space-y-3">
+              {collectedOrders.map((order) => {
+                const collectionTime = getCollectionTime(order);
+
+                return (
+                  <div
+                    key={order.id}
+                    className="p-3 bg-white border border-orange-200 rounded-lg hover:shadow-sm transition-all duration-200"
+                  >
+                    <div className="space-y-3">
+                      {/* Informações do Cliente e Equipamento */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <span className="font-semibold">{order.clientName}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Wrench className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm">
+                              {order.equipmentType} {order.equipmentModel && `- ${order.equipmentModel}`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-orange-600" />
+                            <span className="text-sm text-orange-700">
+                              Coletado às {collectionTime}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="text-right">
+                          <div className="text-xs text-muted-foreground mb-2">
+                            <DisplayNumber item={order} variant="inline" size="sm" showIcon={false} />
+                          </div>
+                          <Badge variant="outline" className="text-xs border-orange-200 text-orange-700">
+                            Coletado
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Endereço de Coleta */}
+                      {order.pickupAddress && (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                          <span className="text-sm text-muted-foreground">
+                            {order.pickupAddress}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Descrição se houver */}
+                      {order.description && (
+                        <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                          {order.description}
+                        </div>
+                      )}
+
+                      {/* Botão de Ação - NextStatusButton */}
+                      <div className="pt-2 border-t border-orange-200">
+                        <NextStatusButton
+                          serviceOrder={order}
+                          onUpdateStatus={async (orderId: string, newStatus: string, notes?: string) => {
+                            if (onUpdateStatus) {
+                              await onUpdateStatus(orderId, newStatus as ServiceOrderStatus, notes);
+                              return true;
+                            }
+                            return false;
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Resumo Compacto quando Recolhido */}
+          {!isExpanded && (
+            <div className="space-y-2">
+              {collectedOrders.slice(0, 2).map((order) => (
+                <div key={order.id} className="flex items-center justify-between text-sm p-2 bg-white rounded border border-orange-200">
+                  <div className="flex items-center gap-2">
+                    <User className="w-3 h-3 text-muted-foreground" />
+                    <span className="font-medium">{order.clientName}</span>
+                    <span className="text-muted-foreground">-</span>
+                    <span className="text-muted-foreground">{order.equipmentType}</span>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <NextStatusButton
+                      serviceOrder={order}
+                      onUpdateStatus={async (orderId: string, newStatus: string, notes?: string) => {
+                        if (onUpdateStatus) {
+                          await onUpdateStatus(orderId, newStatus as ServiceOrderStatus, notes);
+                          return true;
+                        }
+                        return false;
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+              
+              {collectedOrders.length > 2 && (
+                <div className="text-xs text-center text-muted-foreground">
+                  +{collectedOrders.length - 2} equipamentos
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+};

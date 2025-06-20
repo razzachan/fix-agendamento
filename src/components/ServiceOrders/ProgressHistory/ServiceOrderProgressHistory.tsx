@@ -84,6 +84,60 @@ export function ServiceOrderProgressHistory({
     }
   };
 
+  // Função para traduzir status para português
+  const translateStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'pending': 'Pendente',
+      'scheduled': 'Agendado',
+      'on_the_way': 'A Caminho',
+      'in_progress': 'Em Andamento',
+      'collected': 'Coletado',
+      'collected_for_diagnosis': 'Coletado para Diagnóstico',
+      'collected_for_repair': 'Coletado para Conserto',
+      'at_workshop': 'Na Oficina',
+      'diagnosis_pending': 'Aguardando Diagnóstico',
+      'diagnosis_completed': 'Diagnóstico Concluído',
+      'quote_pending': 'Aguardando Orçamento',
+      'quote_approved': 'Orçamento Aprovado',
+      'quote_rejected': 'Orçamento Rejeitado',
+      'repair_in_progress': 'Conserto em Andamento',
+      'repair_completed': 'Conserto Concluído',
+      'payment_pending': 'Aguardando Pagamento',
+      'ready_for_delivery': 'Pronto para Entrega',
+      'delivered': 'Entregue',
+      'completed': 'Concluído',
+      'cancelled': 'Cancelado',
+      'archived': 'Arquivado'
+    };
+
+    return statusMap[status] || status;
+  };
+
+  // Função para traduzir notas automáticas do sistema
+  const translateNotes = (notes: string) => {
+    if (!notes) return notes;
+
+    // Traduzir status dentro das notas
+    let translatedNotes = notes;
+
+    // Padrão: "Status alterado de X para Y"
+    const statusChangePattern = /Status alterado de (\w+) para (\w+)/g;
+    translatedNotes = translatedNotes.replace(statusChangePattern, (match, fromStatus, toStatus) => {
+      return `Status alterado de "${translateStatus(fromStatus)}" para "${translateStatus(toStatus)}"`;
+    });
+
+    // Padrão: "Status revertido de "X" para "Y""
+    const statusRevertPattern = /Status revertido de "([^"]+)" para "([^"]+)"/g;
+    translatedNotes = translatedNotes.replace(statusRevertPattern, (match, fromStatus, toStatus) => {
+      return `Status revertido de "${fromStatus}" para "${toStatus}"`;
+    });
+
+    // Traduzir outras frases comuns
+    translatedNotes = translatedNotes.replace(/pelo técnico/g, 'pelo técnico');
+
+    return translatedNotes;
+  };
+
   return (
     <Card className="w-full">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -123,17 +177,17 @@ export function ServiceOrderProgressHistory({
                   className="border rounded-lg p-4 relative"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <Badge 
+                    <Badge
                       className={`${getStatusColor(entry.status)}`}
                     >
                       {React.createElement(getStatusIcon(entry.status), { className: "h-3 w-3 mr-1" })}
-                      {entry.status}
+                      {translateStatus(entry.status)}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
                       {formatDate(entry.createdAt)}
                     </span>
                   </div>
-                  <p className="text-sm">{entry.notes}</p>
+                  <p className="text-sm">{translateNotes(entry.notes)}</p>
                   {entry.createdBy && (
                     <div className="text-xs text-muted-foreground mt-2">
                       Por: {entry.createdBy}

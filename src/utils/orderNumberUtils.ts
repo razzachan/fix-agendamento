@@ -322,16 +322,27 @@ export function getDisplayNumber(item: any, index?: number): string {
   }
 
   // 3. Detectar pelo contexto/propriedades do item
-  const isServiceOrder = item.status && ['pending', 'scheduled', 'in_progress', 'completed', 'cancelled'].includes(item.status);
-  const isPreSchedule = item.scheduledDate || item.scheduled_date || item.isPreSchedule;
+  // Primeiro verificar se é pré-agendamento (tabela agendamentos_ai)
+  const isPreSchedule = item.nome || // campo específico da tabela agendamentos_ai
+                        item.equipamentos || // campo JSONB específico de pré-agendamentos
+                        item.problemas || // campo JSONB específico de pré-agendamentos
+                        item.scheduledDate ||
+                        item.scheduled_date ||
+                        item.isPreSchedule ||
+                        (item.status && ['pendente', 'confirmado', 'roteirizado', 'cancelado', 'os_criada'].includes(item.status));
+
+  // Só considerar como ordem de serviço se NÃO for pré-agendamento e tiver status de OS
+  const isServiceOrder = !isPreSchedule &&
+                         item.status &&
+                         ['pending', 'scheduled', 'in_progress', 'completed', 'cancelled'].includes(item.status);
 
   // 4. Fallback baseado no tipo detectado
-  if (isServiceOrder) {
-    return typeof index === 'number' ? formatOrderNumber(index + 1) : 'OS #---';
-  }
-
   if (isPreSchedule) {
     return typeof index === 'number' ? formatNumber(index + 1, 'pre_schedule') : 'AG #---';
+  }
+
+  if (isServiceOrder) {
+    return typeof index === 'number' ? formatOrderNumber(index + 1) : 'OS #---';
   }
 
   // 5. Fallback final
@@ -349,12 +360,22 @@ export function detectItemType(item: any): NumberType | null {
   if (item.scheduleNumber || item.schedule_number) return 'pre_schedule';
 
   // Verificar por propriedades características
-  if (item.status && ['pending', 'scheduled', 'in_progress', 'completed', 'cancelled'].includes(item.status)) {
-    return 'service_order';
+  // Primeiro verificar se é pré-agendamento (tabela agendamentos_ai)
+  const isPreSchedule = item.nome || // campo específico da tabela agendamentos_ai
+                        item.equipamentos || // campo JSONB específico de pré-agendamentos
+                        item.problemas || // campo JSONB específico de pré-agendamentos
+                        item.scheduledDate ||
+                        item.scheduled_date ||
+                        item.isPreSchedule ||
+                        (item.status && ['pendente', 'confirmado', 'roteirizado', 'cancelado', 'os_criada'].includes(item.status));
+
+  if (isPreSchedule) {
+    return 'pre_schedule';
   }
 
-  if (item.scheduledDate || item.scheduled_date || item.isPreSchedule) {
-    return 'pre_schedule';
+  // Só considerar como ordem de serviço se NÃO for pré-agendamento
+  if (item.status && ['pending', 'scheduled', 'in_progress', 'completed', 'cancelled'].includes(item.status)) {
+    return 'service_order';
   }
 
   return null;

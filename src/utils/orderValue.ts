@@ -2,21 +2,63 @@ import { ServiceOrder } from '@/types';
 
 /**
  * Calcula o valor total de uma ordem de serviço
- * Prioriza finalCost se disponível, senão soma os valores dos serviceItems
+ * Prioriza finalCost se disponível, senão verifica diagnóstico real,
+ * senão soma os valores dos serviceItems, senão tenta extrair da descrição
  */
 export const calculateOrderValue = (order: ServiceOrder): number => {
+
   // Se há um valor final definido, usar ele
   if (order.finalCost && order.finalCost > 0) {
     return order.finalCost;
   }
 
+  // Verificar se há diagnóstico REAL com valor estimado (não fake do sistema)
+  if (order.diagnosis && order.diagnosis.estimatedCost && order.diagnosis.estimatedCost > 0) {
+    // Verificar se não é um diagnóstico fake do sistema
+    if (order.diagnosis.workshopUserId !== '00000000-0000-0000-0000-000000000000') {
+      return order.diagnosis.estimatedCost;
+    }
+  }
+
   // Senão, calcular a partir dos itens de serviço
   if (order.serviceItems && order.serviceItems.length > 0) {
-    return order.serviceItems.reduce((total, item) => {
+    const total = order.serviceItems.reduce((total, item) => {
       // serviceValue está armazenado em centavos, então dividir por 100
       const value = parseFloat(item.serviceValue || '0') / 100;
       return total + value;
     }, 0);
+    if (total > 0) {
+      return total;
+    }
+  }
+
+  // Tentar extrair valor da descrição (vários formatos possíveis)
+  if (order.description) {
+    // Formato: "... | Valor estimado: R$ 290,00 ..." (baseado na imagem)
+    const valuePatterns = [
+      /Valor\s+estimado:\s*R\$\s*([\d]+,\d{2})/i,  // R$ 290,00
+      /Valor\s+estimado:\s*R\$\s*([\d]+\.\d{2})/i, // R$ 290.00
+      /Valor\s+estimado:\s*R\$\s*([\d]+)/i,        // R$ 290
+      /Valor:\s*R\$\s*([\d.,]+)/i,
+      /R\$\s*([\d.,]+)/i
+    ];
+
+    for (const pattern of valuePatterns) {
+      const valueMatch = order.description.match(pattern);
+      if (valueMatch) {
+        let valueStr = valueMatch[1];
+
+        // Se tem vírgula, assumir formato brasileiro (290,00)
+        if (valueStr.includes(',')) {
+          valueStr = valueStr.replace(',', '.');
+        }
+
+        const value = parseFloat(valueStr);
+        if (!isNaN(value) && value > 0) {
+          return value;
+        }
+      }
+    }
   }
 
   // Se não há valor definido
@@ -46,25 +88,44 @@ export const calculateContextualOrderValue = (order: ServiceOrder): {
 
   switch (attendanceType) {
     case 'coleta_diagnostico':
-      // Coleta diagnóstico: R$350 + orçamento na entrega
+      // Coleta diagnóstico: Taxa personalizada na coleta + orçamento na entrega
       if (['scheduled', 'on_the_way', 'collected_for_diagnosis', 'at_workshop'].includes(status)) {
         return {
-          displayValue: 350,
-          description: 'Taxa de coleta (R$ 350)',
+          displayValue: totalValue,
+          description: `Taxa de coleta (R$ ${totalValue.toFixed(2)})`,
           isPartial: true
         };
       } else if (['diagnosis_completed', 'ready_for_delivery', 'on_the_way_to_deliver'].includes(status)) {
-        return {
-          displayValue: totalValue,
-          description: `Valor do orçamento (R$ ${totalValue.toFixed(2)})`,
-          isPartial: true
-        };
+        // Quando há diagnóstico real, mostrar o valor do orçamento
+        if (order.diagnosis && order.diagnosis.estimatedCost && order.diagnosis.estimatedCost > totalValue) {
+          const orcamentoValue = order.diagnosis.estimatedCost - totalValue;
+          return {
+            displayValue: orcamentoValue,
+            description: `Valor do orçamento (R$ ${orcamentoValue.toFixed(2)})`,
+            isPartial: true
+          };
+        } else {
+          return {
+            displayValue: totalValue,
+            description: `Taxa de coleta (R$ ${totalValue.toFixed(2)})`,
+            isPartial: true
+          };
+        }
       } else {
-        return {
-          displayValue: totalValue + 350,
-          description: `Total: R$ 350 + R$ ${totalValue.toFixed(2)}`,
-          isPartial: false
-        };
+        // Status completed - mostrar total se houver diagnóstico
+        if (order.diagnosis && order.diagnosis.estimatedCost && order.diagnosis.estimatedCost > totalValue) {
+          return {
+            displayValue: order.diagnosis.estimatedCost,
+            description: `Total: R$ ${totalValue.toFixed(2)} + R$ ${(order.diagnosis.estimatedCost - totalValue).toFixed(2)}`,
+            isPartial: false
+          };
+        } else {
+          return {
+            displayValue: totalValue,
+            description: `Taxa de coleta (R$ ${totalValue.toFixed(2)})`,
+            isPartial: false
+          };
+        }
       }
 
     case 'coleta_conserto':
@@ -173,7 +234,7 @@ export const getOrderValueInfo = (order: ServiceOrder): {
 
   switch (attendanceType) {
     case 'coleta_diagnostico':
-      tooltip = 'Coleta Diagnóstico: R$ 350 na coleta + valor do orçamento na entrega';
+      tooltip = 'Coleta Diagnóstico: Taxa personalizada na coleta + valor do orçamento na entrega';
       break;
     case 'coleta_conserto':
       tooltip = 'Coleta Conserto: 50% na coleta + 50% na entrega';
@@ -191,3 +252,5 @@ export const getOrderValueInfo = (order: ServiceOrder): {
     tooltip
   };
 };
+
+

@@ -10,21 +10,19 @@ export async function getServiceOrderProgress(serviceOrderId: string): Promise<S
   try {
     console.log(`Buscando histórico de progresso para ordem de serviço ${serviceOrderId}`);
     
-    // Buscar entradas de progresso ordenadas por timestamp
+    // Buscar entradas de progresso ordenadas por created_at
     const { data, error } = await supabase
       .from('service_order_progress')
       .select(`
         id,
         service_order_id,
         status,
-        timestamp,
-        user_id,
-        user_name,
         notes,
-        system_generated
+        created_at,
+        created_by
       `)
       .eq('service_order_id', serviceOrderId)
-      .order('timestamp', { ascending: true });
+      .order('created_at', { ascending: true });
     
     if (error) {
       console.error('Erro ao buscar histórico de progresso:', error);
@@ -44,11 +42,11 @@ export async function getServiceOrderProgress(serviceOrderId: string): Promise<S
       id: entry.id,
       serviceOrderId: entry.service_order_id,
       status: entry.status,
-      timestamp: entry.timestamp,
-      userId: entry.user_id,
-      userName: entry.user_name,
+      timestamp: entry.created_at,
+      userId: null, // Não temos user_id na tabela atual
+      userName: entry.created_by,
       notes: entry.notes,
-      systemGenerated: entry.system_generated
+      systemGenerated: false // Assumir false por padrão já que não temos a coluna
     }));
     
     return {

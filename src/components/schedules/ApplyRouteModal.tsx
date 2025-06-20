@@ -44,6 +44,10 @@ import { OptimizedRoute } from '@/services/routing/unifiedRoutingService';
 import { calendarAvailabilityService, AvailabilityCheck } from '@/services/calendar/CalendarAvailabilityService';
 import WeeklyRouteCalendar from '@/components/calendar/WeeklyRouteCalendar';
 import { DisplayNumber } from '@/components/common/DisplayNumber';
+import MultipleEquipmentModal from './MultipleEquipmentModal';
+import SingleEquipmentModal from './SingleEquipmentModal';
+import CreateServiceOrderDialog from './CreateServiceOrderDialog';
+import { orderLifecycleService } from '@/services/orderLifecycle/OrderLifecycleService';
 
 interface ApplyRouteModalProps {
   isOpen: boolean;
@@ -72,6 +76,8 @@ const ApplyRouteModal: React.FC<ApplyRouteModalProps> = ({
   route,
   onApply
 }) => {
+  // Log básico para verificar se o componente está sendo renderizado
+  console.log('🔥 ApplyRouteModal renderizado! isOpen:', isOpen, 'route:', route?.logisticsGroup);
   // Estados
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('');
@@ -83,6 +89,40 @@ const ApplyRouteModal: React.FC<ApplyRouteModalProps> = ({
 
   // Estados para drag & drop
   const [draggedAgendamento, setDraggedAgendamento] = useState<{ id: number; name: string } | null>(null);
+  const [multipleEquipmentModal, setMultipleEquipmentModal] = useState<{
+    isOpen: boolean;
+    agendamento: AgendamentoAI | null;
+    scheduledDate: string;
+    scheduledTime: string;
+  }>({
+    isOpen: false,
+    agendamento: null,
+    scheduledDate: '',
+    scheduledTime: ''
+  });
+
+  const [singleEquipmentModal, setSingleEquipmentModal] = useState<{
+    isOpen: boolean;
+    agendamento: AgendamentoAI | null;
+    scheduledDate: string;
+    scheduledTime: string;
+  }>({
+    isOpen: false,
+    agendamento: null,
+    scheduledDate: '',
+    scheduledTime: ''
+  });
+
+  // Estado para o diálogo de criação de OS
+  const [createOrderDialog, setCreateOrderDialog] = useState<{
+    isOpen: boolean;
+    agendamento: AgendamentoAI | null;
+  }>({
+    isOpen: false,
+    agendamento: null,
+  });
+
+
   const [calendarAvailabilityData, setCalendarAvailabilityData] = useState<{ [key: string]: { available: number; total: number } }>({});
 
   // Carregar técnicos
@@ -111,6 +151,7 @@ const ApplyRouteModal: React.FC<ApplyRouteModalProps> = ({
     console.log('🔧 ApplyRouteModal useEffect - route:', route, 'isOpen:', isOpen);
     if (route && isOpen) {
       console.log('🔧 Inicializando modal com rota:', route.logisticsGroup, 'agendamentos:', route.sequence.length);
+      toast.info(`🔧 Modal aberto! Rota: ${route.logisticsGroup}, ${route.sequence.length} agendamentos`, { duration: 5000 });
 
       // Sugerir técnico se disponível
       if (route.suggestedTechnicianId) {
@@ -292,6 +333,366 @@ const ApplyRouteModal: React.FC<ApplyRouteModalProps> = ({
     setDraggedAgendamento(null);
   };
 
+  // Funções para lidar com múltiplos equipamentos
+  const handleCreateMultipleOrders = async (groups: Array<{
+    equipments: string[];
+    problems: string[];
+    attendanceType: 'em_domicilio' | 'coleta_conserto' | 'coleta_diagnostico';
+    technicianId?: string;
+    notes?: string;
+    estimatedValue?: number;
+  }>) => {
+    if (!multipleEquipmentModal.agendamento) {
+      console.error('❌ [handleCreateMultipleOrders] Agendamento não encontrado no modal');
+      return;
+    }
+
+    try {
+      console.log('🚀 [handleCreateMultipleOrders] Iniciando criação de múltiplas OS');
+      console.log('🔍 [handleCreateMultipleOrders] Agendamento:', multipleEquipmentModal.agendamento);
+      console.log('🔍 [handleCreateMultipleOrders] ID do agendamento:', multipleEquipmentModal.agendamento.id, 'tipo:', typeof multipleEquipmentModal.agendamento.id);
+      console.log('🔍 [handleCreateMultipleOrders] Groups:', groups);
+
+      const result = await orderLifecycleService.createMultipleServiceOrdersFromAgendamento(
+        multipleEquipmentModal.agendamento.id,
+        groups.map(group => ({
+          ...group,
+          technicianId: selectedTechnicianId
+        })),
+        multipleEquipmentModal.scheduledDate,
+        multipleEquipmentModal.scheduledTime
+      );
+
+      toast.success(
+        `🎉 ${result.serviceOrders.length} ordens de serviço criadas com sucesso!`,
+        { duration: 4000 }
+      );
+
+      // Remover agendamento da lista (foi convertido)
+      setAgendamentosWithSchedule(prev =>
+        prev.filter(ag => ag.id !== multipleEquipmentModal.agendamento?.id)
+      );
+
+      // Fechar modal
+      closeMultipleEquipmentModal();
+
+      // Continuar processando outros agendamentos se houver
+      await continueProcessingAfterMultipleEquipment();
+
+    } catch (error) {
+      console.error('Erro ao criar múltiplas OS:', error);
+      toast.error('Erro ao criar ordens de serviço');
+    }
+  };
+
+  const handleCreateSingleOrderFromMultiple = async () => {
+    if (!multipleEquipmentModal.agendamento) return;
+
+    try {
+      // Criar OS única com todos os equipamentos
+      const result = await orderLifecycleService.createServiceOrderFromAgendamento(
+        multipleEquipmentModal.agendamento.id,
+        {
+          equipment: 'Múltiplos equipamentos',
+          problem_description: 'Múltiplos problemas - ver detalhes na OS',
+          priority: multipleEquipmentModal.agendamento.urgente ? 'high' : 'medium',
+          notes: 'OS criada com múltiplos equipamentos',
+          technicianId: selectedTechnicianId,
+          scheduledDate: multipleEquipmentModal.scheduledDate,
+          scheduledTime: multipleEquipmentModal.scheduledTime
+        }
+      );
+
+      toast.success('Ordem de serviço única criada com sucesso!');
+
+      // Remover agendamento da lista (foi convertido)
+      setAgendamentosWithSchedule(prev =>
+        prev.filter(ag => ag.id !== multipleEquipmentModal.agendamento?.id)
+      );
+
+      // Fechar modal
+      closeMultipleEquipmentModal();
+
+      // Continuar processando outros agendamentos se houver
+      await continueProcessingAfterMultipleEquipment();
+
+    } catch (error) {
+      console.error('Erro ao criar OS única:', error);
+      toast.error('Erro ao criar ordem de serviço');
+    }
+  };
+
+  const closeMultipleEquipmentModal = () => {
+    setMultipleEquipmentModal({
+      isOpen: false,
+      agendamento: null,
+      scheduledDate: '',
+      scheduledTime: ''
+    });
+  };
+
+  const closeSingleEquipmentModal = () => {
+    setSingleEquipmentModal({
+      isOpen: false,
+      agendamento: null,
+      scheduledDate: '',
+      scheduledTime: ''
+    });
+  };
+
+  // Função para lidar com criação de OS única
+  const handleCreateSingleOrder = async (orderData: {
+    attendanceType: 'em_domicilio' | 'coleta_conserto' | 'coleta_diagnostico';
+    estimatedValue?: number;
+    notes?: string;
+  }) => {
+    if (!singleEquipmentModal.agendamento) return;
+
+    try {
+      const result = await orderLifecycleService.createServiceOrderFromAgendamento(
+        singleEquipmentModal.agendamento.id,
+        {
+          equipment: singleEquipmentModal.agendamento.equipamento || 'Equipamento não especificado',
+          problem_description: singleEquipmentModal.agendamento.problema || 'Problema não especificado',
+          priority: singleEquipmentModal.agendamento.urgente ? 'high' : 'medium',
+          scheduled_date: singleEquipmentModal.scheduledDate,
+          scheduled_time: singleEquipmentModal.scheduledTime,
+          service_attendance_type: orderData.attendanceType,
+          estimated_cost: orderData.estimatedValue,
+          notes: orderData.notes,
+          technicianId: selectedTechnicianId
+        }
+      );
+
+      toast.success('Ordem de serviço criada com sucesso!');
+
+      // Remover agendamento da lista (foi convertido)
+      setAgendamentosWithSchedule(prev =>
+        prev.filter(ag => ag.id !== singleEquipmentModal.agendamento?.id)
+      );
+
+      // Fechar modal
+      closeSingleEquipmentModal();
+
+      // Continuar processando outros agendamentos se houver
+      await continueProcessingAfterSingleEquipment();
+
+    } catch (error) {
+      console.error('Erro ao criar ordem de serviço:', error);
+      toast.error('Erro ao criar ordem de serviço');
+    }
+  };
+
+  // Função para lidar com criação de OS a partir do diálogo
+  const handleCreateServiceOrder = async (
+    agendamentoId: string,
+    scheduledDate: string | null,
+    scheduledTime: string | null,
+    existingClientId?: string,
+    multipleEquipmentData?: {
+      hasMultipleEquipments: boolean;
+      creationMode: 'single' | 'multiple';
+      suggestedGroups: Array<{
+        equipments: string[];
+        problems: string[];
+        attendanceType: 'em_domicilio' | 'coleta_conserto' | 'coleta_diagnostico';
+        reasoning: string;
+      }>;
+    }
+  ) => {
+    if (!createOrderDialog.agendamento) return;
+
+    try {
+      const agendamento = createOrderDialog.agendamento;
+
+      // Verificar se tem múltiplos equipamentos e como proceder
+      if (multipleEquipmentData?.hasMultipleEquipments) {
+        if (multipleEquipmentData.creationMode === 'single') {
+          // Criar OS única com todos os equipamentos
+          const allEquipments = multipleEquipmentData.suggestedGroups.flatMap(g => g.equipments);
+          const allProblems = multipleEquipmentData.suggestedGroups.flatMap(g => g.problems);
+
+          const result = await orderLifecycleService.createServiceOrderFromAgendamento(
+            agendamento.id,
+            {
+              equipment: `Múltiplos equipamentos (${allEquipments.length})`,
+              problem_description: allProblems.join('; '),
+              priority: agendamento.urgente ? 'high' : 'medium',
+              notes: 'OS criada com múltiplos equipamentos',
+              scheduled_date: scheduledDate,
+              scheduled_time: scheduledTime
+            }
+          );
+
+          toast.success('Ordem de serviço única criada com sucesso!');
+        } else {
+          // Criar múltiplas OS baseadas nos agrupamentos sugeridos
+          const result = await orderLifecycleService.createMultipleServiceOrdersFromAgendamento(
+            agendamento.id,
+            multipleEquipmentData.suggestedGroups.map(group => ({
+              equipments: group.equipments,
+              problems: group.problems,
+              attendanceType: group.attendanceType,
+              technicianId: selectedTechnicianId
+            })),
+            scheduledDate || undefined,
+            scheduledTime || undefined
+          );
+
+          toast.success(
+            `🎉 ${result.serviceOrders.length} ordens de serviço criadas com sucesso!`,
+            { duration: 4000 }
+          );
+        }
+      } else {
+        // Criar OS única para equipamento único
+        const result = await orderLifecycleService.createServiceOrderFromAgendamento(
+          agendamento.id,
+          {
+            equipment: agendamento.equipamento || 'Equipamento não especificado',
+            problem_description: agendamento.problema || 'Problema não especificado',
+            priority: agendamento.urgente ? 'high' : 'medium',
+            scheduled_date: scheduledDate,
+            scheduled_time: scheduledTime
+          }
+        );
+
+        toast.success('Ordem de serviço criada com sucesso!');
+      }
+
+      // Remover agendamento da lista (foi convertido)
+      setAgendamentosWithSchedule(prev =>
+        prev.filter(ag => ag.id !== agendamento.id)
+      );
+
+      // Fechar diálogo
+      setCreateOrderDialog({
+        isOpen: false,
+        agendamento: null
+      });
+
+      // Continuar processando outros agendamentos se houver
+      await continueProcessingAfterMultipleEquipment();
+
+    } catch (error) {
+      console.error('Erro ao criar ordem de serviço:', error);
+      toast.error('Erro ao criar ordem de serviço');
+    }
+  };
+
+  // Continuar processando agendamentos após processar equipamento único
+  const continueProcessingAfterSingleEquipment = async () => {
+    try {
+      // Buscar agendamentos selecionados restantes
+      const remainingSelectedAgendamentos = agendamentosWithSchedule.filter(ag => ag.isSelected);
+
+      // Verificar se ainda há agendamentos com múltiplos equipamentos
+      const remainingMultipleEquipments = remainingSelectedAgendamentos.filter(ag =>
+        orderLifecycleService.hasMultipleEquipments(ag)
+      );
+
+      if (remainingMultipleEquipments.length > 0) {
+        // Processar o próximo agendamento com múltiplos equipamentos
+        const nextAgendamento = remainingMultipleEquipments[0];
+
+        setMultipleEquipmentModal({
+          isOpen: true,
+          agendamento: nextAgendamento,
+          scheduledDate: selectedDate,
+          scheduledTime: nextAgendamento.scheduledTime
+        });
+
+        return;
+      }
+
+      // Verificar se ainda há agendamentos únicos
+      const remainingSingleEquipments = remainingSelectedAgendamentos.filter(ag =>
+        !orderLifecycleService.hasMultipleEquipments(ag)
+      );
+
+      if (remainingSingleEquipments.length > 0) {
+        // Processar o próximo agendamento único
+        const nextAgendamento = remainingSingleEquipments[0];
+
+        setSingleEquipmentModal({
+          isOpen: true,
+          agendamento: nextAgendamento,
+          scheduledDate: selectedDate,
+          scheduledTime: nextAgendamento.scheduledTime
+        });
+
+        return;
+      }
+
+      // Se não há mais agendamentos, finalizar
+      toast.success('🎉 Todos os agendamentos foram processados com sucesso!');
+      onClose();
+
+    } catch (error) {
+      console.error('Erro ao continuar processamento:', error);
+      toast.error('Erro ao processar agendamentos restantes');
+    }
+  };
+
+  // Continuar processando agendamentos após processar múltiplos equipamentos
+  const continueProcessingAfterMultipleEquipment = async () => {
+    try {
+      // Buscar agendamentos selecionados restantes
+      const remainingSelectedAgendamentos = agendamentosWithSchedule.filter(ag => ag.isSelected);
+
+      // Verificar se ainda há agendamentos com múltiplos equipamentos
+      const remainingMultipleEquipments = remainingSelectedAgendamentos.filter(ag =>
+        orderLifecycleService.hasMultipleEquipments(ag)
+      );
+
+      if (remainingMultipleEquipments.length > 0) {
+        // Processar o próximo agendamento com múltiplos equipamentos
+        const nextAgendamento = remainingMultipleEquipments[0];
+
+        setMultipleEquipmentModal({
+          isOpen: true,
+          agendamento: nextAgendamento,
+          scheduledDate: selectedDate,
+          scheduledTime: nextAgendamento.scheduledTime
+        });
+
+        return;
+      }
+
+      // Processar agendamentos normais restantes
+      const normalAgendamentos = remainingSelectedAgendamentos.filter(ag =>
+        !orderLifecycleService.hasMultipleEquipments(ag)
+      );
+
+      if (normalAgendamentos.length > 0) {
+        const scheduleData: ScheduleData[] = normalAgendamentos.map(ag => ({
+          agendamentoId: ag.id,
+          scheduledTime: ag.scheduledTime,
+          estimatedDuration: ag.estimatedDuration,
+          selectedDate: selectedDate
+        }));
+
+        await onApply(normalAgendamentos, selectedTechnicianId, scheduleData, selectedDate);
+
+        toast.success(
+          `🎉 Rota aplicada com sucesso! ${normalAgendamentos.length} agendamentos confirmados para ${format(parseISO(selectedDate), 'dd/MM/yyyy', { locale: ptBR })}`,
+          { duration: 4000 }
+        );
+      } else {
+        toast.success('🎉 Todos os agendamentos foram processados com sucesso!');
+      }
+
+      // Fechar modal principal se não há mais agendamentos para processar
+      if (remainingSelectedAgendamentos.length === 0) {
+        onClose();
+      }
+
+    } catch (error) {
+      console.error('Erro ao continuar processamento:', error);
+      toast.error('Erro ao processar agendamentos restantes');
+    }
+  };
+
   const handleAgendamentoDrop = (agendamentoId: number, date: Date, time: string) => {
     const dateString = format(date, 'yyyy-MM-dd');
 
@@ -341,35 +742,44 @@ const ApplyRouteModal: React.FC<ApplyRouteModalProps> = ({
       }
     }
 
-    // Atualizar o agendamento em uma única operação
-    setAgendamentosWithSchedule(prev =>
-      prev.map(ag =>
-        ag.id === agendamentoId
-          ? { ...ag, isSelected: true, scheduledTime: time }
-          : ag
-      )
-    );
-
-    // Limpar estado de drag após sucesso
-    setDraggedAgendamento(null);
-
-    // Mostrar toast apenas para drag manual
-    if (draggedAgendamento) {
-      toast.success(
-        `📅 ${draggedAgendamento.name} agendado para ${format(date, 'dd/MM/yyyy')} às ${time}`,
-        {
-          duration: 3000,
-          style: {
-            background: '#10B981',
-            color: 'white',
-          },
-        }
-      );
+    // Buscar o agendamento completo
+    const agendamento = agendamentosWithSchedule.find(ag => ag.id === agendamentoId);
+    if (!agendamento) {
+      console.error('Agendamento não encontrado:', agendamentoId);
+      setDraggedAgendamento(null);
+      return;
     }
+
+    // Verificar se possui múltiplos equipamentos
+    const hasMultipleEquipments = orderLifecycleService.hasMultipleEquipments(agendamento);
+
+    if (hasMultipleEquipments) {
+      // Abrir modal de múltiplos equipamentos
+      setMultipleEquipmentModal({
+        isOpen: true,
+        agendamento: agendamento,
+        scheduledDate: dateString,
+        scheduledTime: time
+      });
+      setDraggedAgendamento(null);
+      return;
+    }
+
+    // Abrir modal de equipamento único para configuração
+    setSingleEquipmentModal({
+      isOpen: true,
+      agendamento: agendamento,
+      scheduledDate: dateString,
+      scheduledTime: time
+    });
+    setDraggedAgendamento(null);
   };
 
   // Aplicar rota
   const handleApplyRoute = async () => {
+    console.log('🚀 [handleApplyRoute] Função chamada!');
+    alert('🚀 Função handleApplyRoute chamada!');
+
     if (!selectedTechnicianId) {
       toast.error('Selecione um técnico para a rota');
       return;
@@ -381,43 +791,75 @@ const ApplyRouteModal: React.FC<ApplyRouteModalProps> = ({
     }
 
     const selectedAgendamentos = agendamentosWithSchedule.filter(ag => ag.isSelected);
+
+    // Log seguro dos agendamentos selecionados
+    const nomesSelecionados = selectedAgendamentos.map(ag => ag.nome).join(', ');
+    console.log('📋 Agendamentos selecionados:', nomesSelecionados);
+    console.log('🎯 Teste Multiplos Equipamentos na lista?', nomesSelecionados.includes('Teste Multiplos Equipamentos'));
+
+    // Alert para debug
+    alert(`📋 Selecionados: ${nomesSelecionados}`);
+
     if (selectedAgendamentos.length === 0) {
       toast.error('Selecione pelo menos um agendamento');
       return;
     }
 
-    // Validar se os horários são em intervalos de hora em hora
-    const invalidTimes = selectedAgendamentos.filter(ag => {
-      const [hours, minutes] = ag.scheduledTime.split(':').map(Number);
-      return minutes !== 0;
+    // 🔥 PRIMEIRA PRIORIDADE: Verificar múltiplos equipamentos ANTES de qualquer validação
+    console.log('🔍 Verificando agendamentos selecionados:', selectedAgendamentos.map(ag => ({
+      nome: ag.nome,
+      equipamentos: ag.equipamentos,
+      equipamento: ag.equipamento
+    })));
+
+    const agendamentosWithMultipleEquipments = selectedAgendamentos.filter(ag => {
+      console.log('🔍 Verificando agendamento:', ag.nome, 'equipamentos:', ag.equipamentos, 'tipo:', typeof ag.equipamentos);
+
+      const hasMultiple = orderLifecycleService.hasMultipleEquipments(ag);
+      console.log('🎯 Tem múltiplos equipamentos?', hasMultiple);
+
+      return hasMultiple;
     });
 
-    if (invalidTimes.length > 0) {
-      toast.error('Todos os horários devem ser em intervalos de hora em hora (ex: 08:00, 09:00)');
+    if (agendamentosWithMultipleEquipments.length > 0) {
+      // Se há agendamentos com múltiplos equipamentos, abrir modal específico
+      console.log('🔄 Detectados agendamentos com múltiplos equipamentos:', agendamentosWithMultipleEquipments.length);
+
+      const firstMultipleEquipmentAgendamento = agendamentosWithMultipleEquipments[0];
+
+      setMultipleEquipmentModal({
+        isOpen: true,
+        agendamento: firstMultipleEquipmentAgendamento,
+        scheduledDate: selectedDate,
+        scheduledTime: firstMultipleEquipmentAgendamento.scheduledTime
+      });
+
       return;
     }
 
-    setIsApplying(true);
+    // Verificar se há agendamentos únicos
+    const agendamentosWithSingleEquipment = selectedAgendamentos.filter(ag =>
+      !orderLifecycleService.hasMultipleEquipments(ag)
+    );
 
-    try {
-      const scheduleData: ScheduleData[] = selectedAgendamentos.map(ag => ({
-        agendamentoId: ag.id,
-        scheduledTime: ag.scheduledTime,
-        estimatedDuration: ag.estimatedDuration,
-        selectedDate: selectedDate
-      }));
+    if (agendamentosWithSingleEquipment.length > 0) {
+      // Se há agendamentos únicos, abrir modal específico
+      console.log('🔄 Detectados agendamentos com equipamento único:', agendamentosWithSingleEquipment.length);
 
-      await onApply(selectedAgendamentos, selectedTechnicianId, scheduleData, selectedDate);
+      const firstSingleEquipmentAgendamento = agendamentosWithSingleEquipment[0];
 
-      toast.success(`Rota aplicada com sucesso! ${selectedAgendamentos.length} agendamentos confirmados para ${format(parseISO(selectedDate), 'dd/MM/yyyy', { locale: ptBR })}`);
-      onClose();
-      
-    } catch (error) {
-      console.error('Erro ao aplicar rota:', error);
-      toast.error('Erro ao aplicar rota');
-    } finally {
-      setIsApplying(false);
+      setSingleEquipmentModal({
+        isOpen: true,
+        agendamento: firstSingleEquipmentAgendamento,
+        scheduledDate: selectedDate,
+        scheduledTime: firstSingleEquipmentAgendamento.scheduledTime
+      });
+
+      return;
     }
+
+    // Se chegou aqui, não há agendamentos para processar
+    toast.warning('❌ Nenhum agendamento válido encontrado.', { duration: 4000 });
   };
 
   // Estatísticas da seleção
@@ -723,7 +1165,22 @@ const ApplyRouteModal: React.FC<ApplyRouteModalProps> = ({
               Cancelar
             </Button>
             <Button
-              onClick={handleApplyRoute}
+              onClick={() => {
+                toast.info('🔘 Botão "Aplicar Rota" clicado!', { duration: 5000 });
+                if (isApplying) {
+                  toast.warning('⏳ Já está aplicando...', { duration: 3000 });
+                  return;
+                }
+                if (!selectedTechnicianId) {
+                  toast.warning('👤 Nenhum técnico selecionado!', { duration: 3000 });
+                  return;
+                }
+                if (selectedCount === 0) {
+                  toast.warning('📋 Nenhum agendamento selecionado!', { duration: 3000 });
+                  return;
+                }
+                handleApplyRoute();
+              }}
               disabled={isApplying || !selectedTechnicianId || selectedCount === 0}
             >
               {isApplying ? (
@@ -741,6 +1198,35 @@ const ApplyRouteModal: React.FC<ApplyRouteModalProps> = ({
           </div>
         </DialogFooter>
       </DialogContent>
+
+      {/* Modal de Múltiplos Equipamentos */}
+      <MultipleEquipmentModal
+        isOpen={multipleEquipmentModal.isOpen}
+        onClose={closeMultipleEquipmentModal}
+        agendamento={multipleEquipmentModal.agendamento}
+        scheduledDate={multipleEquipmentModal.scheduledDate}
+        scheduledTime={multipleEquipmentModal.scheduledTime}
+        onCreateMultipleOrders={handleCreateMultipleOrders}
+        onCreateSingleOrder={handleCreateSingleOrderFromMultiple}
+      />
+
+      {/* Modal de Equipamento Único */}
+      <SingleEquipmentModal
+        isOpen={singleEquipmentModal.isOpen}
+        onClose={closeSingleEquipmentModal}
+        agendamento={singleEquipmentModal.agendamento}
+        scheduledDate={singleEquipmentModal.scheduledDate}
+        scheduledTime={singleEquipmentModal.scheduledTime}
+        onCreateOrder={handleCreateSingleOrder}
+      />
+
+      {/* Diálogo de Criação de Ordem de Serviço */}
+      <CreateServiceOrderDialog
+        isOpen={createOrderDialog.isOpen}
+        onClose={() => setCreateOrderDialog({ isOpen: false, agendamento: null })}
+        onConfirm={handleCreateServiceOrder}
+        agendamento={createOrderDialog.agendamento}
+      />
     </Dialog>
   );
 };

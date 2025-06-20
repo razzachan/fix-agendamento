@@ -2,6 +2,7 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import { MapProvider } from './contexts/MapContext';
@@ -37,6 +38,7 @@ import MapTestPage from './pages/MapTestPage';
 import SimpleMapTest from './pages/SimpleMapTest';
 import Quotes from './pages/Quotes';
 import RepairsAndDeliveries from './pages/RepairsAndDeliveries';
+import TrackingPage from './pages/TrackingPage';
 import NotFound from './pages/NotFound';
 // Client Pages
 import { ClientPortal } from './pages/client/ClientPortal';
@@ -44,6 +46,9 @@ import { ClientOrders } from './pages/client/ClientOrders';
 import { ClientProfile } from './pages/client/ClientProfile';
 import { ClientProfilePhoto } from './pages/client/ClientProfilePhoto';
 import { ClientProfilePassword } from './pages/client/ClientProfilePassword';
+import Reports from './pages/Reports';
+import PWASettings from './pages/PWASettings';
+import AI from './pages/AI';
 // Components
 import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -54,13 +59,22 @@ function App() {
   return (
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
-        <Toaster />
-        <AuthProvider>
-          <MapProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Toaster />
+          <AuthProvider>
+            <MapProvider>
             <Routes>
               {/* Rotas públicas */}
               <Route path="/login" element={<Login />} />
               <Route path="/client/login" element={<Login />} />
+
+              {/* Rota pública de rastreamento por QR Code */}
+              <Route path="/track/:qrCode" element={<TrackingPage />} />
 
               {/* Rotas acessíveis a todos os usuários autenticados */}
               <Route
@@ -201,6 +215,30 @@ function App() {
                 }
               />
               <Route
+                path="/reports"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><Reports /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/ai"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><AI /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/pwa-settings"
+                element={
+                  <ProtectedRoute allowedRoles={['admin', 'technician', 'workshop']}>
+                    <AppLayout><PWASettings /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/routing"
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'technician']}>
@@ -314,6 +352,7 @@ function App() {
             </Routes>
           </MapProvider>
         </AuthProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </BrowserRouter>
   );

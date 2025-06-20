@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from './AppSidebar';
 import Header from './Header';
+import { PWAInstallPrompt, PWAStatus } from '@/components/pwa/PWAInstallPrompt';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -42,6 +43,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </div>
         </main>
       </SidebarInset>
+
+      {/* Componentes PWA */}
+      <PWAInstallPrompt />
+      <PWAStatus />
     </SidebarProvider>
   );
 };

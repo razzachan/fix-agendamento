@@ -15,7 +15,8 @@ import {
   AlertCircle,
   CheckCircle,
   Home,
-  Package
+  Package,
+  Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getServiceFlow, getCurrentStepIndex } from '@/utils/serviceFlowUtils';
@@ -23,11 +24,15 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { hasOrderValue } from '@/utils/orderValue';
 import OrderValue from '../ServiceOrders/OrderValue';
+import { QuickProgressButton } from './QuickProgressButton';
+import { useNavigate } from 'react-router-dom';
+import { translateStatus } from '@/utils/translations';
 
 interface ModernOrderCardProps {
   order: ServiceOrder;
   isSelected: boolean;
   onSelect: () => void;
+  onUpdateStatus?: (orderId: string, status: string) => Promise<boolean>;
   className?: string;
 }
 
@@ -44,49 +49,70 @@ const getStatusConfig = (status: string) => {
       bgColor: 'bg-blue-50/70',
       borderColor: 'border-blue-200',
       icon: <Calendar className="w-4 h-4" />,
-      label: 'Agendado'
+      label: translateStatus('scheduled')
     },
     'on_the_way': {
       color: 'text-yellow-700',
       bgColor: 'bg-yellow-50/70',
       borderColor: 'border-yellow-200',
       icon: <ArrowRight className="w-4 h-4" />,
-      label: 'A Caminho'
+      label: translateStatus('on_the_way')
     },
     'in_progress': {
       color: 'text-green-700',
       bgColor: 'bg-green-50/70',
       borderColor: 'border-green-200',
       icon: <Wrench className="w-4 h-4" />,
-      label: 'Em Progresso'
+      label: translateStatus('in_progress')
     },
     'collected': {
       color: 'text-purple-700',
       bgColor: 'bg-purple-50/70',
       borderColor: 'border-purple-200',
       icon: <Package className="w-4 h-4" />,
-      label: 'Coletado'
+      label: translateStatus('collected')
+    },
+    'collected_for_diagnosis': {
+      color: 'text-purple-700',
+      bgColor: 'bg-purple-50/70',
+      borderColor: 'border-purple-200',
+      icon: <Package className="w-4 h-4" />,
+      label: translateStatus('collected_for_diagnosis')
     },
     'at_workshop': {
       color: 'text-orange-700',
       bgColor: 'bg-orange-50/70',
       borderColor: 'border-orange-200',
       icon: <Wrench className="w-4 h-4" />,
-      label: 'Na Oficina'
+      label: translateStatus('at_workshop')
+    },
+    'scheduled_for_delivery': {
+      color: 'text-indigo-700',
+      bgColor: 'bg-indigo-50/70',
+      borderColor: 'border-indigo-200',
+      icon: <Calendar className="w-4 h-4" />,
+      label: translateStatus('scheduled_for_delivery')
+    },
+    'out_for_delivery': {
+      color: 'text-cyan-700',
+      bgColor: 'bg-cyan-50/70',
+      borderColor: 'border-cyan-200',
+      icon: <ArrowRight className="w-4 h-4" />,
+      label: translateStatus('out_for_delivery')
     },
     'completed': {
       color: 'text-emerald-700',
       bgColor: 'bg-emerald-50/70',
       borderColor: 'border-emerald-200',
       icon: <CheckCircle className="w-4 h-4" />,
-      label: 'Concluído'
+      label: translateStatus('completed')
     },
     'cancelled': {
       color: 'text-red-700',
       bgColor: 'bg-red-50/70',
       borderColor: 'border-red-200',
       icon: <AlertCircle className="w-4 h-4" />,
-      label: 'Cancelado'
+      label: translateStatus('cancelled')
     }
   };
 
@@ -123,8 +149,10 @@ export const ModernOrderCard: React.FC<ModernOrderCardProps> = ({
   order,
   isSelected,
   onSelect,
+  onUpdateStatus,
   className
 }) => {
+  const navigate = useNavigate();
   const statusConfig = getStatusConfig(order.status);
   const attendanceConfig = getAttendanceTypeConfig(order.serviceAttendanceType || 'em_domicilio');
   
@@ -230,16 +258,28 @@ export const ModernOrderCard: React.FC<ModernOrderCardProps> = ({
           </div>
         )}
 
+        {/* Botão de progressão (se disponível) */}
+        {onUpdateStatus && order.status !== 'completed' && order.status !== 'cancelled' && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <QuickProgressButton
+              orders={[order]}
+              onUpdateStatus={onUpdateStatus}
+              variant="full"
+            />
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex items-center justify-between pt-2 border-t border-white/20">
           <span className="text-xs text-muted-foreground">
             OS #{order.id.substring(0, 8)}
           </span>
-          
+
           <div className="flex items-center gap-1">
+            {/* Botão de Telefone */}
             {order.clientPhone && (
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={(e) => {
@@ -250,7 +290,21 @@ export const ModernOrderCard: React.FC<ModernOrderCardProps> = ({
                 <Phone className="w-3 h-3" />
               </Button>
             )}
-            
+
+            {/* Botão de Ver Detalhes */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/orders/${order.id}`);
+              }}
+              title="Ver detalhes da OS"
+            >
+              <Eye className="w-3 h-3" />
+            </Button>
+
             <ArrowRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </div>

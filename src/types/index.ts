@@ -197,5 +197,68 @@ export interface ServiceEvent {
 
 export type UserRole = 'admin' | 'technician' | 'client' | 'workshop';
 
-// Re-export required actions types
+// ===================================================================
+// 📊 TIPOS PARA SISTEMA DE ANALYTICS E BI (MVP 4)
+// ===================================================================
+
+// Tipos base para relatórios
+export type ReportType =
+  | 'operational'     // Relatórios operacionais
+  | 'financial'       // Relatórios financeiros
+  | 'performance'     // Relatórios de performance
+  | 'customer'        // Relatórios de clientes
+  | 'inventory'       // Relatórios de estoque
+  | 'technician'      // Relatórios de técnicos
+  | 'workshop';       // Relatórios de oficinas
+
+export type ReportFormat = 'pdf' | 'excel' | 'csv' | 'json';
+
+export type ReportPeriod = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
+
+export interface ReportFilters {
+  period: ReportPeriod;
+  startDate?: string;
+  endDate?: string;
+  technicianId?: string;
+  workshopId?: string;
+  clientId?: string;
+  serviceType?: string;
+  status?: string;
+  region?: string;
+}
+
+export interface ReportMetadata {
+  id: string;
+  type: ReportType;
+  title: string;
+  description: string;
+  filters: ReportFilters;
+  format: ReportFormat;
+  generatedAt: string;
+  generatedBy: string;
+  fileUrl?: string;
+  fileSize?: number;
+  status: 'generating' | 'completed' | 'failed';
+  error?: string;
+}
+
+export interface ScheduledReport {
+  id: string;
+  name: string;
+  type: ReportType;
+  filters: ReportFilters;
+  format: ReportFormat;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  recipients: string[]; // emails
+  isActive: boolean;
+  nextRun: string;
+  lastRun?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+// Re-export all types from other modules
 export * from './requiredActions';
+export * from './ai';
+export * from './reports';
+export * from './mobile';

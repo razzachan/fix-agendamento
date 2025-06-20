@@ -8,20 +8,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Camera, CreditCard, CheckCircle, AlertTriangle, DollarSign, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Camera, CreditCard, CheckCircle, AlertTriangle, DollarSign, ArrowRight, ArrowLeft, QrCode } from 'lucide-react';
 import { PaymentStageService, PaymentStageConfig } from '@/services/payments/paymentStageService';
 import PhotoCaptureDialog from '@/components/ServiceOrders/OrdersTable/PhotoCapture/PhotoCaptureDialog';
+import QRCodeGenerator from '@/components/qrcode/QRCodeGenerator';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ServiceOrder {
   id: string;
+  order_number?: string; // ✅ Número sequencial da OS
   client_name: string;
   equipment_type: string;
   equipment_model?: string;
+  equipment_serial?: string;
   service_attendance_type: string;
   status: string;
   final_cost?: number;
+  pickup_address?: string;
 }
 
 interface StatusAdvanceDialogProps {
@@ -46,13 +50,15 @@ export function StatusAdvanceDialog({
   onStatusUpdate
 }: StatusAdvanceDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState<'requirements' | 'photo' | 'payment' | 'confirm'>('requirements');
+  const [step, setStep] = useState<'requirements' | 'qrcode' | 'photo' | 'payment' | 'confirm'>('requirements');
   const [paymentStep, setPaymentStep] = useState<1 | 2>(1); // Sub-steps do pagamento
   const [paymentConfig, setPaymentConfig] = useState<PaymentStageConfig | null>(null);
   const [requiresPayment, setRequiresPayment] = useState(false);
   const [requiresPhoto, setRequiresPhoto] = useState(false);
+  const [requiresQRCode, setRequiresQRCode] = useState(false);
   const [photoCompleted, setPhotoCompleted] = useState(false);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
+  const [qrCodeCompleted, setQrCodeCompleted] = useState(false);
   const [showPhotoDialog, setShowPhotoDialog] = useState(false);
   const [hasExistingPhotos, setHasExistingPhotos] = useState(false);
   const [paymentData, setPaymentData] = useState({
@@ -68,6 +74,7 @@ export function StatusAdvanceDialog({
       setPaymentStep(1); // Reset para o primeiro sub-step
       setPhotoCompleted(false);
       setPaymentCompleted(false);
+      setQrCodeCompleted(false);
       setShowPhotoDialog(false);
       analyzeRequirements();
       checkExistingPhotos();
@@ -86,13 +93,19 @@ export function StatusAdvanceDialog({
     let config: PaymentStageConfig | null = null;
     let needsPayment = false;
     let needsPhoto = false;
+    let needsQRCode = false;
 
     // Determinar que tipo de pagamento é necessário baseado no status
     if (nextStatus === 'collected_for_diagnosis' || nextStatus === 'collected_for_repair' || nextStatus === 'collected') {
       console.log('🎯 [StatusAdvanceDialog] Detectado status de coleta - calculando pagamento');
       config = PaymentStageService.calculateCollectionPayment(serviceOrder);
       needsPhoto = true; // Sempre precisa de foto na coleta
+
+      // Verificar se precisa de QR Code (apenas para coleta_conserto e coleta_diagnostico)
+      needsQRCode = ['coleta_conserto', 'coleta_diagnostico'].includes(serviceOrder.service_attendance_type);
+
       console.log('🎯 [StatusAdvanceDialog] Config de pagamento calculada:', config);
+      console.log('🏷️ [StatusAdvanceDialog] QR Code necessário:', needsQRCode);
     } else if (nextStatus === 'completed' || nextStatus === 'delivered') {
       if (serviceOrder.service_attendance_type === 'em_domicilio') {
         config = PaymentStageService.calculateFullPayment(serviceOrder);
@@ -111,12 +124,14 @@ export function StatusAdvanceDialog({
       config,
       requiresPayment: !!config,
       requiresPhoto: needsPhoto,
+      requiresQRCode: needsQRCode,
       step: 'requirements'
     });
 
     setPaymentConfig(config);
     setRequiresPayment(!!config);
     setRequiresPhoto(needsPhoto);
+    setRequiresQRCode(needsQRCode);
     setStep('requirements');
   };
 
@@ -150,6 +165,15 @@ export function StatusAdvanceDialog({
     } else {
       setStep('confirm');
     }
+  };
+
+  const handleQRCodeGenerated = () => {
+    setQrCodeCompleted(true);
+    toast.success('QR Code gerado com sucesso!');
+
+    // NÃO avançar automaticamente - deixar o usuário ver e imprimir a etiqueta
+    // O usuário clicará em "Continuar" quando estiver pronto
+    console.log('✅ [StatusAdvanceDialog] QR Code marcado como concluído, aguardando ação do usuário');
   };
 
   const calculateFinalAmount = () => {
@@ -228,6 +252,7 @@ export function StatusAdvanceDialog({
             setPaymentStep(1);
             setPhotoCompleted(false);
             setPaymentCompleted(false);
+            setQrCodeCompleted(false);
             setPaymentData({
               payment_method: '',
               notes: '',
@@ -269,6 +294,7 @@ export function StatusAdvanceDialog({
         setStep('requirements');
         setPhotoCompleted(false);
         setPaymentCompleted(false);
+        setQrCodeCompleted(false);
         setPaymentData({
           payment_method: '',
           notes: '',
@@ -318,6 +344,25 @@ export function StatusAdvanceDialog({
           </Card>
         )}
 
+        {requiresQRCode && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <QrCode className="h-5 w-5 text-purple-500" />
+                <div className="flex-1">
+                  <h4 className="font-medium">QR Code de Rastreamento</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Gere e imprima etiqueta QR Code para rastrear o equipamento
+                  </p>
+                </div>
+                <Badge variant={qrCodeCompleted ? "default" : "secondary"}>
+                  {qrCodeCompleted ? "Concluído" : "Pendente"}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {requiresPayment && paymentConfig && (
           <Card>
             <CardContent className="p-4">
@@ -346,21 +391,28 @@ export function StatusAdvanceDialog({
           Cancelar
         </Button>
 
-        {requiresPhoto && !photoCompleted && (
+        {requiresQRCode && !qrCodeCompleted && (
+          <Button onClick={() => setStep('qrcode')}>
+            <QrCode className="h-4 w-4 mr-2" />
+            Gerar QR Code
+          </Button>
+        )}
+
+        {requiresPhoto && (!requiresQRCode || qrCodeCompleted) && !photoCompleted && (
           <Button onClick={() => setShowPhotoDialog(true)}>
             <Camera className="h-4 w-4 mr-2" />
             {hasExistingPhotos ? 'Adicionar Foto' : 'Tirar Foto'}
           </Button>
         )}
 
-        {requiresPayment && (!requiresPhoto || photoCompleted) && !paymentCompleted && (
+        {requiresPayment && (!requiresQRCode || qrCodeCompleted) && (!requiresPhoto || photoCompleted) && !paymentCompleted && (
           <Button onClick={() => setStep('payment')}>
             <CreditCard className="h-4 w-4 mr-2" />
             Confirmar Pagamento
           </Button>
         )}
 
-        {(!requiresPhoto || photoCompleted) && (!requiresPayment || paymentCompleted) && (
+        {(!requiresQRCode || qrCodeCompleted) && (!requiresPhoto || photoCompleted) && (!requiresPayment || paymentCompleted) && (
           <Button onClick={() => setStep('confirm')}>
             <ArrowRight className="h-4 w-4 mr-2" />
             Finalizar
@@ -565,6 +617,100 @@ export function StatusAdvanceDialog({
     </div>
   );
 
+  const renderQRCodeStep = () => (
+    <div className="space-y-4">
+      <div className="text-center">
+        <QrCode className="h-12 w-12 mx-auto text-purple-500 mb-3" />
+        <h3 className="text-lg font-semibold mb-2">Gerar QR Code de Rastreamento</h3>
+        <p className="text-muted-foreground">
+          Gere e imprima a etiqueta QR Code para rastrear este equipamento
+        </p>
+      </div>
+
+      {/* Converter serviceOrder para o formato esperado pelo QRCodeGenerator */}
+      {serviceOrder && (
+        <QRCodeGenerator
+          serviceOrder={{
+            id: serviceOrder.id,
+            orderNumber: (() => {
+              console.log('🔍 [StatusAdvanceDialog] Debug COMPLETO serviceOrder:', serviceOrder);
+              console.log('🔍 [StatusAdvanceDialog] Debug order_number específico:', {
+                raw_order_number: serviceOrder.order_number,
+                typeof_order_number: typeof serviceOrder.order_number,
+                id: serviceOrder.id,
+                client_name: serviceOrder.client_name,
+                all_keys: Object.keys(serviceOrder)
+              });
+
+              // Tentar diferentes variações do campo
+              const possibleOrderNumber =
+                serviceOrder.order_number ||
+                serviceOrder.orderNumber ||
+                serviceOrder['order-number'] ||
+                serviceOrder.os_number ||
+                null;
+
+              console.log('🔍 [StatusAdvanceDialog] Possible order number:', possibleOrderNumber);
+
+              return possibleOrderNumber || `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
+            })(), // ✅ Debug completo para identificar o problema
+            clientName: serviceOrder.client_name,
+            clientEmail: '', // Não disponível neste contexto
+            clientPhone: '', // Não disponível neste contexto
+            clientCpfCnpj: '', // Não disponível neste contexto
+            clientAddressComplement: '', // Não disponível neste contexto
+            clientAddressReference: '', // Não disponível neste contexto
+            technicianId: technicianId,
+            technicianName: technicianName,
+            status: serviceOrder.status as any,
+            createdAt: new Date().toISOString(),
+            scheduledDate: null,
+            scheduledTime: '',
+            completedDate: null,
+            description: '',
+            equipmentType: serviceOrder.equipment_type,
+            equipmentModel: serviceOrder.equipment_model || null,
+            equipmentSerial: serviceOrder.equipment_serial || null,
+            needsPickup: true,
+            pickupAddress: serviceOrder.pickup_address || null,
+            pickupCity: null,
+            pickupState: null,
+            pickupZipCode: null,
+            currentLocation: 'client',
+            serviceAttendanceType: serviceOrder.service_attendance_type as any,
+            clientDescription: '',
+            images: [],
+            serviceItems: [],
+            finalCost: serviceOrder.final_cost,
+            workshopId: null,
+            workshopName: null
+          }}
+          onQRCodeGenerated={handleQRCodeGenerated}
+        />
+      )}
+
+      <div className="flex justify-between">
+        <Button variant="outline" onClick={() => setStep('requirements')}>
+          Voltar
+        </Button>
+        {qrCodeCompleted && (
+          <Button onClick={() => {
+            if (requiresPhoto && !photoCompleted) {
+              setShowPhotoDialog(true);
+            } else if (requiresPayment && !paymentCompleted) {
+              setStep('payment');
+            } else {
+              setStep('confirm');
+            }
+          }}>
+            <ArrowRight className="h-4 w-4 mr-2" />
+            Continuar
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   const renderPaymentStep = () => (
     paymentStep === 1 ? renderPaymentStep1() : renderPaymentStep2()
   );
@@ -584,6 +730,13 @@ export function StatusAdvanceDialog({
           <CardTitle className="text-base">Resumo das Ações</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {requiresQRCode && (
+            <div className="flex items-center gap-3">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              <span className="text-sm">QR Code de rastreamento gerado</span>
+            </div>
+          )}
+
           {requiresPhoto && (
             <div className="flex items-center gap-3">
               <CheckCircle className="h-5 w-5 text-green-500" />
@@ -658,10 +811,23 @@ export function StatusAdvanceDialog({
                     <span className="font-medium">Equipamento:</span> {serviceOrder.equipment_type}
                   </div>
                   <div>
-                    <span className="font-medium">Tipo:</span> {serviceOrder.service_attendance_type}
+                    <span className="font-medium">Tipo:</span> {
+                      serviceOrder.service_attendance_type === 'coleta_diagnostico' ? 'Coleta Diagnóstico' :
+                      serviceOrder.service_attendance_type === 'coleta_conserto' ? 'Coleta Conserto' :
+                      serviceOrder.service_attendance_type === 'em_domicilio' ? 'Em Domicílio' :
+                      serviceOrder.service_attendance_type
+                    }
                   </div>
                   <div>
-                    <span className="font-medium">Status Atual:</span> {serviceOrder.status}
+                    <span className="font-medium">Status Atual:</span> {
+                      serviceOrder.status === 'on_the_way' ? 'A Caminho' :
+                      serviceOrder.status === 'scheduled' ? 'Agendado' :
+                      serviceOrder.status === 'in_progress' ? 'Em Andamento' :
+                      serviceOrder.status === 'collected' ? 'Coletado' :
+                      serviceOrder.status === 'at_workshop' ? 'Na Oficina' :
+                      serviceOrder.status === 'completed' ? 'Concluído' :
+                      serviceOrder.status
+                    }
                   </div>
                 </div>
               </CardContent>
@@ -671,6 +837,7 @@ export function StatusAdvanceDialog({
 
             {/* Renderizar step atual */}
             {step === 'requirements' && renderRequirementsStep()}
+            {step === 'qrcode' && renderQRCodeStep()}
             {step === 'payment' && renderPaymentStep()}
             {step === 'confirm' && renderConfirmStep()}
           </div>

@@ -35,11 +35,9 @@ export async function addProgressEntry(params: AddProgressEntryParams): Promise<
       id: uuidv4(),
       service_order_id: serviceOrderId,
       status,
-      timestamp: new Date().toISOString(),
-      user_id: userId || null,
-      user_name: userName || null,
       notes: notes || null,
-      system_generated: systemGenerated
+      created_at: new Date().toISOString(),
+      created_by: userName || userId || 'Sistema'
     };
     
     // Inserir a entrada no banco de dados
@@ -64,11 +62,11 @@ export async function addProgressEntry(params: AddProgressEntryParams): Promise<
       id: data.id,
       serviceOrderId: data.service_order_id,
       status: data.status,
-      timestamp: data.timestamp,
-      userId: data.user_id,
-      userName: data.user_name,
+      timestamp: data.created_at,
+      userId: userId,
+      userName: data.created_by,
       notes: data.notes,
-      systemGenerated: data.system_generated
+      systemGenerated: systemGenerated || false
     };
   } catch (error) {
     console.error('Erro ao adicionar entrada de progresso:', error);

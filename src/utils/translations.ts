@@ -20,6 +20,8 @@ export const translateStatus = (status: string): string => {
     'in_progress': 'Em Reparo',
     'ready_for_delivery': 'Pronto para Entrega',
     'collected_for_delivery': 'Coletado para Entrega',
+    'scheduled_for_delivery': 'Agendado para Entrega',
+    'out_for_delivery': 'Saiu para Entrega',
     'on_the_way_to_deliver': 'Em Rota de Entrega',
     'payment_pending': 'Aguardando Pagamento',
     'completed': 'Concluído',

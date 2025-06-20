@@ -254,6 +254,97 @@ export type Database = {
           created_by?: string
         }
       }
+      equipment_qr_codes: {
+        Row: {
+          id: string
+          qr_code: string
+          service_order_id: string
+          equipment_serial: string | null
+          generated_at: string
+          generated_by: string | null
+          status: 'active' | 'damaged' | 'replaced' | 'inactive'
+          print_count: number
+          last_scanned_at: string | null
+          last_scanned_by: string | null
+          current_location: 'client' | 'transit' | 'workshop' | 'delivered'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          qr_code: string
+          service_order_id: string
+          equipment_serial?: string | null
+          generated_at?: string
+          generated_by?: string | null
+          status?: 'active' | 'damaged' | 'replaced' | 'inactive'
+          print_count?: number
+          last_scanned_at?: string | null
+          last_scanned_by?: string | null
+          current_location?: 'client' | 'transit' | 'workshop' | 'delivered'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          qr_code?: string
+          service_order_id?: string
+          equipment_serial?: string | null
+          generated_at?: string
+          generated_by?: string | null
+          status?: 'active' | 'damaged' | 'replaced' | 'inactive'
+          print_count?: number
+          last_scanned_at?: string | null
+          last_scanned_by?: string | null
+          current_location?: 'client' | 'transit' | 'workshop' | 'delivered'
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      qr_tracking_events: {
+        Row: {
+          id: string
+          qr_code_id: string
+          service_order_id: string
+          event_type: 'generated' | 'printed' | 'scanned' | 'location_update' | 'status_change'
+          checkpoint: 'collection' | 'workshop_arrival' | 'workshop_departure' | 'delivery' | 'manual' | null
+          location: string | null
+          coordinates: string | null
+          scanned_by: string | null
+          scanned_at: string
+          notes: string | null
+          metadata: any | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          qr_code_id: string
+          service_order_id: string
+          event_type: 'generated' | 'printed' | 'scanned' | 'location_update' | 'status_change'
+          checkpoint?: 'collection' | 'workshop_arrival' | 'workshop_departure' | 'delivery' | 'manual' | null
+          location?: string | null
+          coordinates?: string | null
+          scanned_by?: string | null
+          scanned_at?: string
+          notes?: string | null
+          metadata?: any | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          qr_code_id?: string
+          service_order_id?: string
+          event_type?: 'generated' | 'printed' | 'scanned' | 'location_update' | 'status_change'
+          checkpoint?: 'collection' | 'workshop_arrival' | 'workshop_departure' | 'delivery' | 'manual' | null
+          location?: string | null
+          coordinates?: string | null
+          scanned_by?: string | null
+          scanned_at?: string
+          notes?: string | null
+          metadata?: any | null
+          created_at?: string
+        }
+      }
       scheduled_services: {
         Row: {
           id: string

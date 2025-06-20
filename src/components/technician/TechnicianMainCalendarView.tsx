@@ -32,7 +32,7 @@ import DayView from '../calendar/DayView';
 import ListView from '../calendar/ListView';
 import DragDropCalendar from '../calendar/DragDropCalendar';
 import { scheduledServiceService } from '@/services/scheduledService';
-import { ServiceProgressTracker } from '@/components/ServiceOrders/ProgressTracker';
+import { SmartProgressTracker } from '@/components/ServiceOrders/ProgressTracker';
 import { serviceOrderService } from '@/services/serviceOrder';
 import { ServiceOrder } from '@/types';
 
@@ -655,8 +655,8 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
                       )}
                     </div>
 
-                    {/* ServiceProgressTracker */}
-                    <ServiceProgressTracker
+                    {/* SmartProgressTracker */}
+                    <SmartProgressTracker
                       serviceOrder={selectedServiceOrder}
                       onUpdateStatus={handleUpdateOrderStatus}
                     />
