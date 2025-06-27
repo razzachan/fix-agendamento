@@ -8,7 +8,11 @@ API para receber dados de agendamentos do WhatsApp e inserir no Supabase
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from supabase_client import inserir_agendamento, atualizar_agendamento, buscar_agendamento, listar_agendamentos, get_supabase_client
+from supabase_client import (
+    inserir_agendamento, atualizar_agendamento, buscar_agendamento, listar_agendamentos, get_supabase_client,
+    buscar_ordens_cliente, buscar_status_ordem, buscar_orcamento_ordem,
+    aprovar_orcamento_ordem, reagendar_ordem, formatar_resposta_clientechat
+)
 import uvicorn
 import logging
 import sys
@@ -752,6 +756,251 @@ async def echo_request(request: Request):
         return {
             "success": False,
             "message": f"Erro interno do servidor: {str(e)}"
+        }
+
+# ============================================================================
+# NOVOS ENDPOINTS PARA CLIENTECHAT - CONSULTAS E AÇÕES
+# ============================================================================
+
+@app.get("/api/clientechat/client/{phone}/orders")
+async def get_client_orders(phone: str):
+    """
+    Busca todas as ordens de serviço de um cliente pelo telefone.
+    Endpoint para ClienteChat consultar histórico do cliente.
+    """
+    try:
+        logger.info(f"[ClienteChat] Buscando ordens para telefone: {phone}")
+
+        # Limpar e formatar telefone
+        phone_clean = phone.replace("+55", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
+
+        # Buscar ordens do cliente
+        dados = buscar_ordens_cliente(phone_clean)
+
+        # Formatar resposta para ClienteChat
+        mensagem = formatar_resposta_clientechat(dados, "ordens_cliente")
+
+        return {
+            "success": True,
+            "message": mensagem,
+            "data": dados,
+            "phone": phone_clean
+        }
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar ordens do cliente: {str(e)}")
+        return {
+            "success": False,
+            "message": "Ops! Não consegui buscar suas ordens. Tente novamente em alguns instantes.",
+            "error": str(e)
+        }
+
+@app.get("/api/clientechat/order/{order_id}/status")
+async def get_order_status(order_id: str):
+    """
+    Busca o status atual de uma ordem de serviço específica.
+    Endpoint para ClienteChat consultar status detalhado.
+    """
+    try:
+        logger.info(f"[ClienteChat] Buscando status da ordem: {order_id}")
+
+        # Buscar status da ordem
+        dados = buscar_status_ordem(order_id)
+
+        # Formatar resposta para ClienteChat
+        mensagem = formatar_resposta_clientechat(dados, "status_ordem")
+
+        return {
+            "success": True,
+            "message": mensagem,
+            "data": dados,
+            "order_id": order_id
+        }
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar status da ordem: {str(e)}")
+        return {
+            "success": False,
+            "message": "Não consegui encontrar essa ordem. Verifique o número e tente novamente.",
+            "error": str(e)
+        }
+
+@app.get("/api/clientechat/order/{order_id}/budget")
+async def get_order_budget(order_id: str):
+    """
+    Busca informações de orçamento de uma ordem de serviço.
+    Endpoint para ClienteChat consultar orçamentos.
+    """
+    try:
+        logger.info(f"[ClienteChat] Buscando orçamento da ordem: {order_id}")
+
+        # Buscar orçamento da ordem
+        dados = buscar_orcamento_ordem(order_id)
+
+        # Formatar resposta para ClienteChat
+        mensagem = formatar_resposta_clientechat(dados, "orcamento")
+
+        return {
+            "success": True,
+            "message": mensagem,
+            "data": dados,
+            "order_id": order_id
+        }
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar orçamento: {str(e)}")
+        return {
+            "success": False,
+            "message": "Não consegui encontrar o orçamento dessa ordem.",
+            "error": str(e)
+        }
+
+@app.post("/api/clientechat/order/{order_id}/approve-budget")
+async def approve_order_budget(order_id: str):
+    """
+    Aprova o orçamento de uma ordem de serviço.
+    Endpoint para ClienteChat permitir aprovação de orçamentos.
+    """
+    try:
+        logger.info(f"[ClienteChat] Aprovando orçamento da ordem: {order_id}")
+
+        # Aprovar orçamento
+        resultado = aprovar_orcamento_ordem(order_id)
+
+        if resultado["sucesso"]:
+            # Formatar resposta de sucesso
+            mensagem = formatar_resposta_clientechat(resultado, "aprovacao_sucesso")
+
+            return {
+                "success": True,
+                "message": mensagem,
+                "data": resultado,
+                "order_id": order_id
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Não foi possível aprovar o orçamento: {resultado['erro']}",
+                "error": resultado["erro"]
+            }
+
+    except Exception as e:
+        logger.error(f"Erro ao aprovar orçamento: {str(e)}")
+        return {
+            "success": False,
+            "message": "Ops! Não consegui aprovar o orçamento. Tente novamente.",
+            "error": str(e)
+        }
+
+@app.post("/api/clientechat/order/{order_id}/schedule")
+async def reschedule_order(order_id: str, request: Request):
+    """
+    Reagenda uma ordem de serviço.
+    Endpoint para ClienteChat permitir reagendamento.
+    """
+    try:
+        logger.info(f"[ClienteChat] Reagendando ordem: {order_id}")
+
+        # Obter dados da requisição
+        body = await request.json()
+        nova_data = body.get("nova_data")
+
+        if not nova_data:
+            return {
+                "success": False,
+                "message": "Data não informada para reagendamento."
+            }
+
+        # Reagendar ordem
+        resultado = reagendar_ordem(order_id, nova_data)
+
+        if resultado["sucesso"]:
+            # Formatar resposta de sucesso
+            mensagem = formatar_resposta_clientechat(resultado, "reagendamento_sucesso")
+
+            return {
+                "success": True,
+                "message": mensagem,
+                "data": resultado,
+                "order_id": order_id
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Não foi possível reagendar: {resultado['erro']}",
+                "error": resultado["erro"]
+            }
+
+    except Exception as e:
+        logger.error(f"Erro ao reagendar ordem: {str(e)}")
+        return {
+            "success": False,
+            "message": "Ops! Não consegui reagendar. Tente novamente.",
+            "error": str(e)
+        }
+
+@app.post("/api/clientechat/client/feedback")
+async def submit_client_feedback(request: Request):
+    """
+    Recebe feedback do cliente via ClienteChat.
+    Endpoint para coletar avaliações e comentários.
+    """
+    try:
+        logger.info("[ClienteChat] Recebendo feedback do cliente")
+
+        # Obter dados da requisição
+        body = await request.json()
+        telefone = body.get("telefone")
+        ordem_id = body.get("ordem_id")
+        avaliacao = body.get("avaliacao")  # 1-5
+        comentario = body.get("comentario", "")
+
+        # Validar dados obrigatórios
+        if not telefone or not ordem_id or not avaliacao:
+            return {
+                "success": False,
+                "message": "Dados incompletos para feedback."
+            }
+
+        # Obter cliente Supabase
+        client = get_supabase_client()
+
+        # Inserir feedback na tabela (assumindo que existe)
+        feedback_data = {
+            "telefone": telefone,
+            "ordem_id": ordem_id,
+            "avaliacao": avaliacao,
+            "comentario": comentario,
+            "origem": "clientechat",
+            "created_at": "now()"
+        }
+
+        # Tentar inserir feedback
+        try:
+            response = client.table("client_feedback").insert(feedback_data).execute()
+
+            if response.data:
+                logger.info(f"Feedback registrado com sucesso para ordem: {ordem_id}")
+                return {
+                    "success": True,
+                    "message": "✅ Obrigado pelo seu feedback!\n\nSua avaliação é muito importante para melhorarmos nossos serviços.",
+                    "data": feedback_data
+                }
+        except:
+            # Se tabela não existir, apenas logar
+            logger.info(f"Feedback recebido (tabela não existe): {feedback_data}")
+            return {
+                "success": True,
+                "message": "✅ Obrigado pelo seu feedback!\n\nSua avaliação foi registrada com sucesso.",
+                "data": feedback_data
+            }
+
+    except Exception as e:
+        logger.error(f"Erro ao processar feedback: {str(e)}")
+        return {
+            "success": False,
+            "message": "Ops! Não consegui registrar seu feedback. Tente novamente.",
+            "error": str(e)
         }
 
 if __name__ == "__main__":

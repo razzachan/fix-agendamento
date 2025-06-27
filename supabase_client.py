@@ -328,3 +328,384 @@ def registrar_agendamento(data):
         cpf=data.get("cpf"),
         email=data.get("email")
     )
+
+# ============================================================================
+# NOVAS FUNÇÕES PARA CLIENTECHAT - CONSULTAS E AÇÕES
+# ============================================================================
+
+def buscar_ordens_cliente(telefone):
+    """
+    Busca todas as ordens de serviço de um cliente pelo telefone.
+    Inclui tanto pré-agendamentos quanto ordens de serviço criadas.
+
+    Args:
+        telefone (str): Número de telefone do cliente
+
+    Returns:
+        dict: Dicionário com pré-agendamentos e ordens de serviço
+    """
+    try:
+        logger.info(f"Buscando ordens para cliente com telefone: {telefone}")
+
+        # Obter cliente Supabase
+        client = get_supabase_client()
+
+        # Buscar pré-agendamentos
+        response_agendamentos = client.table("agendamentos_ai").select("*").eq("telefone", telefone).order("created_at", desc=True).execute()
+
+        # Buscar ordens de serviço
+        response_orders = client.table("service_orders").select("*").eq("client_phone", telefone).order("created_at", desc=True).execute()
+
+        agendamentos = response_agendamentos.data if response_agendamentos.data else []
+        ordens = response_orders.data if response_orders.data else []
+
+        logger.info(f"Encontrados {len(agendamentos)} pré-agendamentos e {len(ordens)} ordens de serviço")
+
+        return {
+            "pre_agendamentos": agendamentos,
+            "ordens_servico": ordens,
+            "total": len(agendamentos) + len(ordens)
+        }
+
+    except Exception as e:
+        error_message = str(e)
+        logger.error(f"Erro ao buscar ordens do cliente: {error_message}")
+        return {
+            "pre_agendamentos": [],
+            "ordens_servico": [],
+            "total": 0,
+            "erro": error_message
+        }
+
+def buscar_status_ordem(ordem_id):
+    """
+    Busca o status atual de uma ordem de serviço específica.
+
+    Args:
+        ordem_id (str): ID da ordem de serviço
+
+    Returns:
+        dict: Informações da ordem ou None se não encontrada
+    """
+    try:
+        logger.info(f"Buscando status da ordem: {ordem_id}")
+
+        # Obter cliente Supabase
+        client = get_supabase_client()
+
+        # Tentar buscar como ordem de serviço primeiro
+        try:
+            response_order = client.table("service_orders").select("*").eq("id", ordem_id).single().execute()
+
+            if response_order.data:
+                ordem = response_order.data
+                logger.info(f"Ordem de serviço encontrada: {ordem['id']} - Status: {ordem['status']}")
+
+                return {
+                    "tipo": "ordem_servico",
+                    "id": ordem["id"],
+                    "numero": ordem.get("order_number", "N/A"),
+                    "cliente": ordem["client_name"],
+                    "equipamento": ordem["equipment_type"],
+                    "status": ordem["status"],
+                    "data_criacao": ordem["created_at"],
+                    "data_agendada": ordem.get("scheduled_date"),
+                    "tecnico": ordem.get("technician_name"),
+                    "valor_final": ordem.get("final_cost"),
+                    "descricao": ordem.get("description", "")
+                }
+        except:
+            pass  # Se não encontrou como OS, tentar como pré-agendamento
+
+        # Tentar buscar como pré-agendamento
+        try:
+            response_agendamento = client.table("agendamentos_ai").select("*").eq("id", ordem_id).single().execute()
+
+            if response_agendamento.data:
+                agendamento = response_agendamento.data
+                logger.info(f"Pré-agendamento encontrado: {agendamento['id']} - Status: {agendamento['status']}")
+
+                return {
+                    "tipo": "pre_agendamento",
+                    "id": agendamento["id"],
+                    "numero": f"PA-{agendamento['id'][:8]}",
+                    "cliente": agendamento["nome"],
+                    "equipamento": agendamento["equipamento"],
+                    "status": agendamento["status"],
+                    "data_criacao": agendamento["created_at"],
+                    "data_agendada": agendamento.get("data_agendada"),
+                    "tecnico": agendamento.get("tecnico"),
+                    "problema": agendamento["problema"],
+                    "urgente": agendamento.get("urgente", False)
+                }
+        except:
+            pass
+
+        logger.warning(f"Ordem {ordem_id} não encontrada")
+        return None
+
+    except Exception as e:
+        error_message = str(e)
+        logger.error(f"Erro ao buscar status da ordem: {error_message}")
+        return None
+
+def buscar_orcamento_ordem(ordem_id):
+    """
+    Busca informações de orçamento de uma ordem de serviço.
+
+    Args:
+        ordem_id (str): ID da ordem de serviço
+
+    Returns:
+        dict: Informações do orçamento ou None se não encontrado
+    """
+    try:
+        logger.info(f"Buscando orçamento da ordem: {ordem_id}")
+
+        # Obter cliente Supabase
+        client = get_supabase_client()
+
+        # Buscar ordem de serviço
+        response = client.table("service_orders").select("*").eq("id", ordem_id).single().execute()
+
+        if response.data:
+            ordem = response.data
+
+            # Verificar se tem orçamento
+            if ordem.get("final_cost") and ordem.get("status") in ["budget_pending", "budget_approved"]:
+                return {
+                    "id": ordem["id"],
+                    "numero": ordem.get("order_number", "N/A"),
+                    "cliente": ordem["client_name"],
+                    "equipamento": ordem["equipment_type"],
+                    "valor_total": ordem["final_cost"],
+                    "status_orcamento": ordem["status"],
+                    "descricao": ordem.get("description", ""),
+                    "data_orcamento": ordem.get("updated_at"),
+                    "aprovado": ordem["status"] == "budget_approved"
+                }
+            else:
+                return {
+                    "id": ordem["id"],
+                    "status": "sem_orcamento",
+                    "mensagem": "Orçamento ainda não disponível"
+                }
+
+        return None
+
+    except Exception as e:
+        error_message = str(e)
+        logger.error(f"Erro ao buscar orçamento: {error_message}")
+        return None
+
+def aprovar_orcamento_ordem(ordem_id):
+    """
+    Aprova o orçamento de uma ordem de serviço.
+
+    Args:
+        ordem_id (str): ID da ordem de serviço
+
+    Returns:
+        dict: Resultado da aprovação
+    """
+    try:
+        logger.info(f"Aprovando orçamento da ordem: {ordem_id}")
+
+        # Obter cliente Supabase
+        client = get_supabase_client()
+
+        # Buscar ordem atual
+        response = client.table("service_orders").select("*").eq("id", ordem_id).single().execute()
+
+        if not response.data:
+            return {
+                "sucesso": False,
+                "erro": "Ordem de serviço não encontrada"
+            }
+
+        ordem = response.data
+
+        # Verificar se pode aprovar
+        if ordem["status"] != "budget_pending":
+            return {
+                "sucesso": False,
+                "erro": f"Não é possível aprovar. Status atual: {ordem['status']}"
+            }
+
+        # Atualizar status para aprovado
+        update_response = client.table("service_orders").update({
+            "status": "budget_approved",
+            "updated_at": "now()"
+        }).eq("id", ordem_id).execute()
+
+        if update_response.data:
+            logger.info(f"Orçamento aprovado com sucesso para ordem: {ordem_id}")
+            return {
+                "sucesso": True,
+                "mensagem": "Orçamento aprovado com sucesso!",
+                "ordem_id": ordem_id,
+                "novo_status": "budget_approved"
+            }
+        else:
+            return {
+                "sucesso": False,
+                "erro": "Falha ao atualizar status no banco de dados"
+            }
+
+    except Exception as e:
+        error_message = str(e)
+        logger.error(f"Erro ao aprovar orçamento: {error_message}")
+        return {
+            "sucesso": False,
+            "erro": error_message
+        }
+
+def reagendar_ordem(ordem_id, nova_data):
+    """
+    Reagenda uma ordem de serviço.
+
+    Args:
+        ordem_id (str): ID da ordem de serviço
+        nova_data (str): Nova data no formato ISO
+
+    Returns:
+        dict: Resultado do reagendamento
+    """
+    try:
+        logger.info(f"Reagendando ordem {ordem_id} para {nova_data}")
+
+        # Obter cliente Supabase
+        client = get_supabase_client()
+
+        # Atualizar data agendada
+        response = client.table("service_orders").update({
+            "scheduled_date": nova_data,
+            "updated_at": "now()"
+        }).eq("id", ordem_id).execute()
+
+        if response.data:
+            logger.info(f"Ordem reagendada com sucesso: {ordem_id}")
+            return {
+                "sucesso": True,
+                "mensagem": "Reagendamento realizado com sucesso!",
+                "ordem_id": ordem_id,
+                "nova_data": nova_data
+            }
+        else:
+            return {
+                "sucesso": False,
+                "erro": "Falha ao reagendar no banco de dados"
+            }
+
+    except Exception as e:
+        error_message = str(e)
+        logger.error(f"Erro ao reagendar ordem: {error_message}")
+        return {
+            "sucesso": False,
+            "erro": error_message
+        }
+
+def formatar_resposta_clientechat(dados, tipo_resposta):
+    """
+    Formata dados para resposta amigável ao ClienteChat.
+
+    Args:
+        dados: Dados a serem formatados
+        tipo_resposta (str): Tipo de resposta (ordens, status, orcamento, etc.)
+
+    Returns:
+        str: Mensagem formatada para o ClienteChat
+    """
+    try:
+        if tipo_resposta == "ordens_cliente":
+            if dados["total"] == 0:
+                return "Não encontrei nenhuma ordem de serviço para este telefone. 🤔\n\nTalvez você tenha usado outro número? Ou quer criar uma nova solicitação?"
+
+            mensagem = f"📋 *Suas Ordens de Serviço* ({dados['total']} encontradas):\n\n"
+
+            # Pré-agendamentos
+            for agendamento in dados["pre_agendamentos"]:
+                status_emoji = "⏳" if agendamento["status"] == "pendente" else "✅" if agendamento["status"] == "convertido" else "🔄"
+                mensagem += f"{status_emoji} *PA-{agendamento['id'][:8]}*\n"
+                mensagem += f"🔧 {agendamento['equipamento']}\n"
+                mensagem += f"📍 Status: {agendamento['status'].title()}\n"
+                mensagem += f"📅 Criado: {agendamento['created_at'][:10]}\n\n"
+
+            # Ordens de serviço
+            for ordem in dados["ordens_servico"]:
+                status_emoji = "🔧" if ordem["status"] == "in_progress" else "✅" if ordem["status"] == "completed" else "📋"
+                mensagem += f"{status_emoji} *OS #{ordem.get('order_number', ordem['id'][:8])}*\n"
+                mensagem += f"🔧 {ordem['equipment_type']}\n"
+                mensagem += f"📍 Status: {ordem['status'].replace('_', ' ').title()}\n"
+                if ordem.get("final_cost"):
+                    mensagem += f"💰 Valor: R$ {ordem['final_cost']}\n"
+                mensagem += f"📅 Criado: {ordem['created_at'][:10]}\n\n"
+
+            mensagem += "Para mais detalhes de uma ordem específica, me envie o número dela!"
+            return mensagem
+
+        elif tipo_resposta == "status_ordem":
+            if not dados:
+                return "Ordem não encontrada. 🤔\n\nVerifique o número e tente novamente."
+
+            status_emoji = {
+                "pendente": "⏳",
+                "agendado": "📅",
+                "scheduled": "📅",
+                "in_progress": "🔧",
+                "completed": "✅",
+                "budget_pending": "💰",
+                "budget_approved": "✅"
+            }.get(dados["status"], "📋")
+
+            mensagem = f"{status_emoji} *{dados['numero']}* - {dados['equipamento']}\n\n"
+            mensagem += f"👤 Cliente: {dados['cliente']}\n"
+            mensagem += f"📍 Status: {dados['status'].replace('_', ' ').title()}\n"
+
+            if dados.get("tecnico"):
+                mensagem += f"👨‍🔧 Técnico: {dados['tecnico']}\n"
+
+            if dados.get("data_agendada"):
+                mensagem += f"📅 Agendado: {dados['data_agendada'][:10]}\n"
+
+            if dados.get("valor_final"):
+                mensagem += f"💰 Valor: R$ {dados['valor_final']}\n"
+
+            if dados.get("problema"):
+                mensagem += f"🔍 Problema: {dados['problema']}\n"
+
+            mensagem += f"\n📅 Criado em: {dados['data_criacao'][:10]}"
+            return mensagem
+
+        elif tipo_resposta == "orcamento":
+            if dados.get("status") == "sem_orcamento":
+                return "⏳ *Orçamento em Preparação*\n\nSeu orçamento ainda está sendo preparado pela nossa equipe técnica.\n\nVocê receberá uma notificação assim que estiver pronto!"
+
+            mensagem = f"💰 *Orçamento - {dados['numero']}*\n\n"
+            mensagem += f"🔧 {dados['equipamento']}\n"
+            mensagem += f"💵 Valor Total: *R$ {dados['valor_total']}*\n"
+
+            if dados.get("descricao"):
+                mensagem += f"📋 Serviço: {dados['descricao']}\n"
+
+            if dados["aprovado"]:
+                mensagem += f"\n✅ *Orçamento já aprovado!*\n"
+                mensagem += f"🔧 Serviço será executado em breve."
+            else:
+                mensagem += f"\n⏳ *Aguardando sua aprovação*\n"
+                mensagem += f"Para aprovar, responda: *aprovar {dados['numero']}*"
+
+            return mensagem
+
+        elif tipo_resposta == "aprovacao_sucesso":
+            return f"✅ *Orçamento Aprovado!*\n\nSeu orçamento da ordem {dados['ordem_id'][:8]} foi aprovado com sucesso!\n\n🔧 Nosso técnico iniciará o serviço em breve.\n📱 Você receberá atualizações sobre o progresso."
+
+        elif tipo_resposta == "reagendamento_sucesso":
+            return f"📅 *Reagendamento Confirmado!*\n\nSua ordem foi reagendada para: {dados['nova_data'][:10]}\n\n✅ Confirmação enviada para nossa equipe.\n📱 Você receberá lembretes próximo à data."
+
+        else:
+            return "Desculpe, não consegui processar sua solicitação. 🤔\n\nTente novamente ou entre em contato conosco."
+
+    except Exception as e:
+        logger.error(f"Erro ao formatar resposta: {str(e)}")
+        return "Ops! Algo deu errado ao processar sua solicitação. 😅\n\nTente novamente em alguns instantes."
