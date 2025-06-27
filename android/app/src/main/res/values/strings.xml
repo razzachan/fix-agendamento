@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Fix Fogões</string>
+    <string name="title_activity_main">Fix Fogões</string>
+    <string name="package_name">com.fixfogoes.app</string>
+    <string name="custom_url_scheme">com.fixfogoes.app</string>
+</resources>

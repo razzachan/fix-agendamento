@@ -449,57 +449,144 @@ async def obter_horarios_disponiveis_otimizados(
     data_inicio: datetime,
     dias: int,
     grupo_logistico: str,
-    urgente: bool
+    urgente: bool,
+    endereco: str = "",
+    coordenadas: Optional[Tuple[float, float]] = None
 ) -> List[Dict[str, Any]]:
     """
-    Obtém horários disponíveis otimizados por grupo logístico
+    Obtém horários disponíveis otimizados por grupo logístico, considerando:
+    - Conflitos de agendamentos existentes
+    - Carga de trabalho por grupo logístico
+    - Otimização de rotas e deslocamentos
+    - Priorização por urgência
     """
-    # Usar a função original como base
-    horarios_base = await obter_horarios_disponiveis(data_inicio, dias)
+    try:
+        supabase = get_supabase_client()
 
-    # Aplicar otimizações baseadas no grupo logístico
-    horarios_otimizados = []
+        # 1. Obter horários base (já filtra conflitos)
+        horarios_base = await obter_horarios_disponiveis(data_inicio, dias)
 
-    for horario in horarios_base:
-        # Calcular prioridade baseada no grupo logístico
-        prioridade = 0
+        # 2. Analisar carga de trabalho por grupo logístico nos próximos dias
+        carga_por_grupo = await analisar_carga_trabalho_por_grupo(data_inicio, dias)
 
-        if grupo_logistico == 'A':
-            # Grupo A: Prioridade para horários da manhã (mais próximo do centro)
+        # 3. Aplicar otimizações inteligentes
+        horarios_otimizados = []
+
+        for horario in horarios_base:
+            # Calcular score de prioridade
+            score = 0
             hora = int(horario['hora_inicio'].split(':')[0])
-            if 8 <= hora <= 12:
-                prioridade += 10
-            elif 13 <= hora <= 15:
-                prioridade += 5
-        elif grupo_logistico == 'B':
-            # Grupo B: Prioridade para horários da tarde
-            hora = int(horario['hora_inicio'].split(':')[0])
-            if 13 <= hora <= 16:
-                prioridade += 10
-            elif 8 <= hora <= 12:
-                prioridade += 5
-        else:  # Grupo C
-            # Grupo C: Prioridade para horários mais tardios (viagens longas)
-            hora = int(horario['hora_inicio'].split(':')[0])
-            if 14 <= hora <= 17:
-                prioridade += 10
-            elif 8 <= hora <= 13:
-                prioridade += 3
+            data_horario = datetime.strptime(horario['data'], '%Y-%m-%d')
 
-        # Bonus para urgente
-        if urgente:
-            prioridade += 20
+            # 3.1. OTIMIZAÇÃO POR GRUPO LOGÍSTICO
+            if grupo_logistico == 'A':
+                # Grupo A: Florianópolis - Prioridade manhã (menos trânsito)
+                if 8 <= hora <= 11:
+                    score += 15  # Manhã ideal
+                elif 14 <= hora <= 16:
+                    score += 10  # Tarde boa
+                elif 11 <= hora <= 13:
+                    score += 8   # Meio-dia ok
+                else:
+                    score += 5   # Outros horários
 
-        horario['prioridade'] = prioridade
-        horarios_otimizados.append(horario)
+            elif grupo_logistico == 'B':
+                # Grupo B: Grande Florianópolis - Prioridade tarde (evita rush matinal)
+                if 13 <= hora <= 16:
+                    score += 15  # Tarde ideal
+                elif 9 <= hora <= 11:
+                    score += 12  # Manhã boa
+                elif 16 <= hora <= 17:
+                    score += 10  # Final da tarde
+                else:
+                    score += 6   # Outros horários
 
-    # Ordenar por prioridade (maior primeiro)
-    horarios_otimizados.sort(key=lambda x: x['prioridade'], reverse=True)
+            else:  # Grupo C
+                # Grupo C: Litoral/Interior - Prioridade tarde (viagens longas)
+                if 14 <= hora <= 17:
+                    score += 15  # Tarde ideal para viagens longas
+                elif 9 <= hora <= 12:
+                    score += 10  # Manhã com tempo de deslocamento
+                else:
+                    score += 5   # Outros horários
 
-    # Log da otimização
-    logger.info(f"🎯 Horários otimizados para grupo {grupo_logistico}: {len(horarios_otimizados)} opções")
+            # 3.2. ANÁLISE DE CARGA DE TRABALHO
+            data_str = data_horario.strftime('%Y-%m-%d')
+            carga_dia = carga_por_grupo.get(data_str, {}).get(grupo_logistico, 0)
 
-    return horarios_otimizados
+            if carga_dia < 30:  # Baixa carga
+                score += 10
+            elif carga_dia < 60:  # Média carga
+                score += 5
+            elif carga_dia < 80:  # Alta carga
+                score += 2
+            else:  # Sobrecarga
+                score -= 5
+
+            # 3.3. VERIFICAÇÃO DE CONFLITOS DE GRUPOS (REGRA CRÍTICA)
+            if grupo_logistico == 'C':
+                # GRUPO C: Nunca no mesmo dia que grupos A ou B
+                conflito_grupos = await verificar_conflito_grupos_no_dia(data_str, 'C')
+                if conflito_grupos:
+                    score -= 1000  # Penalização severa para eliminar da lista
+                    logger.info(f"❌ Grupo C bloqueado em {data_str} - há agendamentos A/B no mesmo dia")
+
+            # 3.4. OTIMIZAÇÃO DE ROTAS (se temos coordenadas)
+            if coordenadas and score > 0:  # Só calcular se não foi penalizado
+                # Verificar se há outros agendamentos próximos no mesmo dia
+                bonus_rota = await calcular_bonus_rota(data_str, hora, coordenadas, grupo_logistico)
+                score += bonus_rota
+
+            # 3.5. PRIORIZAÇÃO POR URGÊNCIA
+            if urgente and score > 0:  # Só aplicar se não foi penalizado
+                if grupo_logistico in ['A', 'B'] and 8 <= hora <= 16:
+                    score += 25  # Urgente em horário comercial
+                elif grupo_logistico == 'C' and 9 <= hora <= 17:
+                    score += 20  # Urgente com tempo de deslocamento
+                else:
+                    score += 15  # Urgente em outros horários
+
+            # 3.6. BONUS POR DIA DA SEMANA (só se não foi penalizado)
+            if score > 0:
+                dia_semana = data_horario.weekday()  # 0=segunda, 6=domingo
+                if dia_semana < 5:  # Segunda a sexta
+                    score += 5
+                elif dia_semana == 5:  # Sábado
+                    score += 2
+                # Domingo = sem bonus
+
+                # 3.7. PENALIZAÇÃO POR HORÁRIOS DE PICO
+                if grupo_logistico in ['A', 'B']:
+                    if hora in [7, 8, 17, 18]:  # Horários de trânsito intenso
+                        score -= 3
+
+            horario['score_otimizacao'] = score
+            horario['grupo_logistico'] = grupo_logistico
+            horario['carga_dia'] = carga_dia
+            horarios_otimizados.append(horario)
+
+        # 4. Filtrar horários com score negativo (bloqueados) e ordenar
+        horarios_validos = [h for h in horarios_otimizados if h['score_otimizacao'] > 0]
+        horarios_validos.sort(key=lambda x: x['score_otimizacao'], reverse=True)
+
+        # 5. Garantir que sempre temos pelo menos algumas opções
+        if not horarios_validos and horarios_otimizados:
+            # Se todos foram bloqueados, pegar os com menor penalização
+            horarios_validos = sorted(horarios_otimizados, key=lambda x: x['score_otimizacao'], reverse=True)[:3]
+            logger.warning(f"⚠️ Todos os horários foram penalizados para grupo {grupo_logistico}, oferecendo os melhores disponíveis")
+
+        # 6. Log da otimização
+        logger.info(f"🎯 Horários otimizados para grupo {grupo_logistico}:")
+        logger.info(f"   📊 {len(horarios_validos)} opções válidas de {len(horarios_base)} disponíveis")
+        logger.info(f"   🏆 Melhor score: {horarios_validos[0]['score_otimizacao'] if horarios_validos else 0}")
+        logger.info(f"   📈 Carga média do grupo: {sum(carga_por_grupo.get(d, {}).get(grupo_logistico, 0) for d in carga_por_grupo) / max(len(carga_por_grupo), 1):.1f}%")
+
+        return horarios_validos
+
+    except Exception as e:
+        logger.error(f"Erro na otimização de horários: {e}")
+        # Fallback para função original
+        return await obter_horarios_disponiveis(data_inicio, dias)
 
 # Função para obter horários disponíveis
 async def obter_horarios_disponiveis(data_inicio: datetime, dias: int = 5) -> List[Dict[str, Any]]:
@@ -527,13 +614,26 @@ async def obter_horarios_disponiveis(data_inicio: datetime, dias: int = 5) -> Li
         data_str = data_atual.strftime('%Y-%m-%d')
 
         try:
-            # Buscar agendamentos AI
-            response_ai = supabase.table("agendamentos_ai").select("*").gte("data_agendada", f"{data_str}T00:00:00").lt("data_agendada", f"{data_str}T23:59:59").execute()
+            # Buscar agendamentos AI (múltiplos formatos de data)
+            response_ai = supabase.table("agendamentos_ai").select("*").or_(
+                f"data_agendada.gte.{data_str}T00:00:00,data_agendada.lt.{data_str}T23:59:59"
+            ).execute()
             agendamentos_ai = response_ai.data if response_ai.data else []
 
-            # Buscar ordens de serviço
-            response_os = supabase.table("service_orders").select("*").eq("scheduled_date", data_str).execute()
+            # Buscar ordens de serviço (múltiplos status ativos)
+            response_os = supabase.table("service_orders").select("*").eq("scheduled_date", data_str).in_(
+                "status", ["agendado", "em_andamento", "a_caminho", "confirmado"]
+            ).execute()
             ordens_servico = response_os.data if response_os.data else []
+
+            # Buscar também agendamentos por técnico específico
+            response_tech = supabase.table("service_orders").select("*").eq("scheduled_date", data_str).not_.is_("technician_name", "null").execute()
+            agendamentos_tecnicos = response_tech.data if response_tech.data else []
+
+            # Combinar todas as ordens de serviço
+            ordens_servico.extend([os for os in agendamentos_tecnicos if os not in ordens_servico])
+
+            logger.info(f"📅 {data_str}: {len(agendamentos_ai)} agendamentos AI + {len(ordens_servico)} ordens de serviço")
 
         except Exception as e:
             logger.error(f"Erro ao buscar agendamentos para {data_str}: {e}")
@@ -549,18 +649,29 @@ async def obter_horarios_disponiveis(data_inicio: datetime, dias: int = 5) -> Li
             horario_inicio = data_atual.replace(hour=hora, minute=0, second=0, microsecond=0)
             horario_fim = horario_inicio + timedelta(hours=2)  # Slots de 2 horas
 
-            # Verificar se há conflitos
+            # Verificar se há conflitos com lógica melhorada
             conflito = False
+            motivo_conflito = ""
 
             # Verificar agendamentos AI
             for ag in agendamentos_ai:
                 if ag.get('data_agendada'):
                     try:
-                        data_ag = datetime.fromisoformat(ag['data_agendada'].replace('Z', '+00:00'))
-                        if horario_inicio <= data_ag < horario_fim:
+                        # Suportar múltiplos formatos de data
+                        data_ag_str = ag['data_agendada']
+                        if 'T' in data_ag_str:
+                            data_ag = datetime.fromisoformat(data_ag_str.replace('Z', '+00:00'))
+                        else:
+                            data_ag = datetime.strptime(data_ag_str, '%Y-%m-%d %H:%M:%S')
+
+                        # Verificar sobreposição de horários (com margem de 30min)
+                        margem = timedelta(minutes=30)
+                        if (horario_inicio - margem) <= data_ag < (horario_fim + margem):
                             conflito = True
+                            motivo_conflito = f"Agendamento AI às {data_ag.strftime('%H:%M')}"
                             break
-                    except:
+                    except Exception as e:
+                        logger.warning(f"Erro ao processar agendamento AI: {e}")
                         continue
 
             # Verificar ordens de serviço
@@ -568,24 +679,274 @@ async def obter_horarios_disponiveis(data_inicio: datetime, dias: int = 5) -> Li
                 for os in ordens_servico:
                     if os.get('scheduled_time'):
                         try:
-                            hora_os = int(os['scheduled_time'].split(':')[0])
-                            if hora <= hora_os < hora + 2:
-                                conflito = True
-                                break
-                        except:
+                            # Converter horário da OS para datetime
+                            hora_os_str = os['scheduled_time']
+                            if ':' in hora_os_str:
+                                hora_os, min_os = map(int, hora_os_str.split(':')[:2])
+                                horario_os = data_atual.replace(hour=hora_os, minute=min_os, second=0, microsecond=0)
+
+                                # Verificar sobreposição (OS geralmente dura 1-2 horas)
+                                duracao_os = timedelta(hours=2)  # Assumir 2 horas por OS
+                                margem = timedelta(minutes=30)
+
+                                if (horario_inicio - margem) <= horario_os < (horario_fim + margem) or \
+                                   (horario_os - margem) <= horario_inicio < (horario_os + duracao_os + margem):
+                                    conflito = True
+                                    motivo_conflito = f"OS às {hora_os_str} - {os.get('client_name', 'Cliente')}"
+                                    break
+                        except Exception as e:
+                            logger.warning(f"Erro ao processar OS: {e}")
                             continue
 
+            if conflito:
+                logger.debug(f"⚠️ Conflito em {data_str} {hora:02d}:00 - {motivo_conflito}")
+
             if not conflito:
+                # Sistema agenda para horário específico, mas mostra faixa para o cliente
+                hora_fim_display = hora + 1  # Faixa de 1 hora para o cliente (ex: 9h-10h)
+
                 horarios_disponiveis.append({
                     "data": data_atual.strftime('%Y-%m-%d'),
-                    "hora_inicio": f"{hora:02d}:00",
-                    "hora_fim": f"{hora+2:02d}:00",
+                    "hora_agendamento": f"{hora:02d}:00",  # Horário real do agendamento (ex: 09:00)
+                    "hora_inicio": f"{hora:02d}:00",       # Para exibição ao cliente (ex: 09:00)
+                    "hora_fim": f"{hora_fim_display:02d}:00",  # Para exibição ao cliente (ex: 10:00)
                     "datetime": horario_inicio.isoformat(),
+                    "datetime_agendamento": horario_inicio.isoformat(),  # Horário exato para agendar
                     "data_formatada": data_atual.strftime('%d/%m/%Y'),
                     "dia_semana": ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"][data_atual.weekday()]
                 })
 
+    logger.info(f"🗓️ Total de horários disponíveis encontrados: {len(horarios_disponiveis)}")
     return horarios_disponiveis
+
+async def analisar_carga_trabalho_por_grupo(data_inicio: datetime, dias: int) -> Dict[str, Dict[str, float]]:
+    """
+    Analisa a carga de trabalho por grupo logístico nos próximos dias
+    """
+    try:
+        supabase = get_supabase_client()
+        carga_por_grupo = {}
+
+        for i in range(dias):
+            data_atual = data_inicio + timedelta(days=i)
+            data_str = data_atual.strftime('%Y-%m-%d')
+
+            # Buscar agendamentos do dia
+            response_ai = supabase.table("agendamentos_ai").select("*").gte(
+                "data_agendada", f"{data_str}T00:00:00"
+            ).lt("data_agendada", f"{data_str}T23:59:59").execute()
+
+            response_os = supabase.table("service_orders").select("*").eq("scheduled_date", data_str).execute()
+
+            agendamentos_ai = response_ai.data if response_ai.data else []
+            ordens_servico = response_os.data if response_os.data else []
+
+            # Contar por grupo logístico
+            grupos_count = {'A': 0, 'B': 0, 'C': 0}
+
+            # Analisar agendamentos AI
+            for ag in agendamentos_ai:
+                grupo = ag.get('grupo_logistico', 'B')  # Padrão B
+                grupos_count[grupo] += 1
+
+            # Analisar ordens de serviço (estimar grupo pelo endereço)
+            for os in ordens_servico:
+                endereco_os = os.get('pickup_address', '')
+                grupo = determine_logistics_group(endereco_os) if endereco_os else 'B'
+                grupos_count[grupo] += 1
+
+            # Calcular percentual de carga (assumindo capacidade máxima de 8 atendimentos por grupo por dia)
+            capacidade_maxima = 8
+            carga_por_grupo[data_str] = {
+                'A': (grupos_count['A'] / capacidade_maxima) * 100,
+                'B': (grupos_count['B'] / capacidade_maxima) * 100,
+                'C': (grupos_count['C'] / capacidade_maxima) * 100
+            }
+
+        return carga_por_grupo
+
+    except Exception as e:
+        logger.error(f"Erro ao analisar carga de trabalho: {e}")
+        return {}
+
+async def calcular_bonus_rota(data_str: str, hora: int, coordenadas: Tuple[float, float], grupo_logistico: str) -> float:
+    """
+    Calcula bonus de rota baseado em agendamentos próximos no mesmo dia
+    """
+    try:
+        supabase = get_supabase_client()
+        bonus = 0.0
+
+        # Buscar agendamentos do mesmo dia
+        response_ai = supabase.table("agendamentos_ai").select("*").gte(
+            "data_agendada", f"{data_str}T00:00:00"
+        ).lt("data_agendada", f"{data_str}T23:59:59").execute()
+
+        response_os = supabase.table("service_orders").select("*").eq("scheduled_date", data_str).execute()
+
+        agendamentos_ai = response_ai.data if response_ai.data else []
+        ordens_servico = response_os.data if response_os.data else []
+
+        # Verificar proximidade com outros agendamentos
+        for ag in agendamentos_ai:
+            if ag.get('endereco'):
+                # Estimar coordenadas do agendamento existente
+                coords_ag = await geocodificar_endereco(ag['endereco'])
+                if coords_ag:
+                    distancia = calculate_distance(coordenadas, coords_ag)
+
+                    # Bonus por proximidade (até 5km = bonus máximo)
+                    if distancia <= 2:
+                        bonus += 5  # Muito próximo
+                    elif distancia <= 5:
+                        bonus += 3  # Próximo
+                    elif distancia <= 10:
+                        bonus += 1  # Relativamente próximo
+
+        # Bonus adicional se há concentração no mesmo grupo logístico
+        agendamentos_mesmo_grupo = sum(1 for ag in agendamentos_ai if ag.get('grupo_logistico') == grupo_logistico)
+        if agendamentos_mesmo_grupo >= 2:
+            bonus += 2  # Otimização de rota por grupo
+
+        return min(bonus, 10)  # Máximo 10 pontos de bonus
+
+    except Exception as e:
+        logger.error(f"Erro ao calcular bonus de rota: {e}")
+        return 0.0
+
+async def verificar_conflito_grupos_no_dia(data_str: str, grupo_solicitado: str) -> bool:
+    """
+    Verifica se há conflito de grupos no mesmo dia.
+    REGRA: Grupo C nunca no mesmo dia que grupos A ou B
+    """
+    try:
+        supabase = get_supabase_client()
+
+        if grupo_solicitado != 'C':
+            return False  # Grupos A e B podem coexistir
+
+        # Buscar agendamentos do dia
+        response_ai = supabase.table("agendamentos_ai").select("*").gte(
+            "data_agendada", f"{data_str}T00:00:00"
+        ).lt("data_agendada", f"{data_str}T23:59:59").execute()
+
+        response_os = supabase.table("service_orders").select("*").eq("scheduled_date", data_str).execute()
+
+        agendamentos_ai = response_ai.data if response_ai.data else []
+        ordens_servico = response_os.data if response_os.data else []
+
+        # Verificar se há agendamentos dos grupos A ou B
+        for ag in agendamentos_ai:
+            grupo_ag = ag.get('grupo_logistico', 'B')  # Padrão B
+            if grupo_ag in ['A', 'B']:
+                logger.info(f"🚫 Conflito detectado: Grupo C solicitado em {data_str}, mas há agendamento grupo {grupo_ag}")
+                return True
+
+        # Verificar ordens de serviço (estimar grupo pelo endereço)
+        for os in ordens_servico:
+            endereco_os = os.get('pickup_address', '')
+            if endereco_os:
+                grupo_os = determine_logistics_group(endereco_os)
+                if grupo_os in ['A', 'B']:
+                    logger.info(f"🚫 Conflito detectado: Grupo C solicitado em {data_str}, mas há OS grupo {grupo_os}")
+                    return True
+
+        return False  # Sem conflitos
+
+    except Exception as e:
+        logger.error(f"Erro ao verificar conflito de grupos: {e}")
+        return False  # Em caso de erro, permitir agendamento
+
+def processar_escolha_horario(horario_escolhido: str, horarios_disponiveis: List[Dict]) -> Optional[Dict]:
+    """
+    Processa a escolha do cliente (número 1, 2, 3 ou horário ISO)
+    Retorna o horário selecionado com datetime_agendamento correto
+    """
+    try:
+        # Verificar se é um número (1, 2, 3)
+        if horario_escolhido.strip().isdigit():
+            opcao = int(horario_escolhido.strip())
+            if 1 <= opcao <= len(horarios_disponiveis):
+                horario_selecionado = horarios_disponiveis[opcao - 1]
+                logger.info(f"✅ Cliente escolheu opção {opcao}: {horario_selecionado['dia_semana']} às {horario_selecionado['hora_agendamento']}")
+                return horario_selecionado
+            else:
+                logger.warning(f"⚠️ Opção inválida: {opcao}. Disponíveis: 1-{len(horarios_disponiveis)}")
+                return None
+
+        # Verificar se é um horário ISO (fallback)
+        else:
+            try:
+                horario_dt = datetime.fromisoformat(horario_escolhido)
+                # Procurar horário correspondente na lista
+                for horario in horarios_disponiveis:
+                    if horario['datetime_agendamento'] == horario_escolhido:
+                        logger.info(f"✅ Cliente escolheu horário ISO: {horario_dt}")
+                        return horario
+
+                logger.warning(f"⚠️ Horário ISO não encontrado na lista: {horario_escolhido}")
+                return None
+
+            except:
+                logger.warning(f"⚠️ Formato de horário inválido: {horario_escolhido}")
+                return None
+
+    except Exception as e:
+        logger.error(f"Erro ao processar escolha de horário: {e}")
+        return None
+
+async def verificar_horario_ainda_disponivel(data_horario: str, tecnico_nome: str = None) -> bool:
+    """
+    Verifica se um horário específico ainda está disponível antes de confirmar
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Converter string para datetime
+        horario_dt = datetime.fromisoformat(data_horario)
+        data_str = horario_dt.strftime('%Y-%m-%d')
+        hora_str = horario_dt.strftime('%H:%M')
+
+        # Buscar conflitos em agendamentos AI
+        response_ai = supabase.table("agendamentos_ai").select("*").gte(
+            "data_agendada", f"{data_str}T00:00:00"
+        ).lt("data_agendada", f"{data_str}T23:59:59").execute()
+
+        # Buscar conflitos em ordens de serviço
+        response_os = supabase.table("service_orders").select("*").eq("scheduled_date", data_str).execute()
+
+        agendamentos_ai = response_ai.data if response_ai.data else []
+        ordens_servico = response_os.data if response_os.data else []
+
+        # Verificar conflitos
+        margem = timedelta(hours=1)  # Margem de 1 hora
+
+        for ag in agendamentos_ai:
+            if ag.get('data_agendada'):
+                try:
+                    data_ag = datetime.fromisoformat(ag['data_agendada'].replace('Z', '+00:00'))
+                    if abs((horario_dt - data_ag).total_seconds()) < margem.total_seconds():
+                        logger.warning(f"⚠️ Conflito encontrado com agendamento AI: {ag.get('nome')} às {data_ag}")
+                        return False
+                except:
+                    continue
+
+        for os in ordens_servico:
+            if os.get('scheduled_time'):
+                try:
+                    hora_os = int(os['scheduled_time'].split(':')[0])
+                    if abs(horario_dt.hour - hora_os) <= 1:  # Margem de 1 hora
+                        logger.warning(f"⚠️ Conflito encontrado com OS: {os.get('client_name')} às {os['scheduled_time']}")
+                        return False
+                except:
+                    continue
+
+        logger.info(f"✅ Horário {data_horario} ainda disponível")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro ao verificar disponibilidade do horário: {e}")
+        return False  # Por segurança, considerar indisponível se houver erro
 
 # Função para inserir agendamento no Supabase
 async def inserir_agendamento(agendamento: Dict[str, Any]) -> Dict[str, Any]:
@@ -784,7 +1145,7 @@ async def consultar_disponibilidade(request: Request):
             dias_busca = 5  # Próximos 5 dias
 
         # Obter horários disponíveis com otimização por grupo logístico
-        horarios = await obter_horarios_disponiveis_otimizados(data_inicio, dias_busca, grupo_logistico, urgente)
+        horarios = await obter_horarios_disponiveis_otimizados(data_inicio, dias_busca, grupo_logistico, urgente, endereco, coordenadas)
 
         # Limitar a 3 melhores opções
         melhores_horarios = horarios[:3]
@@ -803,26 +1164,28 @@ async def consultar_disponibilidade(request: Request):
             if len(equipamentos) > 2:
                 resumo_equipamentos += f" e mais {len(equipamentos) - 2} equipamento(s)"
 
-            # Emoji do grupo logístico
-            grupo_emoji = {"A": "🏢", "B": "🏘️", "C": "🌄"}
-
             mensagem = f"🔧 *Agendamento para {nome or 'Cliente'}*\n"
             mensagem += f"📍 {endereco}\n"
             mensagem += f"⚙️ {resumo_equipamentos}\n"
-            mensagem += f"{grupo_emoji.get(grupo_logistico, '📍')} *Região: Grupo {grupo_logistico}*\n"
-            if coordenadas:
-                distancia = calculate_distance(FLORIANOPOLIS_CENTER, coordenadas)
-                mensagem += f"📏 Distância: {distancia:.1f}km do centro\n"
             if urgente:
                 mensagem += f"🚨 *URGENTE*\n"
 
-            # Informações do técnico selecionado
-            mensagem += f"\n👨‍🔧 *Técnico Selecionado:* {tecnico_info['nome']}\n"
-            mensagem += f"🎯 *Especialidades:* {', '.join(tecnico_info['especialidades'][:3])}\n"
-            mensagem += f"⭐ *Score de Compatibilidade:* {tecnico_info['score']}/100\n"
-            mensagem += f"📞 *Contato:* {tecnico_info['telefone']}\n"
+            # Informações do técnico selecionado (mais limpo)
+            mensagem += f"\n👨‍🔧 *Técnico:* {tecnico_info['nome']}\n"
 
-            mensagem += f"\n🗓️ *Horários Otimizados*\n\n"
+            # Mostrar especialidades de forma mais natural
+            especialidades_texto = ""
+            if "coifa" in tecnico_info['especialidades']:
+                especialidades_texto = "Especialista em coifas e exaustores"
+            elif "fogao" in tecnico_info['especialidades']:
+                especialidades_texto = "Especialista em fogões e fornos"
+            else:
+                especialidades_texto = "Técnico especializado"
+
+            mensagem += f"🎯 {especialidades_texto}\n"
+            mensagem += f"📞 {tecnico_info['telefone']}\n"
+
+            mensagem += f"\n🗓️ *Horários Disponíveis*\n\n"
 
             for i, horario in enumerate(melhores_horarios, 1):
                 mensagem += f"*{i}) {horario['dia_semana']}, {horario['data_formatada']}*\n"
@@ -839,12 +1202,7 @@ async def consultar_disponibilidade(request: Request):
                 "tecnico": tecnico,
                 "tecnico_detalhado": tecnico_info,
                 "urgente": urgente,
-                "roteirização": {
-                    "grupo_logistico": grupo_logistico,
-                    "coordenadas": coordenadas,
-                    "distancia_centro": calculate_distance(FLORIANOPOLIS_CENTER, coordenadas) if coordenadas else None,
-                    "otimizado": True
-                },
+                "sistema_otimizado": True,
                 "dados_cliente": {
                     "nome": nome,
                     "endereco": endereco,
@@ -881,7 +1239,7 @@ async def agendamento_inteligente_completo(request: Request):
         else:
             # ETAPA 2: CONFIRMAR AGENDAMENTO
             logger.info("Executando ETAPA 2: Confirmação de agendamento")
-            return await confirmar_agendamento_final(data)
+            return await confirmar_agendamento_final(data, horario_escolhido)
 
     except Exception as e:
         logger.error(f"Erro no agendamento inteligente: {e}")
@@ -1003,55 +1361,118 @@ async def consultar_disponibilidade_interna(data: dict):
 
         agendamento_id = response_agendamento.data[0]["id"]
 
-        # 2. Criar ordem de serviço automaticamente
-        import uuid
-        order_number = f"OS-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+        # 2. Criar ordem de serviço usando o mesmo sistema dos modais
+        try:
+            import uuid
 
-        # Determinar tipo de serviço e valor baseado nos equipamentos
-        service_type = "em_domicilio"
-        final_cost = 120.00  # Valor padrão
+            # Determinar tipo de serviço e valor baseado nos equipamentos (mesma lógica dos modais)
+            service_type = "em_domicilio"
+            final_cost = 120.00  # Valor padrão
 
-        # Ajustar valor baseado nos equipamentos
-        for eq in equipamentos:
-            if "coifa" in eq["equipamento"].lower():
-                final_cost = max(final_cost, 150.00)
-            elif "forno" in eq["equipamento"].lower():
-                final_cost = max(final_cost, 130.00)
+            # Ajustar valor baseado nos equipamentos
+            for eq in equipamentos:
+                if "coifa" in eq["equipamento"].lower():
+                    final_cost = max(final_cost, 150.00)
+                elif "forno" in eq["equipamento"].lower():
+                    final_cost = max(final_cost, 130.00)
 
-        # Se múltiplos equipamentos, adicionar taxa
-        if len(equipamentos) > 1:
-            final_cost += (len(equipamentos) - 1) * 30.00
+            # Se múltiplos equipamentos, adicionar taxa
+            if len(equipamentos) > 1:
+                final_cost += (len(equipamentos) - 1) * 30.00
 
-        # Consolidar descrição dos problemas
-        descricao_completa = " | ".join(problemas) if problemas else "Não especificado"
+            # Consolidar descrição dos problemas
+            descricao_completa = " | ".join(problemas) if problemas else "Não especificado"
+            tipos_equipamentos = ", ".join([eq["equipamento"] for eq in equipamentos])
 
-        # Consolidar tipos de equipamentos
-        tipos_equipamentos = ", ".join([eq["equipamento"] for eq in equipamentos])
+            # 2.1. Criar cliente automaticamente usando função RPC (mesmo sistema dos modais)
+            client_data = {
+                "name": nome,
+                "email": data.get("email", ""),
+                "phone": telefone,
+                "address": endereco
+            }
 
-        dados_os = {
-            "id": str(uuid.uuid4()),
-            "order_number": order_number,
-            "client_name": nome,
-            "client_phone": telefone,
-            "client_email": data.get("email", ""),
-            "address": endereco,
-            "equipment_type": tipos_equipamentos,
-            "problem_description": descricao_completa,
-            "service_type": service_type,
-            "status": "agendado",
-            "scheduled_date": data_agendada,
-            "scheduled_time": hora_agendada,
-            "technician_name": tecnico.split('(')[0].strip(),
-            "final_cost": final_cost,
-            "created_at": datetime.now().isoformat(),
-            "agendamento_origem_id": agendamento_id,
-            "urgente": urgente
-        }
+            client_id = None
+            if client_data["name"]:
+                try:
+                    # Usar função RPC para criar cliente (bypassa RLS como nos modais)
+                    response_client = supabase.rpc('create_client', {
+                        'client_name': client_data["name"],
+                        'client_email': client_data["email"] if client_data["email"] else None,
+                        'client_phone': client_data["phone"] if client_data["phone"] else None,
+                        'client_address': client_data["address"] if client_data["address"] else None,
+                        'client_city': None,
+                        'client_state': None,
+                        'client_zip_code': None
+                    }).execute()
 
-        response_os = supabase.table("service_orders").insert(dados_os).execute()
+                    if response_client.data:
+                        if isinstance(response_client.data, list) and len(response_client.data) > 0:
+                            client_id = response_client.data[0]["id"]
+                        elif isinstance(response_client.data, dict):
+                            client_id = response_client.data["id"]
 
-        if not response_os.data:
-            raise Exception("Erro ao criar ordem de serviço")
+                        logger.info(f"✅ Cliente criado automaticamente: {client_id}")
+
+                        # Criar conta de usuário com senha padrão 123456 (mesmo sistema dos modais)
+                        if client_data["email"]:
+                            try:
+                                user_response = supabase.auth.admin.create_user({
+                                    "email": client_data["email"],
+                                    "password": "123456",
+                                    "email_confirm": True,
+                                    "user_metadata": {
+                                        "name": client_data["name"],
+                                        "role": "client"
+                                    }
+                                })
+                                if user_response.user:
+                                    logger.info(f"✅ Conta de usuário criada: {client_data['email']} (senha: 123456)")
+                            except Exception as user_error:
+                                logger.warning(f"⚠️ Erro ao criar conta de usuário: {user_error}")
+
+                except Exception as client_error:
+                    logger.warning(f"⚠️ Erro ao criar cliente: {client_error}")
+
+            # 2.2. Criar ordem de serviço (mesmo formato dos modais)
+            order_number = f"OS-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+
+            dados_os = {
+                "id": str(uuid.uuid4()),
+                "order_number": order_number,
+                "client_name": nome,
+                "client_phone": telefone,
+                "client_email": client_data["email"],
+                "client_id": client_id,  # Vinculação com cliente criado
+                "pickup_address": endereco,
+                "equipment_type": tipos_equipamentos,
+                "description": descricao_completa,
+                "service_attendance_type": service_type,
+                "status": "agendado",
+                "scheduled_date": data_agendada,
+                "scheduled_time": hora_agendada,
+                "technician_name": tecnico_info["nome"],
+                "technician_id": tecnico_info["tecnico_id"],
+                "estimated_cost": final_cost,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+                "origem_agendamento_id": agendamento_id,
+                "logistics_group": grupo_logistico,
+                "priority": "high" if urgente else "medium",
+                "notes": f"Agendamento inteligente - Score técnico: {tecnico_info['score']}"
+            }
+
+            response_os = supabase.table("service_orders").insert(dados_os).execute()
+
+            if not response_os.data:
+                raise Exception("Erro ao criar ordem de serviço")
+
+            os_id = response_os.data[0]["id"]
+            logger.info(f"✅ Ordem de serviço criada: {order_number} (ID: {os_id})")
+
+        except Exception as os_error:
+            logger.error(f"❌ Erro ao criar OS: {os_error}")
+            raise Exception(f"Erro ao criar ordem de serviço: {str(os_error)}")
 
         # 3. Atualizar agendamento com ID da OS
         supabase.table("agendamentos_ai").update({
@@ -1092,6 +1513,286 @@ async def consultar_disponibilidade_interna(data: dict):
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": f"Erro ao processar agendamento: {str(e)}"}
+        )
+
+# Função para confirmar agendamento final (ETAPA 2)
+async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
+    """
+    Confirma o agendamento criando pré-agendamento e OS usando o mesmo sistema dos modais
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Extrair dados básicos
+        endereco = data.get("endereco", "").strip()
+        nome = data.get("nome", "").strip()
+        telefone = data.get("telefone", "").strip()
+        cpf = data.get("cpf", "").strip()
+        email = data.get("email", "").strip()
+        urgente = data.get("urgente", "não").lower() in ['sim', 'true', 'urgente', '1', 'yes']
+
+        # Consolidar equipamentos
+        equipamentos = []
+        for i in range(1, 4):
+            eq_key = "equipamento" if i == 1 else f"equipamento_{i}"
+            tipo_key = f"tipo_equipamento_{i}"
+
+            equipamento = data.get(eq_key, "").strip()
+            tipo_equipamento = data.get(tipo_key, "").strip()
+
+            if equipamento:
+                equipamentos.append({
+                    "equipamento": equipamento,
+                    "tipo": tipo_equipamento or "Não especificado"
+                })
+
+        # Consolidar problemas
+        problemas = []
+        for i in range(1, 4):
+            prob_key = "problema" if i == 1 else f"problema_{i}"
+            problema = data.get(prob_key, "").strip()
+            if problema:
+                problemas.append(problema)
+
+        # Validar dados obrigatórios
+        if not nome or not endereco or not telefone or not equipamentos or not horario_escolhido:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Dados obrigatórios faltando"}
+            )
+
+        # Determinar técnico baseado nos equipamentos (usando sistema inteligente)
+        lista_equipamentos = [eq["equipamento"] for eq in equipamentos]
+
+        # Geocodificar endereço para determinar grupo logístico
+        coordenadas = await geocodificar_endereco(endereco)
+        grupo_logistico = determine_logistics_group(endereco, coordenadas)
+
+        # Selecionar técnico otimizado
+        tecnico_info = await determinar_tecnico_otimizado(lista_equipamentos, grupo_logistico, urgente)
+
+        # Processar horário escolhido
+        try:
+            horario_dt = datetime.fromisoformat(horario_escolhido)
+            data_agendada = horario_dt.strftime('%Y-%m-%d')
+            hora_agendada = horario_dt.strftime('%H:%M')
+        except:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Formato de horário inválido"}
+            )
+
+        # Verificar se horário ainda está disponível
+        if not await verificar_horario_ainda_disponivel(horario_escolhido, tecnico_info["nome"]):
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "success": False,
+                    "message": "⚠️ Horário não está mais disponível. Por favor, escolha outro horário.",
+                    "action": "reselect_time"
+                }
+            )
+
+        # 1. Criar pré-agendamento
+        agendamento_data = {
+            "nome": nome,
+            "telefone": telefone,
+            "email": email,
+            "cpf": cpf,
+            "endereco": endereco,
+            "equipamento": lista_equipamentos[0],  # Primeiro equipamento
+            "problema": problemas[0] if problemas else "Não especificado",
+            "data_agendada": horario_dt.isoformat(),
+            "tecnico": tecnico_info["nome"],
+            "urgente": urgente,
+            "status": "confirmado",
+            "origem": "clientechat_inteligente",
+            "grupo_logistico": grupo_logistico,
+            "score_tecnico": tecnico_info["score"]
+        }
+
+        response_agendamento = supabase.table("agendamentos_ai").insert(agendamento_data).execute()
+
+        if not response_agendamento.data:
+            raise Exception("Erro ao criar pré-agendamento")
+
+        agendamento_id = response_agendamento.data[0]["id"]
+        logger.info(f"✅ Pré-agendamento criado: {agendamento_id}")
+
+        # 2. Criar ordem de serviço usando o mesmo sistema dos modais
+        import uuid
+
+        # Determinar tipo de serviço e valor baseado nos equipamentos (mesma lógica dos modais)
+        service_type = "em_domicilio"
+        final_cost = 120.00  # Valor padrão
+
+        # Ajustar valor baseado nos equipamentos
+        for eq in equipamentos:
+            if "coifa" in eq["equipamento"].lower():
+                final_cost = max(final_cost, 150.00)
+            elif "forno" in eq["equipamento"].lower():
+                final_cost = max(final_cost, 130.00)
+
+        # Se múltiplos equipamentos, adicionar taxa
+        if len(equipamentos) > 1:
+            final_cost += (len(equipamentos) - 1) * 30.00
+
+        # Consolidar descrição dos problemas
+        descricao_completa = " | ".join(problemas) if problemas else "Não especificado"
+        tipos_equipamentos = ", ".join([eq["equipamento"] for eq in equipamentos])
+
+        # 2.1. Criar cliente automaticamente usando função RPC (mesmo sistema dos modais)
+        client_data = {
+            "name": nome,
+            "email": email if email else None,
+            "phone": telefone,
+            "address": endereco
+        }
+
+        client_id = None
+        if client_data["name"]:
+            try:
+                # Usar função RPC para criar cliente (bypassa RLS como nos modais)
+                response_client = supabase.rpc('create_client', {
+                    'client_name': client_data["name"],
+                    'client_email': client_data["email"],
+                    'client_phone': client_data["phone"],
+                    'client_address': client_data["address"],
+                    'client_city': None,
+                    'client_state': None,
+                    'client_zip_code': None
+                }).execute()
+
+                if response_client.data:
+                    if isinstance(response_client.data, list) and len(response_client.data) > 0:
+                        client_id = response_client.data[0]["id"]
+                    elif isinstance(response_client.data, dict):
+                        client_id = response_client.data["id"]
+
+                    logger.info(f"✅ Cliente criado automaticamente: {client_id}")
+
+                    # Criar conta de usuário com senha padrão 123456 (mesmo sistema dos modais)
+                    if client_data["email"]:
+                        try:
+                            user_response = supabase.auth.admin.create_user({
+                                "email": client_data["email"],
+                                "password": "123456",
+                                "email_confirm": True,
+                                "user_metadata": {
+                                    "name": client_data["name"],
+                                    "role": "client"
+                                }
+                            })
+                            if user_response.user:
+                                logger.info(f"✅ Conta de usuário criada: {client_data['email']} (senha: 123456)")
+                        except Exception as user_error:
+                            logger.warning(f"⚠️ Erro ao criar conta de usuário: {user_error}")
+
+            except Exception as client_error:
+                logger.warning(f"⚠️ Erro ao criar cliente: {client_error}")
+
+        # 2.2. Criar ordem de serviço (mesmo formato dos modais)
+        order_number = f"OS-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+
+        dados_os = {
+            "id": str(uuid.uuid4()),
+            "order_number": order_number,
+            "client_name": nome,
+            "client_phone": telefone,
+            "client_email": client_data["email"],
+            "client_id": client_id,  # Vinculação com cliente criado
+            "pickup_address": endereco,
+            "equipment_type": tipos_equipamentos,
+            "description": descricao_completa,
+            "service_attendance_type": service_type,
+            "status": "agendado",
+            "scheduled_date": data_agendada,
+            "scheduled_time": hora_agendada,
+            "technician_name": tecnico_info["nome"],
+            "technician_id": tecnico_info["tecnico_id"],
+            "estimated_cost": final_cost,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+            "origem_agendamento_id": agendamento_id,
+            "logistics_group": grupo_logistico,
+            "priority": "high" if urgente else "medium",
+            "notes": f"Agendamento inteligente - Score técnico: {tecnico_info['score']}"
+        }
+
+        response_os = supabase.table("service_orders").insert(dados_os).execute()
+
+        if not response_os.data:
+            raise Exception("Erro ao criar ordem de serviço")
+
+        os_id = response_os.data[0]["id"]
+        logger.info(f"✅ Ordem de serviço criada: {order_number} (ID: {os_id})")
+
+        # 3. Vincular agendamento à OS
+        try:
+            supabase.table("agendamentos_ai").update({
+                "ordem_servico_id": os_id,
+                "ordem_servico_numero": order_number
+            }).eq("id", agendamento_id).execute()
+
+            logger.info(f"✅ Agendamento vinculado à OS: {agendamento_id} -> {order_number}")
+        except Exception as link_error:
+            logger.warning(f"⚠️ Erro ao vincular agendamento à OS: {link_error}")
+
+        # 4. Preparar resposta de confirmação
+        data_formatada = horario_dt.strftime('%A, %d/%m/%Y')
+        hora_formatada = horario_dt.strftime('%H:%M')
+
+        # Traduzir dia da semana
+        dias_semana = {
+            'Monday': 'Segunda-feira',
+            'Tuesday': 'Terça-feira',
+            'Wednesday': 'Quarta-feira',
+            'Thursday': 'Quinta-feira',
+            'Friday': 'Sexta-feira',
+            'Saturday': 'Sábado',
+            'Sunday': 'Domingo'
+        }
+
+        for en, pt in dias_semana.items():
+            data_formatada = data_formatada.replace(en, pt)
+
+        mensagem_confirmacao = f"✅ *Agendamento Confirmado!*\n\n"
+        mensagem_confirmacao += f"📋 *Ordem de Serviço:* {order_number}\n"
+        mensagem_confirmacao += f"👤 *Cliente:* {nome}\n"
+        mensagem_confirmacao += f"⚙️ *Equipamento(s):* {tipos_equipamentos}\n"
+        mensagem_confirmacao += f"📅 *Data/Hora:* {data_formatada} às {hora_formatada}\n"
+        mensagem_confirmacao += f"👨‍🔧 *Técnico:* {tecnico_info['nome']}\n"
+        mensagem_confirmacao += f"📞 *Contato:* {tecnico_info['telefone']}\n"
+        mensagem_confirmacao += f"💰 *Valor Estimado:* R$ {final_cost:.2f}\n\n"
+        mensagem_confirmacao += f"📱 *Central:* (48) 98833-2664\n"
+        mensagem_confirmacao += f"Confirmação automática 1 dia antes do agendamento.\n\n"
+        mensagem_confirmacao += f"Obrigado por escolher a Fix Fogões! 🔧"
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": mensagem_confirmacao,
+                "agendamento_confirmado": True,
+                "dados_agendamento": {
+                    "agendamento_id": agendamento_id,
+                    "ordem_servico_id": os_id,
+                    "ordem_servico_numero": order_number,
+                    "cliente": nome,
+                    "data_agendada": data_agendada,
+                    "hora_agendada": hora_agendada,
+                    "tecnico": tecnico_info,
+                    "valor_estimado": final_cost,
+                    "grupo_logistico": grupo_logistico
+                }
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao confirmar agendamento: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"Erro ao confirmar agendamento: {str(e)}"}
         )
 
 if __name__ == "__main__":
