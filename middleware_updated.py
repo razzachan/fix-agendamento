@@ -1641,8 +1641,28 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
                 logger.info(f"   {i}. {h.get('texto', 'N/A')} -> {h.get('datetime_agendamento', 'N/A')}")
 
             # Processar escolha
+            logger.info(f"🔍 Chamando processar_escolha_horario com: escolha='{horario_escolhido}', horarios={len(horarios_disponiveis)}")
             horario_selecionado = processar_escolha_horario(horario_escolhido, horarios_disponiveis[:3])
-            logger.info(f"🎯 Horário selecionado: {horario_selecionado}")
+            logger.info(f"🎯 Horário selecionado retornado: {horario_selecionado}")
+
+            # Debug detalhado se retornou None
+            if not horario_selecionado:
+                logger.error(f"🚨 ERRO CRÍTICO: processar_escolha_horario retornou None!")
+                logger.error(f"   📝 Entrada: horario_escolhido='{horario_escolhido}'")
+                logger.error(f"   📝 Horários disponíveis: {horarios_disponiveis[:3]}")
+                for i, h in enumerate(horarios_disponiveis[:3], 1):
+                    logger.error(f"      {i}: {h}")
+                logger.error(f"   📝 Tipo da escolha: {type(horario_escolhido)}")
+                logger.error(f"   📝 É dígito? {horario_escolhido.strip().isdigit()}")
+                if horario_escolhido.strip().isdigit():
+                    opcao = int(horario_escolhido.strip())
+                    logger.error(f"   📝 Opção convertida: {opcao}")
+                    logger.error(f"   📝 Range válido: 1-{len(horarios_disponiveis[:3])}")
+                    logger.error(f"   📝 Está no range? {1 <= opcao <= len(horarios_disponiveis[:3])}")
+                    if 1 <= opcao <= len(horarios_disponiveis[:3]):
+                        logger.error(f"   📝 Horário que deveria ser selecionado: {horarios_disponiveis[opcao - 1]}")
+            else:
+                logger.info(f"✅ Horário selecionado com sucesso: {horario_selecionado}")
 
             if not horario_selecionado:
                 logger.error(f"❌ Falha ao processar escolha {horario_escolhido} com {len(horarios_disponiveis)} horários")
