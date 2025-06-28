@@ -161,8 +161,8 @@ async def health_check():
 # Endpoint de teste para agendamento inteligente completo
 @app.post("/agendamento-inteligente-completo")
 async def agendamento_inteligente_completo_test():
-    """Endpoint de teste para agendamento inteligente"""
-    return {"success": True, "message": "Endpoint funcionando!"}
+    """Endpoint de teste para agendamento inteligente - VERSÃO 2"""
+    return {"success": True, "message": "Endpoint funcionando! Versão 2.0"}
 
 if __name__ == "__main__":
     import uvicorn
