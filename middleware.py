@@ -365,9 +365,22 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
         telefone = data.get("telefone", "").strip()
         problema = data.get("problema", "Não especificado").strip()
 
-        # Extrair dados de negócio do ClienteChat
-        tipo_atendimento = data.get("tipo_atendimento", "em_domicilio").strip()
-        valor_os = data.get("valor_os", "0").strip()
+        # Extrair múltiplos equipamentos
+        equipamento_2 = data.get("equipamento_2", "").strip()
+        problema_2 = data.get("problema_2", "").strip()
+        equipamento_3 = data.get("equipamento_3", "").strip()
+        problema_3 = data.get("problema_3", "").strip()
+
+        # Extrair tipos de atendimento para cada equipamento
+        tipo_atendimento_1 = data.get("tipo_atendimento_1", data.get("tipo_atendimento", "em_domicilio")).strip()
+        tipo_atendimento_2 = data.get("tipo_atendimento_2", "").strip()
+        tipo_atendimento_3 = data.get("tipo_atendimento_3", "").strip()
+
+        # Extrair valores para cada equipamento
+        valor_os_1 = data.get("valor_os_1", data.get("valor_os", "0")).strip()
+        valor_os_2 = data.get("valor_os_2", "0").strip()
+        valor_os_3 = data.get("valor_os_3", "0").strip()
+
         urgente = data.get("urgente", "não").strip().lower() in ['sim', 'true', 'urgente', '1', 'yes']
 
         # Processar horário escolhido
@@ -402,7 +415,7 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
                 "mensagem": "Formato de horário inválido"
             }
 
-        # Criar pré-agendamento
+        # Criar pré-agendamento com múltiplos equipamentos
         agendamento_data = {
             "nome": nome,
             "telefone": telefone,
@@ -414,8 +427,19 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
             "urgente": urgente,
             "status": "confirmado",
             "origem": "clientechat_v4",
-            "tipo_atendimento": tipo_atendimento,
-            "valor_os": float(valor_os) if valor_os.replace('.', '').replace(',', '').isdigit() else 0.0
+            # Múltiplos equipamentos
+            "equipamento_2": equipamento_2 if equipamento_2 else None,
+            "problema_2": problema_2 if problema_2 else None,
+            "equipamento_3": equipamento_3 if equipamento_3 else None,
+            "problema_3": problema_3 if problema_3 else None,
+            # Tipos de atendimento
+            "tipo_atendimento_1": tipo_atendimento_1,
+            "tipo_atendimento_2": tipo_atendimento_2 if tipo_atendimento_2 else None,
+            "tipo_atendimento_3": tipo_atendimento_3 if tipo_atendimento_3 else None,
+            # Valores
+            "valor_os_1": float(valor_os_1) if valor_os_1.replace('.', '').replace(',', '').isdigit() else 0.0,
+            "valor_os_2": float(valor_os_2) if valor_os_2.replace('.', '').replace(',', '').isdigit() else 0.0,
+            "valor_os_3": float(valor_os_3) if valor_os_3.replace('.', '').replace(',', '').isdigit() else 0.0
         }
 
         response = supabase.table("agendamentos_ai").insert(agendamento_data).execute()
@@ -425,31 +449,73 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
 
         agendamento_id = response.data[0]["id"]
 
-        # Resposta de confirmação com informações de cobrança
+        # Resposta de confirmação com informações de múltiplos equipamentos
         mensagem = f"✅ *Agendamento Confirmado V4.0!*\n\n"
         mensagem += f"📋 *ID:* #{agendamento_id}\n"
         mensagem += f"👤 *Cliente:* {nome}\n"
         mensagem += f"📍 *Endereço:* {endereco}\n"
-        mensagem += f"🔧 *Equipamento:* {equipamento}\n"
         mensagem += f"📅 *Data:* {horario_dt.strftime('%d/%m/%Y')}\n"
-        mensagem += f"⏰ *Horário:* {horario_dt.strftime('%H:%M')}\n"
+        mensagem += f"⏰ *Horário:* {horario_dt.strftime('%H:%M')}\n\n"
 
-        # Adicionar informações específicas do tipo de atendimento
-        if tipo_atendimento == "coleta_diagnostico":
-            mensagem += f"🔍 *Tipo:* Coleta para Diagnóstico\n"
-            mensagem += f"💰 *Taxa de Diagnóstico:* R$ 350,00 (paga na coleta)\n"
-            mensagem += f"⏱️ *Prazo:* Diagnóstico em até 2 dias úteis\n"
-        elif tipo_atendimento == "coleta_conserto":
-            mensagem += f"🔧 *Tipo:* Coleta para Conserto\n"
-            if float(valor_os) > 0:
-                mensagem += f"💰 *Valor Total:* R$ {float(valor_os):.2f}\n"
-                mensagem += f"💳 *Pagamento:* 50% na coleta + 50% na entrega\n"
-            mensagem += f"⏱️ *Prazo:* Conserto em até 7 dias úteis\n"
-        elif tipo_atendimento == "em_domicilio":
-            mensagem += f"🏠 *Tipo:* Atendimento em Domicílio\n"
-            if float(valor_os) > 0:
-                mensagem += f"💰 *Valor:* R$ {float(valor_os):.2f} (pago na conclusão)\n"
-            mensagem += f"⏱️ *Prazo:* Mesmo dia ou próximo dia útil\n"
+        # Listar equipamentos e seus tipos de atendimento
+        equipamentos_info = []
+
+        # Equipamento 1
+        if equipamento:
+            info = f"🔧 *{equipamento}*\n"
+            if tipo_atendimento_1 == "coleta_diagnostico":
+                info += f"   🔍 Coleta para Diagnóstico - R$ 350,00\n"
+                info += f"   ⏱️ Diagnóstico em até 2 dias úteis\n"
+            elif tipo_atendimento_1 == "coleta_conserto":
+                info += f"   🔧 Coleta para Conserto\n"
+                if float(valor_os_1) > 0:
+                    info += f"   💰 R$ {float(valor_os_1):.2f} (50% coleta + 50% entrega)\n"
+                info += f"   ⏱️ Conserto em até 7 dias úteis\n"
+            elif tipo_atendimento_1 == "em_domicilio":
+                info += f"   🏠 Atendimento em Domicílio\n"
+                if float(valor_os_1) > 0:
+                    info += f"   💰 R$ {float(valor_os_1):.2f} (pago na conclusão)\n"
+                info += f"   ⏱️ Mesmo dia ou próximo dia útil\n"
+            equipamentos_info.append(info)
+
+        # Equipamento 2
+        if equipamento_2:
+            info = f"🔧 *{equipamento_2}*\n"
+            if tipo_atendimento_2 == "coleta_diagnostico":
+                info += f"   🔍 Coleta para Diagnóstico - R$ 350,00\n"
+                info += f"   ⏱️ Diagnóstico em até 2 dias úteis\n"
+            elif tipo_atendimento_2 == "coleta_conserto":
+                info += f"   🔧 Coleta para Conserto\n"
+                if float(valor_os_2) > 0:
+                    info += f"   💰 R$ {float(valor_os_2):.2f} (50% coleta + 50% entrega)\n"
+                info += f"   ⏱️ Conserto em até 7 dias úteis\n"
+            elif tipo_atendimento_2 == "em_domicilio":
+                info += f"   🏠 Atendimento em Domicílio\n"
+                if float(valor_os_2) > 0:
+                    info += f"   💰 R$ {float(valor_os_2):.2f} (pago na conclusão)\n"
+                info += f"   ⏱️ Mesmo dia ou próximo dia útil\n"
+            equipamentos_info.append(info)
+
+        # Equipamento 3
+        if equipamento_3:
+            info = f"🔧 *{equipamento_3}*\n"
+            if tipo_atendimento_3 == "coleta_diagnostico":
+                info += f"   🔍 Coleta para Diagnóstico - R$ 350,00\n"
+                info += f"   ⏱️ Diagnóstico em até 2 dias úteis\n"
+            elif tipo_atendimento_3 == "coleta_conserto":
+                info += f"   🔧 Coleta para Conserto\n"
+                if float(valor_os_3) > 0:
+                    info += f"   💰 R$ {float(valor_os_3):.2f} (50% coleta + 50% entrega)\n"
+                info += f"   ⏱️ Conserto em até 7 dias úteis\n"
+            elif tipo_atendimento_3 == "em_domicilio":
+                info += f"   🏠 Atendimento em Domicílio\n"
+                if float(valor_os_3) > 0:
+                    info += f"   💰 R$ {float(valor_os_3):.2f} (pago na conclusão)\n"
+                info += f"   ⏱️ Mesmo dia ou próximo dia útil\n"
+            equipamentos_info.append(info)
+
+        # Adicionar informações dos equipamentos
+        mensagem += "\n".join(equipamentos_info)
 
         mensagem += f"\n📱 *Contato:* (48) 98833-2664\n"
         mensagem += f"Você receberá uma confirmação por WhatsApp 1 dia antes do atendimento."
