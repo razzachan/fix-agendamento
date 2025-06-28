@@ -591,9 +591,8 @@ async def criar_ordens_servico_automaticamente(supabase, agendamento_data, agend
         for i, equip in enumerate(equipamentos, 1):
             order_number = gerar_numero_ordem()
 
-            # Dados da ordem de serviço
+            # Dados da ordem de serviço (usando campos corretos da tabela)
             dados_os = {
-                "id": order_number,
                 "client_name": agendamento_data["nome"],
                 "client_phone": agendamento_data["telefone"],
                 "client_email": agendamento_data.get("email"),
@@ -606,8 +605,9 @@ async def criar_ordens_servico_automaticamente(supabase, agendamento_data, agend
                 "status": "scheduled",
                 "scheduled_date": agendamento_data["data_agendada"],
                 "client_id": cliente_id,
-                "origem_agendamento_id": agendamento_id,
-                "estimated_value": equip["valor"],
+                "final_cost": equip["valor"],
+                "order_number": order_number,
+                "notes": f"Criado automaticamente do agendamento {agendamento_id}",
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat()
             }
