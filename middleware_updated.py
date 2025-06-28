@@ -25,6 +25,54 @@ load_dotenv()
 # Cache para horários disponíveis (para manter consistência entre ETAPA 1 e 2)
 cache_horarios = {}
 
+def gerar_horarios_fixos_consistentes(urgente: bool = False) -> List[Dict]:
+    """
+    Gera sempre os mesmos 3 horários para garantir consistência entre ETAPA 1 e 2
+    """
+    try:
+        agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
+
+        # Para urgente, começar amanhã. Para normal, começar em 2 dias
+        inicio = agora + timedelta(days=1 if urgente else 2)
+
+        # Sempre gerar os mesmos 3 horários: 09:00, 14:00, 16:00
+        horarios_fixos = [
+            {"hora": 9, "texto": "09:00"},
+            {"hora": 14, "texto": "14:00"},
+            {"hora": 16, "texto": "16:00"}
+        ]
+
+        horarios = []
+
+        # Encontrar o próximo dia útil
+        data_atual = inicio
+        while data_atual.weekday() >= 5:  # Pular fins de semana
+            data_atual += timedelta(days=1)
+
+        # Gerar os 3 horários fixos
+        for i, horario_info in enumerate(horarios_fixos, 1):
+            horario_dt = data_atual.replace(
+                hour=horario_info["hora"],
+                minute=0,
+                second=0,
+                microsecond=0
+            )
+
+            horarios.append({
+                "numero": i,
+                "texto": f"{horario_dt.strftime('%d/%m')} às {horario_info['texto']}",
+                "datetime_agendamento": horario_dt.isoformat(),
+                "dia_semana": horario_dt.strftime("%A, %d/%m/%Y"),
+                "hora_agendamento": horario_info["texto"]
+            })
+
+        logger.info(f"✅ Horários fixos gerados: {[h['texto'] for h in horarios]}")
+        return horarios
+
+    except Exception as e:
+        logger.error(f"Erro ao gerar horários fixos: {e}")
+        return []
+
 def gerar_chave_cache(dados: dict) -> str:
     """Gera uma chave única para o cache baseada nos dados do cliente"""
     nome = dados.get("nome", "").strip()
@@ -161,13 +209,21 @@ def determinar_grupo_logistico(endereco: str) -> str:
     else:
         return "C"
 
-async def gerar_horarios_disponiveis_v4(tecnico: str, grupo_logistico: str, urgente: bool) -> List[Dict]:
+async def gerar_horarios_disponiveis_v4(tecnico: str, grupo_logistico: str, urgente: bool, data_base: datetime = None) -> List[Dict]:
     """
     Gera horários disponíveis baseado no técnico e grupo logístico
+    IMPORTANTE: data_base permite fixar a data de referência para garantir consistência entre ETAPA 1 e 2
     """
     try:
         horarios = []
-        agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
+
+        # Usar data_base se fornecida, senão usar agora
+        if data_base:
+            agora = data_base
+            logger.info(f"🕐 Usando data base fixa: {agora}")
+        else:
+            agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
+            logger.info(f"🕐 Usando data atual: {agora}")
 
         # Para urgente, começar amanhã. Para normal, começar em 2 dias
         inicio = agora + timedelta(days=1 if urgente else 2)
@@ -1447,10 +1503,9 @@ async def consultar_disponibilidade_interna(data: dict):
         else:
             urgente = False
 
-        # Gerar horários disponíveis
-        horarios_disponiveis = await gerar_horarios_disponiveis_v4(
-            tecnico, grupo_logistico, urgente
-        )
+        # 🕐 ETAPA 1: Gerar horários fixos e consistentes
+        logger.info(f"🕐 ETAPA 1: Gerando horários fixos para consistência")
+        horarios_disponiveis = gerar_horarios_fixos_consistentes(urgente)
 
         if not horarios_disponiveis:
             return JSONResponse(
@@ -1563,10 +1618,12 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
             # É uma escolha numérica - gerar horários para processar
             logger.info(f"🎯 Processando escolha numérica: {horario_escolhido}")
 
-            # Gerar os mesmos horários da ETAPA 1 para manter consistência
-            horarios_disponiveis = await gerar_horarios_disponiveis_v4(
-                tecnico_info["nome"], grupo_logistico, urgente
-            )
+            # 🕐 ETAPA 2: Gerar horários fixos e consistentes
+            logger.info(f"🎯 ETAPA 2: Gerando horários fixos para escolha {horario_escolhido}")
+
+            # Gerar sempre os mesmos 3 horários para garantir consistência
+            horarios_disponiveis = gerar_horarios_fixos_consistentes(urgente)
+            logger.info(f"🔍 Horários fixos gerados: {len(horarios_disponiveis)}")
 
             if not horarios_disponiveis:
                 return JSONResponse(
