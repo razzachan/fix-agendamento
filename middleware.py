@@ -117,16 +117,17 @@ async def agendamento_inteligente(request: Request):
         data = await request.json()
         logger.info(f"Agendamento inteligente - dados recebidos: {data}")
 
-        # DETECTAR QUAL ETAPA EXECUTAR
+        # SISTEMA INTELIGENTE V3.0 - DETECTAR QUAL ETAPA EXECUTAR
         horario_escolhido = data.get("horario_escolhido", "").strip()
+        logger.info(f"SISTEMA V3.0 - horario_escolhido: '{horario_escolhido}'")
 
         if not horario_escolhido:
             # ETAPA 1: CONSULTAR DISPONIBILIDADE
-            logger.info("Executando ETAPA 1: Consulta de disponibilidade")
+            logger.info("SISTEMA V3.0 - Executando ETAPA 1: Consulta de disponibilidade")
             return await consultar_disponibilidade_simples(data)
         else:
             # ETAPA 2: CONFIRMAR AGENDAMENTO
-            logger.info("Executando ETAPA 2: Confirmação de agendamento")
+            logger.info("SISTEMA V3.0 - Executando ETAPA 2: Confirmação de agendamento")
             return await confirmar_agendamento_simples(data, horario_escolhido)
 
     except Exception as e:
