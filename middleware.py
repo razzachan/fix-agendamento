@@ -112,29 +112,29 @@ async def agendamento_inteligente_get():
 
 @app.post("/agendamento-inteligente")
 async def agendamento_inteligente(request: Request):
-    """Endpoint para agendamento inteligente via Clientechat - SISTEMA COMPLETO"""
+    """🚀 SISTEMA DE AGENDAMENTO INTELIGENTE V4.0 - ATUALIZADO 🚀"""
     try:
         data = await request.json()
-        logger.info(f"Agendamento inteligente - dados recebidos: {data}")
+        logger.info(f"🚀 SISTEMA V4.0 - dados recebidos: {data}")
 
-        # SISTEMA INTELIGENTE V3.0 - DETECTAR QUAL ETAPA EXECUTAR
+        # DETECTAR QUAL ETAPA EXECUTAR
         horario_escolhido = data.get("horario_escolhido", "").strip()
-        logger.info(f"SISTEMA V3.0 - horario_escolhido: '{horario_escolhido}'")
+        logger.info(f"🚀 SISTEMA V4.0 - horario_escolhido: '{horario_escolhido}'")
 
         if not horario_escolhido:
             # ETAPA 1: CONSULTAR DISPONIBILIDADE
-            logger.info("SISTEMA V3.0 - Executando ETAPA 1: Consulta de disponibilidade")
-            return await consultar_disponibilidade_simples(data)
+            logger.info("🚀 SISTEMA V4.0 - Executando ETAPA 1: Consulta de disponibilidade")
+            return await consultar_disponibilidade_v4(data)
         else:
             # ETAPA 2: CONFIRMAR AGENDAMENTO
-            logger.info("SISTEMA V3.0 - Executando ETAPA 2: Confirmação de agendamento")
-            return await confirmar_agendamento_simples(data, horario_escolhido)
+            logger.info("🚀 SISTEMA V4.0 - Executando ETAPA 2: Confirmação de agendamento")
+            return await confirmar_agendamento_v4(data, horario_escolhido)
 
     except Exception as e:
-        logger.error(f"Erro no agendamento inteligente: {e}")
+        logger.error(f"🚀 SISTEMA V4.0 - Erro: {e}")
         return {
             "sucesso": False,
-            "mensagem": f"Erro ao processar agendamento: {str(e)}"
+            "mensagem": f"Erro ao processar agendamento V4.0: {str(e)}"
         }
 
 async def consultar_disponibilidade_simples(data: dict):
