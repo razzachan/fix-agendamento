@@ -1566,7 +1566,9 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
     Confirma o agendamento criando pré-agendamento e OS usando o mesmo sistema dos modais
     """
     try:
+        logger.info(f"🚀 ETAPA 2: Iniciando confirmar_agendamento_final com horario_escolhido='{horario_escolhido}'")
         supabase = get_supabase_client()
+        logger.info(f"✅ ETAPA 2: Supabase client criado com sucesso")
 
         # Extrair dados básicos
         endereco = data.get("endereco", "").strip()
