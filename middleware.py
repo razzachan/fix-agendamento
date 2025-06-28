@@ -1045,23 +1045,9 @@ async def health_check():
 
 # Endpoint de teste para agendamento inteligente
 @app.post("/agendamento-inteligente-completo")
-async def agendamento_inteligente_completo_test(request: Request):
+async def agendamento_inteligente_completo_test():
     """Endpoint de teste para agendamento inteligente"""
-    try:
-        data = await request.json()
-        return JSONResponse(
-            status_code=200,
-            content={
-                "success": True,
-                "message": "✅ Endpoint funcionando! Sistema de agendamento inteligente ativo.",
-                "data": data
-            }
-        )
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "message": f"Erro: {str(e)}"}
-        )
+    return {"success": True, "message": "Endpoint funcionando!"}
 
 # Endpoint para listar agendamentos
 @app.get("/api/agendamentos")
