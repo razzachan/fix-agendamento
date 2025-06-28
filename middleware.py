@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.info("🚀 MIDDLEWARE V4.1 INICIADO - SISTEMA INTELIGENTE COMPLETO COM DEBUG 🚀")
+logger.info("🚀 MIDDLEWARE V4.2 INICIADO - VERSÃO ESTÁVEL PARA DEPLOY 🚀")
 
 # Carregar variáveis de ambiente
 load_dotenv()
