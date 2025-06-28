@@ -112,12 +112,17 @@ async def agendamento_inteligente_get():
 
 @app.post("/agendamento-inteligente")
 async def agendamento_inteligente(request: Request):
-    """🚀 SISTEMA DE AGENDAMENTO INTELIGENTE V4.0 - ATUALIZADO 🚀"""
+    """🚀 SISTEMA DE AGENDAMENTO INTELIGENTE V4.0 - CLIENTECHAT DUAS ETAPAS 🚀"""
     try:
         data = await request.json()
         logger.info(f"🚀 SISTEMA V4.0 - dados recebidos: {data}")
 
-        # DETECTAR QUAL ETAPA EXECUTAR
+        # DETECTAR SE É MENSAGEM DO CLIENTECHAT
+        if 'message' in data and 'phone' in data:
+            # É mensagem do ClienteChat - processar com nova lógica
+            return await processar_mensagem_clientechat(data)
+
+        # LÓGICA ORIGINAL PARA OUTRAS INTEGRAÇÕES
         horario_escolhido = data.get("horario_escolhido", "").strip()
         logger.info(f"🚀 SISTEMA V4.0 - horario_escolhido: '{horario_escolhido}'")
 
@@ -136,6 +141,174 @@ async def agendamento_inteligente(request: Request):
             "sucesso": False,
             "mensagem": f"Erro ao processar agendamento V4.0: {str(e)}"
         }
+
+async def processar_mensagem_clientechat(data: dict):
+    """🤖 PROCESSAR MENSAGEM DO CLIENTECHAT - DUAS ETAPAS AUTOMÁTICAS"""
+    try:
+        mensagem = data.get('message', '').strip()
+        telefone = data.get('phone', '').replace('+', '').replace(' ', '').replace('-', '')
+
+        logger.info(f"📱 ClienteChat - Telefone: {telefone}")
+        logger.info(f"💬 ClienteChat - Mensagem: {mensagem}")
+
+        # ETAPA 2: DETECTAR ESCOLHA DE HORÁRIO (números 1, 2 ou 3)
+        if mensagem in ['1', '2', '3']:
+            logger.info(f"🎯 ClienteChat - ETAPA 2: Escolha de horário {mensagem}")
+            return await processar_escolha_horario_clientechat(telefone, mensagem)
+
+        # ETAPA 1: DETECTAR DADOS COMPLETOS PARA AGENDAMENTO
+        if all(campo in mensagem.lower() for campo in ['nome', 'endereço', 'cpf', 'e-mail']):
+            logger.info("🎯 ClienteChat - ETAPA 1: Consulta de disponibilidade")
+            return await processar_primeira_consulta_clientechat(mensagem, telefone)
+
+        # MENSAGEM INCOMPLETA
+        return {
+            "response": "❌ Para agendar, preciso dos seguintes dados:\n\n1️⃣ Nome completo\n2️⃣ Endereço completo com CEP e complemento (se tiver)\n3️⃣ CPF\n4️⃣ E-mail\n\nAssim que eu tiver esses dados, podemos prosseguir com o agendamento!"
+        }
+
+    except Exception as e:
+        logger.error(f"❌ ClienteChat - Erro: {e}")
+        return {
+            "response": f"❌ Erro ao processar sua mensagem: {str(e)}"
+        }
+
+async def processar_primeira_consulta_clientechat(mensagem: str, telefone: str):
+    """🎯 ETAPA 1: PROCESSAR DADOS E CONSULTAR HORÁRIOS DISPONÍVEIS"""
+    try:
+        # Extrair dados da mensagem usando regex ou parsing simples
+        dados_extraidos = extrair_dados_mensagem(mensagem)
+
+        if not dados_extraidos:
+            return {
+                "response": "❌ Não consegui extrair todos os dados necessários. Por favor, envie:\n\n1️⃣ Nome completo\n2️⃣ Endereço completo com CEP\n3️⃣ CPF\n4️⃣ E-mail"
+            }
+
+        # Adicionar telefone aos dados
+        dados_extraidos['telefone'] = telefone
+
+        # Consultar horários disponíveis usando a lógica existente
+        resultado = await consultar_disponibilidade_v4(dados_extraidos)
+
+        # Salvar dados temporariamente para a segunda etapa
+        await salvar_dados_temporarios(telefone, dados_extraidos)
+
+        # Retornar horários formatados para ClienteChat
+        if resultado.get('sucesso'):
+            horarios = resultado.get('horarios_disponiveis', [])
+            if horarios:
+                response = "✅ Encontrei horários disponíveis para você:\n\n"
+                for i, horario in enumerate(horarios[:3], 1):  # Máximo 3 opções
+                    response += f"{i}️⃣ {horario}\n"
+                response += "\n📱 Responda com o número da opção desejada (1, 2 ou 3)"
+                return {"response": response}
+            else:
+                return {"response": "❌ Não encontrei horários disponíveis no momento. Tente novamente mais tarde."}
+        else:
+            return {"response": f"❌ {resultado.get('mensagem', 'Erro ao consultar horários')}"}
+
+    except Exception as e:
+        logger.error(f"❌ Erro na primeira consulta ClienteChat: {e}")
+        return {"response": f"❌ Erro ao processar consulta: {str(e)}"}
+
+async def processar_escolha_horario_clientechat(telefone: str, escolha: str):
+    """🎯 ETAPA 2: PROCESSAR ESCOLHA DE HORÁRIO E CRIAR AGENDAMENTO"""
+    try:
+        # Recuperar dados salvos temporariamente
+        dados_salvos = await recuperar_dados_temporarios(telefone)
+
+        if not dados_salvos:
+            return {
+                "response": "❌ Não encontrei seus dados. Por favor, inicie o agendamento novamente com seus dados completos."
+            }
+
+        # Adicionar escolha de horário aos dados
+        dados_salvos['horario_escolhido'] = escolha
+
+        # Confirmar agendamento usando a lógica existente
+        resultado = await confirmar_agendamento_v4(dados_salvos, escolha)
+
+        # Limpar dados temporários
+        await limpar_dados_temporarios(telefone)
+
+        # Retornar confirmação formatada para ClienteChat
+        if resultado.get('sucesso'):
+            return {"response": f"✅ {resultado.get('mensagem', 'Agendamento confirmado com sucesso!')}"}
+        else:
+            return {"response": f"❌ {resultado.get('mensagem', 'Erro ao confirmar agendamento')}"}
+
+    except Exception as e:
+        logger.error(f"❌ Erro na escolha de horário ClienteChat: {e}")
+        return {"response": f"❌ Erro ao processar escolha: {str(e)}"}
+
+# FUNÇÕES AUXILIARES PARA CLIENTECHAT
+import re
+
+# Armazenamento temporário em memória (em produção, usar Redis ou banco)
+dados_temporarios = {}
+
+def extrair_dados_mensagem(mensagem: str) -> dict:
+    """Extrair dados estruturados da mensagem do cliente"""
+    try:
+        dados = {}
+
+        # Extrair nome (primeira linha ou após "nome:")
+        nome_match = re.search(r'nome[:\s]+([^\n]+)', mensagem, re.IGNORECASE)
+        if nome_match:
+            dados['nome'] = nome_match.group(1).strip()
+
+        # Extrair endereço
+        endereco_match = re.search(r'endere[çc]o[:\s]+([^\n]+)', mensagem, re.IGNORECASE)
+        if endereco_match:
+            dados['endereco'] = endereco_match.group(1).strip()
+
+        # Extrair CPF
+        cpf_match = re.search(r'cpf[:\s]+([0-9.-]+)', mensagem, re.IGNORECASE)
+        if cpf_match:
+            dados['cpf'] = cpf_match.group(1).strip()
+
+        # Extrair email
+        email_match = re.search(r'e-?mail[:\s]+([^\s\n]+@[^\s\n]+)', mensagem, re.IGNORECASE)
+        if email_match:
+            dados['email'] = email_match.group(1).strip()
+
+        # Extrair equipamento (opcional)
+        equipamento_match = re.search(r'equipamento[:\s]+([^\n]+)', mensagem, re.IGNORECASE)
+        if equipamento_match:
+            dados['equipamento'] = equipamento_match.group(1).strip()
+        else:
+            dados['equipamento'] = 'Fogão'  # Padrão
+
+        # Validar se tem dados mínimos
+        if all(key in dados for key in ['nome', 'endereco', 'cpf', 'email']):
+            return dados
+        else:
+            return None
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao extrair dados: {e}")
+        return None
+
+async def salvar_dados_temporarios(telefone: str, dados: dict):
+    """Salvar dados temporariamente para a segunda etapa"""
+    dados_temporarios[telefone] = {
+        'dados': dados,
+        'timestamp': datetime.now().isoformat()
+    }
+    logger.info(f"💾 Dados salvos para {telefone}")
+
+async def recuperar_dados_temporarios(telefone: str) -> dict:
+    """Recuperar dados salvos temporariamente"""
+    if telefone in dados_temporarios:
+        dados_salvos = dados_temporarios[telefone]['dados']
+        logger.info(f"📂 Dados recuperados para {telefone}")
+        return dados_salvos
+    return None
+
+async def limpar_dados_temporarios(telefone: str):
+    """Limpar dados temporários após uso"""
+    if telefone in dados_temporarios:
+        del dados_temporarios[telefone]
+        logger.info(f"🗑️ Dados limpos para {telefone}")
 
 async def consultar_disponibilidade_simples(data: dict):
     """ETAPA 1: Consultar horários disponíveis"""
