@@ -591,7 +591,7 @@ async def criar_ordens_servico_automaticamente(supabase, agendamento_data, agend
         for i, equip in enumerate(equipamentos, 1):
             order_number = gerar_numero_ordem()
 
-            # Dados da ordem de serviço (usando campos corretos da tabela)
+            # Dados da ordem de serviço (usando apenas campos que existem)
             dados_os = {
                 "client_name": agendamento_data["nome"],
                 "client_phone": agendamento_data["telefone"],
@@ -607,9 +607,7 @@ async def criar_ordens_servico_automaticamente(supabase, agendamento_data, agend
                 "client_id": cliente_id,
                 "final_cost": equip["valor"],
                 "order_number": order_number,
-                "notes": f"Criado automaticamente do agendamento {agendamento_id}",
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
+                "notes": f"Criado automaticamente do agendamento {agendamento_id}"
             }
 
             # Criar a OS no banco
@@ -663,16 +661,13 @@ async def criar_ou_buscar_cliente(supabase, agendamento_data):
                 logger.info(f"👤 Cliente encontrado por telefone: {telefone}")
                 return response.data[0]["id"]
 
-        # Criar novo cliente
+        # Criar novo cliente (usando apenas campos que existem)
         dados_cliente = {
             "name": agendamento_data["nome"],
             "phone": telefone,
             "email": agendamento_data.get("email"),
             "cpf_cnpj": cpf,
-            "address": agendamento_data["endereco"],
-            "password": "123456",  # Senha padrão
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
+            "address": agendamento_data["endereco"]
         }
 
         response = supabase.table("clients").insert(dados_cliente).execute()
