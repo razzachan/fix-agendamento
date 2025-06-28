@@ -1420,13 +1420,19 @@ async def agendamento_inteligente_completo(request: Request):
         # DETECTAR QUAL ETAPA EXECUTAR
         horario_escolhido = data.get("horario_escolhido", "").strip()
 
+        logger.info(f"🔍 DEBUG ETAPA - horario_escolhido RAW: '{data.get('horario_escolhido')}'")
+        logger.info(f"🔍 DEBUG ETAPA - horario_escolhido STRIP: '{horario_escolhido}'")
+        logger.info(f"🔍 DEBUG ETAPA - not horario_escolhido: {not horario_escolhido}")
+        logger.info(f"🔍 DEBUG ETAPA - bool(horario_escolhido): {bool(horario_escolhido)}")
+        logger.info(f"🔍 DEBUG ETAPA - len(horario_escolhido): {len(horario_escolhido)}")
+
         if not horario_escolhido:
             # ETAPA 1: CONSULTAR DISPONIBILIDADE
-            logger.info("Executando ETAPA 1: Consulta de disponibilidade")
+            logger.info("🚀 EXECUTANDO ETAPA 1: Consulta de disponibilidade")
             return await consultar_disponibilidade_interna(data)
         else:
             # ETAPA 2: CONFIRMAR AGENDAMENTO
-            logger.info("Executando ETAPA 2: Confirmação de agendamento")
+            logger.info("🚀 EXECUTANDO ETAPA 2: Confirmação de agendamento")
             logger.info(f"🎯 PRESTES A CHAMAR confirmar_agendamento_final com data={data} e horario_escolhido='{horario_escolhido}'")
             resultado = await confirmar_agendamento_final(data, horario_escolhido)
             logger.info(f"🎯 RESULTADO DA CHAMADA: {resultado}")
