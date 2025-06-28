@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import json
 import logging
@@ -20,6 +21,43 @@ logger = logging.getLogger(__name__)
 
 # Carregar variáveis de ambiente
 load_dotenv()
+
+# Cache para horários disponíveis (para manter consistência entre ETAPA 1 e 2)
+cache_horarios = {}
+
+def gerar_chave_cache(dados: dict) -> str:
+    """Gera uma chave única para o cache baseada nos dados do cliente"""
+    nome = dados.get("nome", "").strip()
+    endereco = dados.get("endereco", "").strip()
+    equipamento = dados.get("equipamento", "").strip()
+    return f"{nome}_{endereco}_{equipamento}".replace(" ", "_").lower()
+
+def salvar_horarios_cache(dados: dict, horarios: List[Dict]) -> str:
+    """Salva horários no cache e retorna a chave"""
+    chave = gerar_chave_cache(dados)
+    cache_horarios[chave] = {
+        "horarios": horarios,
+        "timestamp": datetime.now().isoformat(),
+        "dados_originais": dados
+    }
+    logger.info(f"💾 Horários salvos no cache: {chave}")
+    return chave
+
+def recuperar_horarios_cache(dados: dict) -> Optional[List[Dict]]:
+    """Recupera horários do cache"""
+    chave = gerar_chave_cache(dados)
+    if chave in cache_horarios:
+        cache_entry = cache_horarios[chave]
+        # Verificar se não expirou (30 minutos)
+        timestamp = datetime.fromisoformat(cache_entry["timestamp"])
+        if (datetime.now() - timestamp).total_seconds() < 1800:  # 30 minutos
+            logger.info(f"📂 Horários recuperados do cache: {chave}")
+            return cache_entry["horarios"]
+        else:
+            # Remover entrada expirada
+            del cache_horarios[chave]
+            logger.info(f"🗑️ Cache expirado removido: {chave}")
+    return None
 
 app = FastAPI()
 
@@ -104,6 +142,96 @@ def determinar_tecnico(equipamento: str) -> str:
         return "Marcelo (marcelodsmoritz@gmail.com)"
     else:
         return "Paulo Cesar (betonipaulo@gmail.com)"
+
+def determinar_grupo_logistico(endereco: str) -> str:
+    """
+    Determina o grupo logístico baseado no endereço
+    """
+    endereco_lower = endereco.lower()
+
+    # Grupo A - Centro de Florianópolis
+    if any(bairro in endereco_lower for bairro in ['centro', 'agronômica', 'trindade', 'córrego grande']):
+        return "A"
+
+    # Grupo B - Grande Florianópolis
+    elif any(cidade in endereco_lower for cidade in ['são josé', 'palhoça', 'biguaçu', 'santo amaro']):
+        return "B"
+
+    # Grupo C - Litoral e interior
+    else:
+        return "C"
+
+async def gerar_horarios_disponiveis_v4(tecnico: str, grupo_logistico: str, urgente: bool) -> List[Dict]:
+    """
+    Gera horários disponíveis baseado no técnico e grupo logístico
+    """
+    try:
+        horarios = []
+        agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
+
+        # Para urgente, começar amanhã. Para normal, começar em 2 dias
+        inicio = agora + timedelta(days=1 if urgente else 2)
+
+        # Gerar horários para os próximos 7 dias
+        for i in range(7):
+            data = inicio + timedelta(days=i)
+
+            # Apenas dias úteis (segunda a sexta)
+            if data.weekday() < 5:
+                # Horários disponíveis: 8h às 17h
+                for hora in range(8, 18):
+                    horario_dt = data.replace(hour=hora, minute=0, second=0, microsecond=0)
+
+                    # Verificar se horário não está ocupado
+                    if await verificar_horario_disponivel(horario_dt, tecnico):
+                        horarios.append({
+                            "datetime_agendamento": horario_dt.isoformat(),
+                            "dia_semana": horario_dt.strftime("%A, %d/%m/%Y"),
+                            "hora_agendamento": horario_dt.strftime("%H:%M"),
+                            "texto": f"{horario_dt.strftime('%A, %d/%m/%Y')} às {horario_dt.strftime('%H:%M')}"
+                        })
+
+                        # Limitar a 10 horários
+                        if len(horarios) >= 10:
+                            break
+
+            if len(horarios) >= 10:
+                break
+
+        return horarios
+
+    except Exception as e:
+        logger.error(f"Erro ao gerar horários disponíveis: {e}")
+        return []
+
+async def verificar_horario_disponivel(horario_dt: datetime, tecnico: str) -> bool:
+    """
+    Verifica se um horário específico está disponível
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Verificar agendamentos existentes
+        response = supabase.table("agendamentos_ai").select("*").eq(
+            "data_agendada", horario_dt.isoformat()
+        ).eq("tecnico", tecnico).execute()
+
+        if response.data and len(response.data) > 0:
+            return False
+
+        # Verificar ordens de serviço agendadas
+        response_os = supabase.table("service_orders").select("*").eq(
+            "scheduled_date", horario_dt.strftime('%Y-%m-%d')
+        ).eq("scheduled_time", horario_dt.strftime('%H:%M')).execute()
+
+        if response_os.data and len(response_os.data) > 0:
+            return False
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro ao verificar disponibilidade: {e}")
+        return True  # Em caso de erro, assumir disponível
 
 # Funções de roteirização inteligente
 def calculate_distance(point1: Tuple[float, float], point2: Tuple[float, float]) -> float:
@@ -1302,26 +1430,13 @@ async def consultar_disponibilidade_interna(data: dict):
                 status_code=400,
                 content={"success": False, "message": "Pelo menos um equipamento deve ser informado"}
             )
-        if not horario_escolhido:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Horário escolhido é obrigatório"}
-            )
-
+        # Esta função é para consulta de disponibilidade, não para confirmação
         # Determinar técnico baseado no primeiro equipamento
         primeiro_equipamento = equipamentos[0]["equipamento"]
         tecnico = determinar_tecnico(primeiro_equipamento)
 
-        # Processar horário escolhido
-        try:
-            horario_dt = datetime.fromisoformat(horario_escolhido)
-            data_agendada = horario_dt.strftime('%Y-%m-%d')
-            hora_agendada = horario_dt.strftime('%H:%M')
-        except:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Formato de horário inválido"}
-            )
+        # Determinar grupo logístico
+        grupo_logistico = determinar_grupo_logistico(endereco)
 
         # Determinar urgência
         urgente = data.get("urgente", "não")
@@ -1332,179 +1447,50 @@ async def consultar_disponibilidade_interna(data: dict):
         else:
             urgente = False
 
-        supabase = get_supabase_client()
+        # Gerar horários disponíveis
+        horarios_disponiveis = await gerar_horarios_disponiveis_v4(
+            tecnico, grupo_logistico, urgente
+        )
 
-        # 1. Criar pré-agendamento
-        dados_agendamento = {
-            "nome": nome,
-            "endereco": endereco,
-            "equipamento": primeiro_equipamento,  # Equipamento principal
-            "problema": problemas[0] if problemas else "Não especificado",  # Problema principal
-            "urgente": urgente,
-            "status": "confirmado",
-            "telefone": telefone,
-            "cpf": data.get("cpf", ""),
-            "email": data.get("email", ""),
-            "origem": "clientechat_inteligente",
-            "tecnico": tecnico,
-            "data_agendada": horario_dt.isoformat(),
-            "equipamentos": json.dumps([eq["equipamento"] for eq in equipamentos]),
-            "problemas": json.dumps(problemas),
-            "tipos_atendimento": json.dumps(["em_domicilio"]),
-            "tipos_equipamentos": json.dumps([eq["tipo"] for eq in equipamentos])
-        }
+        if not horarios_disponiveis:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": "⚠️ Não há horários disponíveis no momento. Nossa equipe entrará em contato para agendar.",
+                    "horarios_disponiveis": [],
+                    "action": "contact_later"
+                }
+            )
 
-        response_agendamento = supabase.table("agendamentos_ai").insert(dados_agendamento).execute()
+        # 🔧 SALVAR HORÁRIOS NO CACHE PARA ETAPA 2
+        salvar_horarios_cache(data, horarios_disponiveis[:3])
 
-        if not response_agendamento.data:
-            raise Exception("Erro ao criar pré-agendamento")
+        # Formatar resposta para o cliente
+        mensagem = f"✅ Encontrei horários disponíveis para {primeiro_equipamento}:\n\n"
+        for i, horario in enumerate(horarios_disponiveis[:3], 1):
+            mensagem += f"{i}. {horario['texto']}\n"
 
-        agendamento_id = response_agendamento.data[0]["id"]
-
-        # 2. Criar ordem de serviço usando o mesmo sistema dos modais
-        try:
-            import uuid
-
-            # Determinar tipo de serviço e valor baseado nos equipamentos (mesma lógica dos modais)
-            service_type = "em_domicilio"
-            final_cost = 120.00  # Valor padrão
-
-            # Ajustar valor baseado nos equipamentos
-            for eq in equipamentos:
-                if "coifa" in eq["equipamento"].lower():
-                    final_cost = max(final_cost, 150.00)
-                elif "forno" in eq["equipamento"].lower():
-                    final_cost = max(final_cost, 130.00)
-
-            # Se múltiplos equipamentos, adicionar taxa
-            if len(equipamentos) > 1:
-                final_cost += (len(equipamentos) - 1) * 30.00
-
-            # Consolidar descrição dos problemas
-            descricao_completa = " | ".join(problemas) if problemas else "Não especificado"
-            tipos_equipamentos = ", ".join([eq["equipamento"] for eq in equipamentos])
-
-            # 2.1. Criar cliente automaticamente usando função RPC (mesmo sistema dos modais)
-            client_data = {
-                "name": nome,
-                "email": data.get("email", ""),
-                "phone": telefone,
-                "address": endereco
-            }
-
-            client_id = None
-            if client_data["name"]:
-                try:
-                    # Usar função RPC para criar cliente (bypassa RLS como nos modais)
-                    response_client = supabase.rpc('create_client', {
-                        'client_name': client_data["name"],
-                        'client_email': client_data["email"] if client_data["email"] else None,
-                        'client_phone': client_data["phone"] if client_data["phone"] else None,
-                        'client_address': client_data["address"] if client_data["address"] else None,
-                        'client_city': None,
-                        'client_state': None,
-                        'client_zip_code': None
-                    }).execute()
-
-                    if response_client.data:
-                        if isinstance(response_client.data, list) and len(response_client.data) > 0:
-                            client_id = response_client.data[0]["id"]
-                        elif isinstance(response_client.data, dict):
-                            client_id = response_client.data["id"]
-
-                        logger.info(f"✅ Cliente criado automaticamente: {client_id}")
-
-                        # Criar conta de usuário com senha padrão 123456 (mesmo sistema dos modais)
-                        if client_data["email"]:
-                            try:
-                                user_response = supabase.auth.admin.create_user({
-                                    "email": client_data["email"],
-                                    "password": "123456",
-                                    "email_confirm": True,
-                                    "user_metadata": {
-                                        "name": client_data["name"],
-                                        "role": "client"
-                                    }
-                                })
-                                if user_response.user:
-                                    logger.info(f"✅ Conta de usuário criada: {client_data['email']} (senha: 123456)")
-                            except Exception as user_error:
-                                logger.warning(f"⚠️ Erro ao criar conta de usuário: {user_error}")
-
-                except Exception as client_error:
-                    logger.warning(f"⚠️ Erro ao criar cliente: {client_error}")
-
-            # 2.2. Criar ordem de serviço (mesmo formato dos modais)
-            order_number = f"OS-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
-
-            dados_os = {
-                "id": str(uuid.uuid4()),
-                "order_number": order_number,
-                "client_name": nome,
-                "client_phone": telefone,
-                "client_email": client_data["email"],
-                "client_id": client_id,  # Vinculação com cliente criado
-                "pickup_address": endereco,
-                "equipment_type": tipos_equipamentos,
-                "description": descricao_completa,
-                "service_attendance_type": service_type,
-                "status": "agendado",
-                "scheduled_date": data_agendada,
-                "scheduled_time": hora_agendada,
-                "technician_name": tecnico_info["nome"],
-                "technician_id": tecnico_info["tecnico_id"],
-                "estimated_cost": final_cost,
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat(),
-                "origem_agendamento_id": agendamento_id,
-                "logistics_group": grupo_logistico,
-                "priority": "high" if urgente else "medium",
-                "notes": f"Agendamento inteligente - Score técnico: {tecnico_info['score']}"
-            }
-
-            response_os = supabase.table("service_orders").insert(dados_os).execute()
-
-            if not response_os.data:
-                raise Exception("Erro ao criar ordem de serviço")
-
-            os_id = response_os.data[0]["id"]
-            logger.info(f"✅ Ordem de serviço criada: {order_number} (ID: {os_id})")
-
-        except Exception as os_error:
-            logger.error(f"❌ Erro ao criar OS: {os_error}")
-            raise Exception(f"Erro ao criar ordem de serviço: {str(os_error)}")
-
-        # 3. Atualizar agendamento com ID da OS
-        supabase.table("agendamentos_ai").update({
-            "ordem_servico_id": dados_os["id"],
-            "status": "os_criada"
-        }).eq("id", agendamento_id).execute()
-
-        # Formatar resposta de confirmação
-        mensagem = f"✅ *Agendamento Confirmado!*\n\n"
-        mensagem += f"📋 *Ordem de Serviço:* {order_number}\n"
-        mensagem += f"👤 *Cliente:* {nome}\n"
-        mensagem += f"📍 *Endereço:* {endereco}\n"
-        mensagem += f"🔧 *Equipamento(s):* {tipos_equipamentos}\n"
-        if len(problemas) > 0:
-            mensagem += f"⚠️ *Problema(s):* {descricao_completa}\n"
-        mensagem += f"📅 *Data:* {horario_dt.strftime('%d/%m/%Y')}\n"
-        mensagem += f"⏰ *Horário:* {hora_agendada}\n"
-        mensagem += f"👨‍🔧 *Técnico:* {tecnico.split('(')[0].strip()}\n"
-        if urgente:
-            mensagem += f"🚨 *ATENDIMENTO URGENTE*\n"
-        mensagem += f"💰 *Valor:* R$ {final_cost:.2f}\n\n"
-        mensagem += f"📱 *Contato:* (48) 98833-2664\n"
-        mensagem += f"Você receberá uma confirmação por WhatsApp 1 dia antes do atendimento."
+        mensagem += "\nResponda com o número da opção desejada (1, 2 ou 3)."
 
         return JSONResponse(
             status_code=200,
             content={
                 "success": True,
                 "message": mensagem,
-                "order_number": order_number,
-                "agendamento_id": agendamento_id,
-                "ordem_servico_id": dados_os["id"]
+                "horarios_disponiveis": horarios_disponiveis[:3],
+                "tecnico": tecnico,
+                "urgente": urgente,
+                "action": "select_time",
+                "dados_cliente": {
+                    "nome": nome,
+                    "endereco": endereco,
+                    "telefone": telefone,
+                    "cpf": data.get("cpf", ""),
+                    "email": data.get("email", "")
+                },
+                "equipamentos": equipamentos,
+                "problemas": problemas
             }
         )
 
@@ -1571,9 +1557,35 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         # Selecionar técnico otimizado
         tecnico_info = await determinar_tecnico_otimizado(lista_equipamentos, grupo_logistico, urgente)
 
-        # Processar horário escolhido
+        # 🔧 PROCESSAR HORÁRIO ESCOLHIDO USANDO CACHE
+        # Primeiro, tentar recuperar horários do cache
+        horarios_cache = recuperar_horarios_cache(data)
+
+        if horarios_cache:
+            # Usar horários do cache (ETAPA 1)
+            logger.info(f"📂 Usando horários do cache para processar escolha: {horario_escolhido}")
+            horario_selecionado = processar_escolha_horario(horario_escolhido, horarios_cache)
+
+            if not horario_selecionado:
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "message": "Opção de horário inválida. Por favor, escolha 1, 2 ou 3."}
+                )
+
+            horario_iso = horario_selecionado.get('datetime_agendamento')
+            if not horario_iso:
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "message": "Erro ao processar horário selecionado"}
+                )
+        else:
+            # Fallback: tentar interpretar como horário ISO direto
+            logger.warning(f"⚠️ Cache não encontrado, tentando interpretar como ISO: {horario_escolhido}")
+            horario_iso = horario_escolhido
+
+        # Converter para datetime
         try:
-            horario_dt = datetime.fromisoformat(horario_escolhido)
+            horario_dt = datetime.fromisoformat(horario_iso)
             data_agendada = horario_dt.strftime('%Y-%m-%d')
             hora_agendada = horario_dt.strftime('%H:%M')
         except:
