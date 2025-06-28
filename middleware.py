@@ -449,6 +449,9 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
 
         agendamento_id = response.data[0]["id"]
 
+        # Criar ordens de serviço automaticamente
+        await criar_ordens_servico_automaticamente(supabase, agendamento_data, agendamento_id)
+
         # Resposta de confirmação com informações de múltiplos equipamentos
         mensagem = f"✅ *Agendamento Confirmado V4.0!*\n\n"
         mensagem += f"📋 *ID:* #{agendamento_id}\n"
@@ -533,6 +536,158 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
             "sucesso": False,
             "mensagem": f"Erro ao confirmar agendamento V4.0: {str(e)}"
         }
+
+def gerar_numero_ordem():
+    """Gera um número sequencial para a ordem de serviço"""
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    return f"OS{timestamp[-6:]}"
+
+async def criar_ordens_servico_automaticamente(supabase, agendamento_data, agendamento_id):
+    """
+    Cria ordens de serviço automaticamente a partir dos dados do agendamento
+    Suporta múltiplos equipamentos com tipos de atendimento diferentes
+    """
+    try:
+        logger.info(f"🚀 Criando ordens de serviço automaticamente para agendamento {agendamento_id}")
+
+        # Primeiro, criar ou buscar cliente
+        cliente_id = await criar_ou_buscar_cliente(supabase, agendamento_data)
+
+        # Coletar equipamentos e seus dados
+        equipamentos = []
+
+        # Equipamento 1 (sempre existe)
+        if agendamento_data.get("equipamento"):
+            equipamentos.append({
+                "equipamento": agendamento_data["equipamento"],
+                "problema": agendamento_data.get("problema", ""),
+                "tipo_atendimento": agendamento_data.get("tipo_atendimento_1", "em_domicilio"),
+                "valor": float(agendamento_data.get("valor_os_1", 0))
+            })
+
+        # Equipamento 2 (se existir)
+        if agendamento_data.get("equipamento_2"):
+            equipamentos.append({
+                "equipamento": agendamento_data["equipamento_2"],
+                "problema": agendamento_data.get("problema_2", ""),
+                "tipo_atendimento": agendamento_data.get("tipo_atendimento_2", "em_domicilio"),
+                "valor": float(agendamento_data.get("valor_os_2", 0))
+            })
+
+        # Equipamento 3 (se existir)
+        if agendamento_data.get("equipamento_3"):
+            equipamentos.append({
+                "equipamento": agendamento_data["equipamento_3"],
+                "problema": agendamento_data.get("problema_3", ""),
+                "tipo_atendimento": agendamento_data.get("tipo_atendimento_3", "em_domicilio"),
+                "valor": float(agendamento_data.get("valor_os_3", 0))
+            })
+
+        logger.info(f"📋 Encontrados {len(equipamentos)} equipamentos para criar OS")
+
+        ordens_criadas = []
+
+        # Criar uma OS para cada equipamento
+        for i, equip in enumerate(equipamentos, 1):
+            order_number = gerar_numero_ordem()
+
+            # Dados da ordem de serviço
+            dados_os = {
+                "id": order_number,
+                "client_name": agendamento_data["nome"],
+                "client_phone": agendamento_data["telefone"],
+                "client_email": agendamento_data.get("email"),
+                "client_cpf_cnpj": agendamento_data.get("cpf"),
+                "pickup_address": agendamento_data["endereco"],
+                "equipment_type": equip["equipamento"],
+                "description": equip["problema"],
+                "service_attendance_type": equip["tipo_atendimento"],
+                "needs_pickup": equip["tipo_atendimento"].startswith("coleta"),
+                "status": "scheduled",
+                "scheduled_date": agendamento_data["data_agendada"],
+                "client_id": cliente_id,
+                "origem_agendamento_id": agendamento_id,
+                "estimated_value": equip["valor"],
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+
+            # Criar a OS no banco
+            response_os = supabase.table("service_orders").insert(dados_os).execute()
+
+            if not response_os.data:
+                logger.error(f"❌ Erro ao criar OS {i} para equipamento {equip['equipamento']}")
+                continue
+
+            os_criada = response_os.data[0]
+            ordens_criadas.append(os_criada)
+
+            logger.info(f"✅ OS criada: {order_number} - {equip['equipamento']} ({equip['tipo_atendimento']}) - R$ {equip['valor']}")
+
+        # Marcar agendamento como processado
+        if ordens_criadas:
+            supabase.table("agendamentos_ai").update({
+                "status": "convertido",
+                "processado": True,
+                "ordem_servico_id": ordens_criadas[0]["id"],
+                "data_conversao": datetime.now().isoformat()
+            }).eq("id", agendamento_id).execute()
+
+            logger.info(f"🎉 {len(ordens_criadas)} ordens de serviço criadas automaticamente!")
+
+        return ordens_criadas
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar ordens de serviço automaticamente: {e}")
+        return []
+
+async def criar_ou_buscar_cliente(supabase, agendamento_data):
+    """
+    Cria ou busca um cliente baseado no CPF/telefone
+    """
+    try:
+        cpf = agendamento_data.get("cpf", "").replace(".", "").replace("-", "")
+        telefone = agendamento_data.get("telefone", "")
+
+        # Tentar buscar cliente existente por CPF
+        if cpf:
+            response = supabase.table("clients").select("id").eq("cpf_cnpj", cpf).execute()
+            if response.data:
+                logger.info(f"👤 Cliente encontrado por CPF: {cpf}")
+                return response.data[0]["id"]
+
+        # Tentar buscar por telefone
+        if telefone:
+            response = supabase.table("clients").select("id").eq("phone", telefone).execute()
+            if response.data:
+                logger.info(f"👤 Cliente encontrado por telefone: {telefone}")
+                return response.data[0]["id"]
+
+        # Criar novo cliente
+        dados_cliente = {
+            "name": agendamento_data["nome"],
+            "phone": telefone,
+            "email": agendamento_data.get("email"),
+            "cpf_cnpj": cpf,
+            "address": agendamento_data["endereco"],
+            "password": "123456",  # Senha padrão
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+
+        response = supabase.table("clients").insert(dados_cliente).execute()
+
+        if response.data:
+            cliente_id = response.data[0]["id"]
+            logger.info(f"👤 Novo cliente criado: {agendamento_data['nome']} (ID: {cliente_id})")
+            return cliente_id
+        else:
+            logger.error("❌ Erro ao criar cliente")
+            return None
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar/buscar cliente: {e}")
+        return None
 
 if __name__ == "__main__":
     import uvicorn
