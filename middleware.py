@@ -365,6 +365,11 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
         telefone = data.get("telefone", "").strip()
         problema = data.get("problema", "Não especificado").strip()
 
+        # Extrair dados de negócio do ClienteChat
+        tipo_atendimento = data.get("tipo_atendimento", "em_domicilio").strip()
+        valor_os = data.get("valor_os", "0").strip()
+        urgente = data.get("urgente", "não").strip().lower() in ['sim', 'true', 'urgente', '1', 'yes']
+
         # Processar horário escolhido
         try:
             # Se é um número (1, 2, 3), converter para horário ISO
@@ -406,9 +411,11 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
             "problema": problema,
             "data_agendada": horario_dt.isoformat(),
             "tecnico": "A definir",
-            "urgente": False,
+            "urgente": urgente,
             "status": "confirmado",
-            "origem": "clientechat_v4"
+            "origem": "clientechat_v4",
+            "tipo_atendimento": tipo_atendimento,
+            "valor_os": float(valor_os) if valor_os.replace('.', '').replace(',', '').isdigit() else 0.0
         }
 
         response = supabase.table("agendamentos_ai").insert(agendamento_data).execute()
@@ -418,7 +425,7 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
 
         agendamento_id = response.data[0]["id"]
 
-        # Resposta de confirmação
+        # Resposta de confirmação com informações de cobrança
         mensagem = f"✅ *Agendamento Confirmado V4.0!*\n\n"
         mensagem += f"📋 *ID:* #{agendamento_id}\n"
         mensagem += f"👤 *Cliente:* {nome}\n"
@@ -426,7 +433,25 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
         mensagem += f"🔧 *Equipamento:* {equipamento}\n"
         mensagem += f"📅 *Data:* {horario_dt.strftime('%d/%m/%Y')}\n"
         mensagem += f"⏰ *Horário:* {horario_dt.strftime('%H:%M')}\n"
-        mensagem += f"📱 *Contato:* (48) 98833-2664\n\n"
+
+        # Adicionar informações específicas do tipo de atendimento
+        if tipo_atendimento == "coleta_diagnostico":
+            mensagem += f"🔍 *Tipo:* Coleta para Diagnóstico\n"
+            mensagem += f"💰 *Taxa de Diagnóstico:* R$ 350,00 (paga na coleta)\n"
+            mensagem += f"⏱️ *Prazo:* Diagnóstico em até 2 dias úteis\n"
+        elif tipo_atendimento == "coleta_conserto":
+            mensagem += f"🔧 *Tipo:* Coleta para Conserto\n"
+            if float(valor_os) > 0:
+                mensagem += f"💰 *Valor Total:* R$ {float(valor_os):.2f}\n"
+                mensagem += f"💳 *Pagamento:* 50% na coleta + 50% na entrega\n"
+            mensagem += f"⏱️ *Prazo:* Conserto em até 7 dias úteis\n"
+        elif tipo_atendimento == "em_domicilio":
+            mensagem += f"🏠 *Tipo:* Atendimento em Domicílio\n"
+            if float(valor_os) > 0:
+                mensagem += f"💰 *Valor:* R$ {float(valor_os):.2f} (pago na conclusão)\n"
+            mensagem += f"⏱️ *Prazo:* Mesmo dia ou próximo dia útil\n"
+
+        mensagem += f"\n📱 *Contato:* (48) 98833-2664\n"
         mensagem += f"Você receberá uma confirmação por WhatsApp 1 dia antes do atendimento."
 
         return {
