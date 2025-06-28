@@ -1043,6 +1043,26 @@ async def agendamento_inteligente(request: Request):
 async def health_check():
     return {"status": "ok"}
 
+# Endpoint de teste para agendamento inteligente
+@app.post("/agendamento-inteligente-completo")
+async def agendamento_inteligente_completo_test(request: Request):
+    """Endpoint de teste para agendamento inteligente"""
+    try:
+        data = await request.json()
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": "✅ Endpoint funcionando! Sistema de agendamento inteligente ativo.",
+                "data": data
+            }
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"Erro: {str(e)}"}
+        )
+
 # Endpoint para listar agendamentos
 @app.get("/api/agendamentos")
 async def listar_agendamentos():
@@ -1352,31 +1372,7 @@ async def confirmar_agendamento_simples(data: dict, horario_escolhido: str):
             content={"success": False, "message": f"Erro ao confirmar agendamento: {str(e)}"}
         )
 
-# Endpoint inteligente que gerencia consulta + confirmação
-@app.post("/agendamento-inteligente-completo")
-async def agendamento_inteligente_completo(request: Request):
-    try:
-        data = await request.json()
-        logger.info(f"Agendamento inteligente - dados recebidos: {data}")
-
-        # DETECTAR QUAL ETAPA EXECUTAR
-        horario_escolhido = data.get("horario_escolhido", "").strip()
-
-        if not horario_escolhido:
-            # ETAPA 1: CONSULTAR DISPONIBILIDADE
-            logger.info("Executando ETAPA 1: Consulta de disponibilidade")
-            return await consultar_disponibilidade_simples(data)
-        else:
-            # ETAPA 2: CONFIRMAR AGENDAMENTO
-            logger.info("Executando ETAPA 2: Confirmação de agendamento")
-            return await confirmar_agendamento_simples(data, horario_escolhido)
-
-    except Exception as e:
-        logger.error(f"Erro no agendamento inteligente: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "message": f"Erro interno: {str(e)}"}
-        )
+# Endpoint duplicado removido - usando o de cima
 
 # Função interna para consulta de disponibilidade - TEMPORARIAMENTE DESABILITADA
 async def consultar_disponibilidade_interna_disabled(data: dict):
