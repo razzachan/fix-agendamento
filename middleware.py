@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.info("Middleware iniciado - versão com agendamento inteligente completo")
+logger.info("Middleware iniciado - versão com agendamento inteligente completo v2.1")
 
 # Carregar variáveis de ambiente
 load_dotenv()
