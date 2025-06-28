@@ -1433,7 +1433,10 @@ async def agendamento_inteligente_completo(request: Request):
             return resultado
 
     except Exception as e:
-        logger.error(f"Erro no agendamento inteligente: {e}")
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"🚨 EXCEÇÃO CAPTURADA NO AGENDAMENTO INTELIGENTE: {e}")
+        logger.error(f"🚨 TRACEBACK COMPLETO: {error_details}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": f"Erro interno: {str(e)}"}
