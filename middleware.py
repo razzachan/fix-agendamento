@@ -1246,8 +1246,8 @@ async def agendamento_inteligente_completo(request: Request):
             content={"success": False, "message": f"Erro interno: {str(e)}"}
         )
 
-# Função interna para consulta de disponibilidade
-async def consultar_disponibilidade_interna(data: dict):
+# Função interna para consulta de disponibilidade - TEMPORARIAMENTE DESABILITADA
+async def consultar_disponibilidade_interna_disabled(data: dict):
     try:
         # Extrair dados básicos
         endereco = data.get("endereco", "").strip()
