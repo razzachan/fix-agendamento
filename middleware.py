@@ -51,7 +51,7 @@ def get_supabase_client() -> Client:
 @app.get("/")
 async def root():
     """Endpoint principal que serve a interface web"""
-    return {"message": "Fix Fogões Middleware - Sistema de Agendamento Inteligente"}
+    return {"message": "Fix Fogões Middleware - Sistema Inteligente v3.0 ATIVO - DEPLOY OK"}
 
 @app.post("/")
 async def receber_dados(agendamento: Agendamento):
