@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.info("Middleware iniciado - versão com agendamento inteligente completo v2.1")
+logger.info("🚀 MIDDLEWARE V4.0 INICIADO - SISTEMA INTELIGENTE COMPLETO 🚀")
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -51,7 +51,7 @@ def get_supabase_client() -> Client:
 @app.get("/")
 async def root():
     """Endpoint principal que serve a interface web"""
-    return {"message": "Fix Fogões Middleware - Sistema Inteligente v3.0 ATIVO - DEPLOY OK"}
+    return {"message": "🚀 MIDDLEWARE V4.0 - SISTEMA INTELIGENTE COMPLETO ATIVO 🚀", "version": "4.0", "status": "DEPLOY_OK"}
 
 @app.post("/")
 async def receber_dados(agendamento: Agendamento):
