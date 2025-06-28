@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy only the necessary files (excluding main_backup.py)
 COPY main.py .
+COPY middleware.py .
 COPY supabase_client.py .
 COPY check_env.py .
 COPY start.py .
