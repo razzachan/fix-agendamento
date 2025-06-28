@@ -1052,7 +1052,11 @@ def processar_escolha_horario(horario_escolhido: str, horarios_disponiveis: List
             opcao = int(horario_escolhido.strip())
             if 1 <= opcao <= len(horarios_disponiveis):
                 horario_selecionado = horarios_disponiveis[opcao - 1]
-                logger.info(f"✅ Cliente escolheu opção {opcao}: {horario_selecionado['dia_semana']} às {horario_selecionado['hora_agendamento']}")
+                # Log seguro - verificar se campos existem
+                dia_info = horario_selecionado.get('dia_semana', horario_selecionado.get('texto', 'N/A'))
+                hora_info = horario_selecionado.get('hora_agendamento', 'N/A')
+                logger.info(f"✅ Cliente escolheu opção {opcao}: {dia_info} às {hora_info}")
+                logger.info(f"🎯 Horário selecionado completo: {horario_selecionado}")
                 return horario_selecionado
             else:
                 logger.warning(f"⚠️ Opção inválida: {opcao}. Disponíveis: 1-{len(horarios_disponiveis)}")
