@@ -79,7 +79,7 @@ async def receber_dados(agendamento: Agendamento):
         
         return {
             "sucesso": True,
-            "mensagem": "Agendamento registrado com sucesso. Em breve nossa equipe irá roteirizar o melhor horário e retornará a confirmação 😊"
+            "mensagem": "SISTEMA ANTIGO - Agendamento registrado com sucesso. Em breve nossa equipe irá roteirizar o melhor horário e retornará a confirmação 😊"
         }
         
     except Exception as e:
