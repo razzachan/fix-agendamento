@@ -1223,24 +1223,21 @@ async def consultar_disponibilidade(request: Request):
             content={"success": False, "message": f"Erro interno: {str(e)}"}
         )
 
-# Endpoint inteligente que gerencia consulta + confirmação
+# Endpoint de teste simples
 @app.post("/agendamento-inteligente-completo")
 async def agendamento_inteligente_completo(request: Request):
     try:
         data = await request.json()
         logger.info(f"Agendamento inteligente - dados recebidos: {data}")
 
-        # DETECTAR QUAL ETAPA EXECUTAR
-        horario_escolhido = data.get("horario_escolhido", "").strip()
-
-        if not horario_escolhido:
-            # ETAPA 1: CONSULTAR DISPONIBILIDADE
-            logger.info("Executando ETAPA 1: Consulta de disponibilidade")
-            return await consultar_disponibilidade_interna(data)
-        else:
-            # ETAPA 2: CONFIRMAR AGENDAMENTO
-            logger.info("Executando ETAPA 2: Confirmação de agendamento")
-            return await confirmar_agendamento_final(data, horario_escolhido)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": "✅ Endpoint funcionando! Dados recebidos com sucesso.",
+                "data_received": data
+            }
+        )
 
     except Exception as e:
         logger.error(f"Erro no agendamento inteligente: {e}")
