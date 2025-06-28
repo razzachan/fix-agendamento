@@ -538,9 +538,11 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
         }
 
 def gerar_numero_ordem():
-    """Gera um número sequencial para a ordem de serviço"""
+    """Gera um número sequencial ÚNICO para a ordem de serviço"""
+    import time
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    return f"OS{timestamp[-6:]}"
+    microseconds = str(int(time.time() * 1000000))[-3:]  # Últimos 3 dígitos dos microsegundos
+    return f"OS{timestamp[-6:]}{microseconds}"
 
 async def criar_os_individual(supabase, agendamento_data, agendamento_id, cliente_id, numero_equipamento):
     """
@@ -729,7 +731,7 @@ async def criar_ou_buscar_cliente(supabase, agendamento_data):
         dados_cliente = {
             "name": nome,
             "phone": telefone if telefone else None,
-            "email": agendamento_data.get("email") if agendamento_data.get("email") else None,
+            "email": agendamento_data.get("email") if agendamento_data.get("email") else f"{nome.lower().replace(' ', '.')}@cliente.com",
             "cpf_cnpj": cpf if cpf else None,
             "address": agendamento_data.get("endereco") if agendamento_data.get("endereco") else None
         }
