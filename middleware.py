@@ -1,19 +1,24 @@
+# -*- coding: utf-8 -*-
 import os
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any, List
-from fastapi import FastAPI, Request
+import math
+import asyncio
+import httpx
+from typing import Dict, Any, List, Optional, Tuple
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
+import pytz
+from datetime import datetime, timedelta
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.info("🚀 MIDDLEWARE V4.0 INICIADO - SISTEMA INTELIGENTE COMPLETO 🚀")
+logger.info("🚀 MIDDLEWARE V4.1 INICIADO - SISTEMA INTELIGENTE COMPLETO COM DEBUG 🚀")
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -47,6 +52,132 @@ def get_supabase_client() -> Client:
     if not url or not key:
         raise Exception("Variáveis SUPABASE_URL e SUPABASE_KEY são obrigatórias")
     return create_client(url, key)
+
+def determinar_tecnico(equipamento: str) -> str:
+    """Determina o técnico baseado no tipo de equipamento"""
+    equipamento_lower = equipamento.lower()
+
+    if "coifa" in equipamento_lower:
+        return "Marcelo (marcelodsmoritz@gmail.com)"
+    else:
+        return "Paulo Cesar (betonipaulo@gmail.com)"
+
+def determinar_grupo_logistico(endereco: str) -> str:
+    """
+    Determina o grupo logístico baseado no endereço
+    """
+    endereco_lower = endereco.lower()
+
+    # Grupo A - Centro de Florianópolis
+    if any(bairro in endereco_lower for bairro in ['centro', 'agronômica', 'trindade', 'córrego grande']):
+        return "A"
+
+    # Grupo B - Grande Florianópolis
+    elif any(cidade in endereco_lower for cidade in ['são josé', 'palhoça', 'biguaçu', 'santo amaro']):
+        return "B"
+
+    # Grupo C - Litoral e interior
+    else:
+        return "C"
+
+async def gerar_horarios_disponiveis_v4(tecnico: str, grupo_logistico: str, urgente: bool) -> List[Dict]:
+    """
+    Gera horários disponíveis baseado no técnico e grupo logístico
+    """
+    try:
+        horarios = []
+        agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
+
+        # Para urgente, começar amanhã. Para normal, começar em 2 dias
+        inicio = agora + timedelta(days=1 if urgente else 2)
+
+        # Gerar horários para os próximos 7 dias
+        for i in range(7):
+            data = inicio + timedelta(days=i)
+
+            # Apenas dias úteis (segunda a sexta)
+            if data.weekday() < 5:
+                # Horários disponíveis: 8h às 17h
+                for hora in range(8, 18):
+                    horario_dt = data.replace(hour=hora, minute=0, second=0, microsecond=0)
+
+                    # Verificar se horário não está ocupado
+                    if await verificar_horario_disponivel(horario_dt, tecnico):
+                        horarios.append({
+                            "datetime_agendamento": horario_dt.isoformat(),
+                            "dia_semana": horario_dt.strftime("%A, %d/%m/%Y"),
+                            "hora_agendamento": horario_dt.strftime("%H:%M"),
+                            "texto": f"{horario_dt.strftime('%A, %d/%m/%Y')} às {horario_dt.strftime('%H:%M')}"
+                        })
+
+                        # Limitar a 10 horários
+                        if len(horarios) >= 10:
+                            break
+
+            if len(horarios) >= 10:
+                break
+
+        return horarios
+
+    except Exception as e:
+        logger.error(f"Erro ao gerar horários disponíveis: {e}")
+        return []
+
+async def verificar_horario_disponivel(horario_dt: datetime, tecnico: str) -> bool:
+    """
+    Verifica se um horário específico está disponível
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Verificar agendamentos existentes
+        response = supabase.table("agendamentos_ai").select("*").eq(
+            "data_agendada", horario_dt.isoformat()
+        ).eq("tecnico", tecnico).execute()
+
+        if response.data and len(response.data) > 0:
+            return False
+
+        # Verificar ordens de serviço agendadas
+        response_os = supabase.table("service_orders").select("*").eq(
+            "scheduled_date", horario_dt.strftime('%Y-%m-%d')
+        ).eq("scheduled_time", horario_dt.strftime('%H:%M')).execute()
+
+        if response_os.data and len(response_os.data) > 0:
+            return False
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro ao verificar disponibilidade: {e}")
+        return True  # Em caso de erro, assumir disponível
+
+def processar_escolha_horario(horario_escolhido: str, horarios_disponiveis: List[Dict]) -> Optional[str]:
+    """
+    Processa a escolha do cliente (número 1, 2, 3 ou horário ISO)
+    Retorna o horário ISO correspondente
+    """
+    try:
+        # Verificar se é um número (1, 2, 3)
+        if horario_escolhido.strip().isdigit():
+            opcao = int(horario_escolhido.strip())
+            if 1 <= opcao <= len(horarios_disponiveis):
+                horario_selecionado = horarios_disponiveis[opcao - 1]
+                return horario_selecionado.get('datetime_agendamento')
+            else:
+                return None
+
+        # Verificar se é um horário ISO (fallback)
+        else:
+            try:
+                datetime.fromisoformat(horario_escolhido)
+                return horario_escolhido
+            except:
+                return None
+
+    except Exception as e:
+        logger.error(f"Erro ao processar escolha de horário: {e}")
+        return None
 
 @app.get("/")
 async def root():
@@ -112,35 +243,41 @@ async def agendamento_inteligente_get():
 
 @app.post("/agendamento-inteligente")
 async def agendamento_inteligente(request: Request):
-    """🚀 SISTEMA DE AGENDAMENTO INTELIGENTE V4.0 - CLIENTECHAT DUAS ETAPAS 🚀"""
+    """🚀 SISTEMA DE AGENDAMENTO INTELIGENTE V4.1 - CLIENTECHAT DUAS ETAPAS COM DEBUG 🚀"""
     try:
         data = await request.json()
-        logger.info(f"🚀 SISTEMA V4.0 - dados recebidos: {data}")
+        logger.info(f"🚀 SISTEMA V4.1 - dados recebidos: {data}")
 
-        # DETECTAR SE É MENSAGEM DO CLIENTECHAT
-        if 'message' in data and 'phone' in data:
-            # É mensagem do ClienteChat - processar com nova lógica
-            return await processar_mensagem_clientechat(data)
-
-        # LÓGICA ORIGINAL PARA OUTRAS INTEGRAÇÕES
+        # DETECTAR QUAL ETAPA EXECUTAR
         horario_escolhido = data.get("horario_escolhido", "").strip()
-        logger.info(f"🚀 SISTEMA V4.0 - horario_escolhido: '{horario_escolhido}'")
+
+        logger.info(f"🔍 DEBUG ETAPA - horario_escolhido RAW: '{data.get('horario_escolhido')}'")
+        logger.info(f"🔍 DEBUG ETAPA - horario_escolhido STRIP: '{horario_escolhido}'")
+        logger.info(f"🔍 DEBUG ETAPA - not horario_escolhido: {not horario_escolhido}")
+        logger.info(f"🔍 DEBUG ETAPA - bool(horario_escolhido): {bool(horario_escolhido)}")
+        logger.info(f"🔍 DEBUG ETAPA - len(horario_escolhido): {len(horario_escolhido)}")
 
         if not horario_escolhido:
             # ETAPA 1: CONSULTAR DISPONIBILIDADE
-            logger.info("🚀 SISTEMA V4.0 - Executando ETAPA 1: Consulta de disponibilidade")
+            logger.info("🚀 EXECUTANDO ETAPA 1: Consulta de disponibilidade")
             return await consultar_disponibilidade_v4(data)
         else:
             # ETAPA 2: CONFIRMAR AGENDAMENTO
-            logger.info("🚀 SISTEMA V4.0 - Executando ETAPA 2: Confirmação de agendamento")
-            return await confirmar_agendamento_v4(data, horario_escolhido)
+            logger.info("🚀 EXECUTANDO ETAPA 2: Confirmação de agendamento")
+            logger.info(f"🎯 PRESTES A CHAMAR confirmar_agendamento_v4 com data={data} e horario_escolhido='{horario_escolhido}'")
+            resultado = await confirmar_agendamento_v4(data, horario_escolhido)
+            logger.info(f"🎯 RESULTADO DA CHAMADA: {resultado}")
+            return resultado
 
     except Exception as e:
-        logger.error(f"🚀 SISTEMA V4.0 - Erro: {e}")
-        return {
-            "sucesso": False,
-            "mensagem": f"Erro ao processar agendamento V4.0: {str(e)}"
-        }
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"🚨 EXCEÇÃO CAPTURADA NO AGENDAMENTO INTELIGENTE: {e}")
+        logger.error(f"🚨 TRACEBACK COMPLETO: {error_details}")
+        return JSONResponse(
+            status_code=500,
+            content={"sucesso": False, "mensagem": f"Erro interno: {str(e)}"}
+        )
 
 async def processar_mensagem_clientechat(data: dict):
     """🤖 PROCESSAR MENSAGEM DO CLIENTECHAT - DUAS ETAPAS AUTOMÁTICAS"""
@@ -577,9 +714,28 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
         telefone = data.get("telefone", "").strip()
         problema = data.get("problema", "Não especificado").strip()
 
-        # Processar horário escolhido
+        # Determinar técnico e grupo logístico
+        tecnico = determinar_tecnico(equipamento)
+        grupo_logistico = determinar_grupo_logistico(endereco)
+        urgente = data.get("urgente", "não")
+        if isinstance(urgente, str):
+            urgente = urgente.lower() in ['sim', 'true', 'urgente', '1', 'yes']
+
+        # Gerar horários disponíveis para processar a escolha
+        horarios_disponiveis = await gerar_horarios_disponiveis_v4(tecnico, grupo_logistico, urgente)
+
+        # Processar horário escolhido (aceita 1, 2, 3 ou ISO)
+        horario_iso = processar_escolha_horario(horario_escolhido, horarios_disponiveis)
+
+        if not horario_iso:
+            return {
+                "sucesso": False,
+                "mensagem": "Opção de horário inválida. Por favor, escolha 1, 2 ou 3."
+            }
+
+        # Converter para datetime
         try:
-            horario_dt = datetime.fromisoformat(horario_escolhido)
+            horario_dt = datetime.fromisoformat(horario_iso)
         except:
             return {
                 "sucesso": False,
@@ -631,6 +787,108 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
             "sucesso": False,
             "mensagem": f"Erro ao confirmar agendamento V4.0: {str(e)}"
         }
+
+# Endpoint para consultar disponibilidade
+@app.post("/consultar-disponibilidade")
+async def consultar_disponibilidade(request: Request):
+    try:
+        data = await request.json()
+        logger.info(f"Consultando disponibilidade: {data}")
+
+        # Extrair dados básicos
+        endereco = data.get("endereco", "").strip()
+        nome = data.get("nome", "").strip()
+        telefone = data.get("telefone", "").strip()
+        equipamento = data.get("equipamento", "").strip()
+        problema = data.get("problema", "").strip()
+
+        # Validar dados obrigatórios
+        if not nome:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Nome é obrigatório"}
+            )
+        if not endereco:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Endereço é obrigatório"}
+            )
+        if not telefone:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Telefone é obrigatório"}
+            )
+        if not equipamento:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Equipamento é obrigatório"}
+            )
+
+        # Determinar técnico baseado no equipamento
+        tecnico = determinar_tecnico(equipamento)
+
+        # Determinar grupo logístico
+        grupo_logistico = determinar_grupo_logistico(endereco)
+
+        # Determinar urgência
+        urgente = data.get("urgente", "não")
+        if isinstance(urgente, str):
+            urgente = urgente.lower() in ['sim', 'true', 'urgente', '1', 'yes']
+        elif isinstance(urgente, bool):
+            urgente = urgente
+        else:
+            urgente = False
+
+        # Gerar horários disponíveis
+        horarios_disponiveis = await gerar_horarios_disponiveis_v4(
+            tecnico, grupo_logistico, urgente
+        )
+
+        if not horarios_disponiveis:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": "⚠️ Não há horários disponíveis no momento. Nossa equipe entrará em contato para agendar.",
+                    "horarios_disponiveis": [],
+                    "action": "contact_later"
+                }
+            )
+
+        # Formatar resposta para o cliente
+        mensagem = f"✅ Encontrei horários disponíveis para {equipamento}:\n\n"
+        for i, horario in enumerate(horarios_disponiveis[:3], 1):
+            mensagem += f"{i}. {horario['texto']}\n"
+
+        mensagem += "\nResponda com o número da opção desejada (1, 2 ou 3)."
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": mensagem,
+                "horarios_disponiveis": horarios_disponiveis[:3],
+                "tecnico": tecnico,
+                "urgente": urgente,
+                "action": "select_time",
+                "dados_cliente": {
+                    "nome": nome,
+                    "endereco": endereco,
+                    "telefone": telefone,
+                    "cpf": data.get("cpf", ""),
+                    "email": data.get("email", "")
+                },
+                "equipamento": equipamento,
+                "problema": problema
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao consultar disponibilidade: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"Erro ao consultar disponibilidade: {str(e)}"}
+        )
 
 if __name__ == "__main__":
     import uvicorn
