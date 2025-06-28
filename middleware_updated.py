@@ -1824,10 +1824,12 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         )
 
     except Exception as e:
-        logger.error(f"Erro ao confirmar agendamento: {e}")
+        # Tratar encoding de caracteres especiais
+        error_msg = str(e).encode('utf-8', errors='replace').decode('utf-8')
+        logger.error(f"Erro ao confirmar agendamento: {error_msg}")
         return JSONResponse(
             status_code=500,
-            content={"success": False, "message": f"Erro ao confirmar agendamento: {str(e)}"}
+            content={"success": False, "message": f"Erro ao confirmar agendamento: {error_msg}"}
         )
 
 if __name__ == "__main__":
