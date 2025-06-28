@@ -172,11 +172,13 @@ async def consultar_disponibilidade_simples(data: dict):
                         break
 
         # Resposta para o cliente
-        mensagem = f"✅ Encontrei horários disponíveis para {equipamento}:\n\n"
+        mensagem = f"✅ Encontrei horários disponíveis para {equipamento}:"
+        mensagem += "\n\n"
         for h in horarios_disponiveis:
-            mensagem += f"{h['numero']}. {h['texto']}\n"
+            mensagem += f"{h['numero']}. {h['texto']}"
+            mensagem += "\n"
 
-        mensagem += f"\nResponda com o número da opção desejada (1, 2 ou 3)."
+        mensagem += "\nResponda com o número da opção desejada (1, 2 ou 3)."
 
         return {
             "sucesso": True,
@@ -332,11 +334,13 @@ async def consultar_disponibilidade_v4(data: dict):
                         break
 
         # Resposta para o cliente
-        mensagem = f"✅ Encontrei horários disponíveis para {equipamento}:\n\n"
+        mensagem = f"✅ Encontrei horários disponíveis para {equipamento}:"
+        mensagem += "\n\n"
         for h in horarios_disponiveis:
-            mensagem += f"{h['numero']}. {h['texto']}\n"
+            mensagem += f"{h['numero']}. {h['texto']}"
+            mensagem += "\n"
 
-        mensagem += f"\nResponda com o número da opção desejada (1, 2 ou 3)."
+        mensagem += "\nResponda com o número da opção desejada (1, 2 ou 3)."
 
         return {
             "sucesso": True,
