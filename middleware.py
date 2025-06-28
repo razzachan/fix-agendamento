@@ -199,7 +199,10 @@ async def processar_primeira_consulta_clientechat(mensagem: str, telefone: str):
 
                 response = "✅ Encontrei horários disponíveis para você:\n\n"
                 for i, horario in enumerate(horarios[:3], 1):  # Máximo 3 opções
-                    response += f"{i}️⃣ {horario}\n"
+                    if isinstance(horario, dict):
+                        response += f"{i}️⃣ {horario.get('texto', horario)}\n"
+                    else:
+                        response += f"{i}️⃣ {horario}\n"
                 response += "\n📱 Responda com o número da opção desejada (1, 2 ou 3)"
                 return {"response": response}
             else:
@@ -238,7 +241,14 @@ async def processar_escolha_horario_clientechat(telefone: str, escolha: str):
                     "response": f"❌ Opção inválida. Escolha entre 1 e {len(horarios_disponiveis)}."
                 }
 
-            horario_escolhido = horarios_disponiveis[indice]
+            horario_obj = horarios_disponiveis[indice]
+
+            # Extrair o datetime do horário escolhido
+            if isinstance(horario_obj, dict):
+                horario_escolhido = horario_obj.get('datetime_agendamento', horario_obj.get('texto', str(horario_obj)))
+            else:
+                horario_escolhido = str(horario_obj)
+
             logger.info(f"🎯 Horário escolhido: {horario_escolhido}")
 
         except ValueError:
@@ -543,7 +553,7 @@ async def consultar_disponibilidade_v4(data: dict):
         return {
             "sucesso": True,
             "mensagem": mensagem,
-            "horarios": horarios_disponiveis,
+            "horarios_disponiveis": horarios_disponiveis,
             "action": "select_time",
             "version": "4.0"
         }
