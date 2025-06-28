@@ -1557,14 +1557,25 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         # Selecionar técnico otimizado
         tecnico_info = await determinar_tecnico_otimizado(lista_equipamentos, grupo_logistico, urgente)
 
-        # 🔧 PROCESSAR HORÁRIO ESCOLHIDO USANDO CACHE
-        # Primeiro, tentar recuperar horários do cache
-        horarios_cache = recuperar_horarios_cache(data)
+        # 🔧 PROCESSAR HORÁRIO ESCOLHIDO
+        # Verificar se é um número (1, 2, 3) ou horário ISO
+        if horario_escolhido.strip().isdigit():
+            # É uma escolha numérica - gerar horários para processar
+            logger.info(f"🎯 Processando escolha numérica: {horario_escolhido}")
 
-        if horarios_cache:
-            # Usar horários do cache (ETAPA 1)
-            logger.info(f"📂 Usando horários do cache para processar escolha: {horario_escolhido}")
-            horario_selecionado = processar_escolha_horario(horario_escolhido, horarios_cache)
+            # Gerar os mesmos horários da ETAPA 1 para manter consistência
+            horarios_disponiveis = await gerar_horarios_disponiveis_v4(
+                tecnico_info["nome"], grupo_logistico, urgente
+            )
+
+            if not horarios_disponiveis:
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "message": "Não há horários disponíveis no momento"}
+                )
+
+            # Processar escolha
+            horario_selecionado = processar_escolha_horario(horario_escolhido, horarios_disponiveis[:3])
 
             if not horario_selecionado:
                 return JSONResponse(
@@ -1579,8 +1590,8 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
                     content={"success": False, "message": "Erro ao processar horário selecionado"}
                 )
         else:
-            # Fallback: tentar interpretar como horário ISO direto
-            logger.warning(f"⚠️ Cache não encontrado, tentando interpretar como ISO: {horario_escolhido}")
+            # É um horário ISO direto
+            logger.info(f"🎯 Processando horário ISO direto: {horario_escolhido}")
             horario_iso = horario_escolhido
 
         # Converter para datetime
@@ -1588,7 +1599,9 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
             horario_dt = datetime.fromisoformat(horario_iso)
             data_agendada = horario_dt.strftime('%Y-%m-%d')
             hora_agendada = horario_dt.strftime('%H:%M')
-        except:
+            logger.info(f"✅ Horário processado: {data_agendada} às {hora_agendada}")
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar horário: {e}")
             return JSONResponse(
                 status_code=400,
                 content={"success": False, "message": "Formato de horário inválido"}
