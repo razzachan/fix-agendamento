@@ -1574,17 +1574,27 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
                     content={"success": False, "message": "Não há horários disponíveis no momento"}
                 )
 
+            # Debug: mostrar horários disponíveis
+            logger.info(f"🔍 Horários disponíveis gerados: {len(horarios_disponiveis)}")
+            for i, h in enumerate(horarios_disponiveis[:3], 1):
+                logger.info(f"   {i}. {h.get('texto', 'N/A')} -> {h.get('datetime_agendamento', 'N/A')}")
+
             # Processar escolha
             horario_selecionado = processar_escolha_horario(horario_escolhido, horarios_disponiveis[:3])
+            logger.info(f"🎯 Horário selecionado: {horario_selecionado}")
 
             if not horario_selecionado:
+                logger.error(f"❌ Falha ao processar escolha {horario_escolhido} com {len(horarios_disponiveis)} horários")
                 return JSONResponse(
                     status_code=400,
                     content={"success": False, "message": "Opção de horário inválida. Por favor, escolha 1, 2 ou 3."}
                 )
 
             horario_iso = horario_selecionado.get('datetime_agendamento')
+            logger.info(f"🎯 Horário ISO extraído: {horario_iso}")
+
             if not horario_iso:
+                logger.error(f"❌ Horário selecionado não tem datetime_agendamento: {horario_selecionado}")
                 return JSONResponse(
                     status_code=400,
                     content={"success": False, "message": "Erro ao processar horário selecionado"}
@@ -1608,7 +1618,7 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
             )
 
         # Verificar se horário ainda está disponível
-        if not await verificar_horario_ainda_disponivel(horario_escolhido, tecnico_info["nome"]):
+        if not await verificar_horario_ainda_disponivel(horario_iso, tecnico_info["nome"]):
             return JSONResponse(
                 status_code=409,
                 content={
