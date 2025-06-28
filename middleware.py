@@ -542,6 +542,83 @@ def gerar_numero_ordem():
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     return f"OS{timestamp[-6:]}"
 
+async def criar_os_individual(supabase, agendamento_data, agendamento_id, cliente_id, numero_equipamento):
+    """
+    Cria UMA ordem de serviço individual para um equipamento específico
+    Função simples e confiável que replica o comportamento do modal de OS única
+    """
+    try:
+        # Determinar qual equipamento estamos processando
+        if numero_equipamento == 1:
+            equipamento = agendamento_data.get("equipamento")
+            problema = agendamento_data.get("problema", "Não especificado")
+            tipo_atendimento = agendamento_data.get("tipo_atendimento_1", "em_domicilio")
+            valor = agendamento_data.get("valor_os_1", "0")
+        elif numero_equipamento == 2:
+            equipamento = agendamento_data.get("equipamento_2")
+            problema = agendamento_data.get("problema_2", "Não especificado")
+            tipo_atendimento = agendamento_data.get("tipo_atendimento_2", "em_domicilio")
+            valor = agendamento_data.get("valor_os_2", "0")
+        elif numero_equipamento == 3:
+            equipamento = agendamento_data.get("equipamento_3")
+            problema = agendamento_data.get("problema_3", "Não especificado")
+            tipo_atendimento = agendamento_data.get("tipo_atendimento_3", "em_domicilio")
+            valor = agendamento_data.get("valor_os_3", "0")
+        else:
+            logger.error(f"❌ Número de equipamento inválido: {numero_equipamento}")
+            return None
+
+        # Verificar se o equipamento existe
+        if not equipamento or equipamento.strip() == "":
+            logger.warning(f"⚠️ Equipamento {numero_equipamento} está vazio, pulando...")
+            return None
+
+        # Gerar número único da OS
+        order_number = gerar_numero_ordem()
+
+        # Converter valor para float
+        try:
+            valor_float = float(str(valor).replace(',', '.'))
+        except:
+            valor_float = 0.0
+
+        # Dados da OS (usando exatamente os mesmos campos que funcionam)
+        dados_os = {
+            "client_name": agendamento_data["nome"],
+            "client_phone": agendamento_data.get("telefone"),
+            "client_email": agendamento_data.get("email"),
+            "client_cpf_cnpj": agendamento_data.get("cpf"),
+            "pickup_address": agendamento_data["endereco"],
+            "equipment_type": equipamento,
+            "description": problema,
+            "service_attendance_type": tipo_atendimento,
+            "needs_pickup": tipo_atendimento.startswith("coleta"),
+            "status": "scheduled",
+            "scheduled_date": agendamento_data["data_agendada"],
+            "client_id": cliente_id if cliente_id else None,
+            "final_cost": valor_float,
+            "order_number": order_number,
+            "notes": f"Criado automaticamente - Agendamento {agendamento_id} - Equipamento {numero_equipamento}",
+            "technician_id": None
+        }
+
+        logger.info(f"📝 Equipamento {numero_equipamento}: {equipamento} ({tipo_atendimento}) - R$ {valor_float}")
+
+        # Criar a OS no banco (uma por vez, como o modal funciona)
+        response = supabase.table("service_orders").insert(dados_os).execute()
+
+        if response.data and len(response.data) > 0:
+            os_criada = response.data[0]
+            logger.info(f"✅ OS criada: {order_number} - {equipamento}")
+            return os_criada
+        else:
+            logger.error(f"❌ Erro ao criar OS para {equipamento} - resposta vazia")
+            return None
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar OS individual {numero_equipamento}: {str(e)}")
+        return None
+
 async def criar_ordens_servico_automaticamente(supabase, agendamento_data, agendamento_id):
     """
     Cria ordens de serviço automaticamente a partir dos dados do agendamento
@@ -557,89 +634,40 @@ async def criar_ordens_servico_automaticamente(supabase, agendamento_data, agend
             logger.error(f"❌ Erro ao criar/buscar cliente, continuando sem client_id: {e}")
             cliente_id = None
 
-        # LOOP SIMPLES E ROBUSTO - Criar OS para cada equipamento
+        # ESTRATÉGIA SIMPLES: Criar 1 OS por vez usando função que já funciona
         ordens_criadas = []
-        equipamentos_para_processar = []
 
-        # Coletar TODOS os equipamentos em uma lista simples
+        # EQUIPAMENTO 1 (sempre existe)
         if agendamento_data.get("equipamento"):
-            equipamentos_para_processar.append({
-                "nome": agendamento_data["equipamento"],
-                "problema": agendamento_data.get("problema", "Não especificado"),
-                "tipo": agendamento_data.get("tipo_atendimento_1", "em_domicilio"),
-                "valor": agendamento_data.get("valor_os_1", "0")
-            })
+            logger.info("🔄 Criando OS para EQUIPAMENTO 1...")
+            os1 = await criar_os_individual(supabase, agendamento_data, agendamento_id, cliente_id, 1)
+            if os1:
+                ordens_criadas.append(os1)
+                logger.info("✅ OS 1 criada com sucesso!")
+            else:
+                logger.error("❌ Falha ao criar OS 1")
 
+        # EQUIPAMENTO 2 (se existir)
         if agendamento_data.get("equipamento_2"):
-            equipamentos_para_processar.append({
-                "nome": agendamento_data["equipamento_2"],
-                "problema": agendamento_data.get("problema_2", "Não especificado"),
-                "tipo": agendamento_data.get("tipo_atendimento_2", "em_domicilio"),
-                "valor": agendamento_data.get("valor_os_2", "0")
-            })
+            logger.info("🔄 Criando OS para EQUIPAMENTO 2...")
+            os2 = await criar_os_individual(supabase, agendamento_data, agendamento_id, cliente_id, 2)
+            if os2:
+                ordens_criadas.append(os2)
+                logger.info("✅ OS 2 criada com sucesso!")
+            else:
+                logger.error("❌ Falha ao criar OS 2")
 
+        # EQUIPAMENTO 3 (se existir)
         if agendamento_data.get("equipamento_3"):
-            equipamentos_para_processar.append({
-                "nome": agendamento_data["equipamento_3"],
-                "problema": agendamento_data.get("problema_3", "Não especificado"),
-                "tipo": agendamento_data.get("tipo_atendimento_3", "em_domicilio"),
-                "valor": agendamento_data.get("valor_os_3", "0")
-            })
+            logger.info("🔄 Criando OS para EQUIPAMENTO 3...")
+            os3 = await criar_os_individual(supabase, agendamento_data, agendamento_id, cliente_id, 3)
+            if os3:
+                ordens_criadas.append(os3)
+                logger.info("✅ OS 3 criada com sucesso!")
+            else:
+                logger.error("❌ Falha ao criar OS 3")
 
-        logger.info(f"📋 LOOP: Encontrados {len(equipamentos_para_processar)} equipamentos para processar")
-
-        # LOOP PRINCIPAL - Processar cada equipamento
-        for i, equip in enumerate(equipamentos_para_processar, 1):
-            logger.info(f"🔄 LOOP {i}/{len(equipamentos_para_processar)}: Processando {equip['nome']}")
-
-            try:
-                # Gerar número único para cada OS
-                order_number = gerar_numero_ordem()
-
-                # Converter valor para float
-                try:
-                    valor_float = float(str(equip['valor']).replace(',', '.'))
-                except:
-                    valor_float = 0.0
-
-                # Dados da OS
-                dados_os = {
-                    "client_name": agendamento_data["nome"],
-                    "client_phone": agendamento_data.get("telefone"),
-                    "client_email": agendamento_data.get("email"),
-                    "client_cpf_cnpj": agendamento_data.get("cpf"),
-                    "pickup_address": agendamento_data["endereco"],
-                    "equipment_type": equip["nome"],
-                    "description": equip["problema"],
-                    "service_attendance_type": equip["tipo"],
-                    "needs_pickup": equip["tipo"].startswith("coleta"),
-                    "status": "scheduled",
-                    "scheduled_date": agendamento_data["data_agendada"],
-                    "client_id": cliente_id if cliente_id else None,
-                    "final_cost": valor_float,
-                    "order_number": order_number,
-                    "notes": f"Auto-criado do agendamento {agendamento_id} - Equipamento {i}",
-                    "technician_id": None
-                }
-
-                logger.info(f"📝 LOOP {i}: Dados preparados para {equip['nome']} - R$ {valor_float}")
-
-                # Tentar criar a OS
-                response_os = supabase.table("service_orders").insert(dados_os).execute()
-
-                if response_os.data and len(response_os.data) > 0:
-                    os_criada = response_os.data[0]
-                    ordens_criadas.append(os_criada)
-                    logger.info(f"✅ LOOP {i}: OS criada com sucesso! {order_number} - {equip['nome']}")
-                else:
-                    logger.error(f"❌ LOOP {i}: Falha ao criar OS para {equip['nome']} - resposta vazia")
-
-            except Exception as e:
-                logger.error(f"❌ LOOP {i}: Erro ao processar {equip['nome']}: {str(e)}")
-                # Continuar com próximo equipamento
-                continue
-
-        logger.info(f"🎯 LOOP FINALIZADO: {len(ordens_criadas)} OS criadas de {len(equipamentos_para_processar)} equipamentos")
+        logger.info(f"🎯 RESULTADO FINAL: {len(ordens_criadas)} OS criadas com sucesso!")
 
         # Marcar agendamento como processado
         if ordens_criadas:
