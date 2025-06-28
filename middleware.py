@@ -1223,28 +1223,13 @@ async def consultar_disponibilidade(request: Request):
             content={"success": False, "message": f"Erro interno: {str(e)}"}
         )
 
-# Endpoint de teste simples
+# Importar funções do agendamento inteligente
+from agendamento_inteligente import agendamento_inteligente_completo_handler
+
+# Endpoint inteligente que gerencia consulta + confirmação
 @app.post("/agendamento-inteligente-completo")
 async def agendamento_inteligente_completo(request: Request):
-    try:
-        data = await request.json()
-        logger.info(f"Agendamento inteligente - dados recebidos: {data}")
-
-        return JSONResponse(
-            status_code=200,
-            content={
-                "success": True,
-                "message": "✅ Endpoint funcionando! Dados recebidos com sucesso.",
-                "data_received": data
-            }
-        )
-
-    except Exception as e:
-        logger.error(f"Erro no agendamento inteligente: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "message": f"Erro interno: {str(e)}"}
-        )
+    return await agendamento_inteligente_completo_handler(request)
 
 # Função interna para consulta de disponibilidade - TEMPORARIAMENTE DESABILITADA
 async def consultar_disponibilidade_interna_disabled(data: dict):
