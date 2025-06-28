@@ -26,7 +26,6 @@ COPY .env .
 
 # Remove any potential problematic files
 RUN rm -f main_backup.py || true
-RUN rm -f middleware_updated.py || true
 
 # Expose port
 EXPOSE 8000
