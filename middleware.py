@@ -1373,60 +1373,6 @@ async def consultar_disponibilidade_interna(data: dict):
             content={"success": False, "message": f"Erro ao processar consulta: {str(e)}"}
         )
 
-
-
-
-            if not response_os.data:
-                raise Exception("Erro ao criar ordem de serviço")
-
-            os_id = response_os.data[0]["id"]
-            logger.info(f"✅ Ordem de serviço criada: {order_number} (ID: {os_id})")
-
-        except Exception as os_error:
-            logger.error(f"❌ Erro ao criar OS: {os_error}")
-            raise Exception(f"Erro ao criar ordem de serviço: {str(os_error)}")
-
-        # 3. Atualizar agendamento com ID da OS
-        supabase.table("agendamentos_ai").update({
-            "ordem_servico_id": dados_os["id"],
-            "status": "os_criada"
-        }).eq("id", agendamento_id).execute()
-
-        # Formatar resposta de confirmação
-        mensagem = f"✅ *Agendamento Confirmado!*\n\n"
-        mensagem += f"📋 *Ordem de Serviço:* {order_number}\n"
-        mensagem += f"👤 *Cliente:* {nome}\n"
-        mensagem += f"📍 *Endereço:* {endereco}\n"
-        mensagem += f"🔧 *Equipamento(s):* {tipos_equipamentos}\n"
-        if len(problemas) > 0:
-            mensagem += f"⚠️ *Problema(s):* {descricao_completa}\n"
-        mensagem += f"📅 *Data:* {horario_dt.strftime('%d/%m/%Y')}\n"
-        mensagem += f"⏰ *Horário:* {hora_agendada}\n"
-        mensagem += f"👨‍🔧 *Técnico:* {tecnico.split('(')[0].strip()}\n"
-        if urgente:
-            mensagem += f"🚨 *ATENDIMENTO URGENTE*\n"
-        mensagem += f"💰 *Valor:* R$ {final_cost:.2f}\n\n"
-        mensagem += f"📱 *Contato:* (48) 98833-2664\n"
-        mensagem += f"Você receberá uma confirmação por WhatsApp 1 dia antes do atendimento."
-
-        return JSONResponse(
-            status_code=200,
-            content={
-                "success": True,
-                "message": mensagem,
-                "order_number": order_number,
-                "agendamento_id": agendamento_id,
-                "ordem_servico_id": dados_os["id"]
-            }
-        )
-
-    except Exception as e:
-        logger.error(f"Erro ao criar agendamento inteligente: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "message": f"Erro ao processar agendamento: {str(e)}"}
-        )
-
 # Função para confirmar agendamento final (ETAPA 2)
 async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
     """
