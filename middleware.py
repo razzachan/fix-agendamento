@@ -17,6 +17,7 @@ import pytz
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.info("Middleware iniciado - versão com agendamento inteligente completo")
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -1302,167 +1303,78 @@ async def consultar_disponibilidade_interna(data: dict):
                 status_code=400,
                 content={"success": False, "message": "Pelo menos um equipamento deve ser informado"}
             )
-        if not horario_escolhido:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Horário escolhido é obrigatório"}
-            )
-
-        # Determinar técnico baseado no primeiro equipamento
-        primeiro_equipamento = equipamentos[0]["equipamento"]
-        tecnico = determinar_tecnico(primeiro_equipamento)
-
-        # Processar horário escolhido
-        try:
-            horario_dt = datetime.fromisoformat(horario_escolhido)
-            data_agendada = horario_dt.strftime('%Y-%m-%d')
-            hora_agendada = horario_dt.strftime('%H:%M')
-        except:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Formato de horário inválido"}
-            )
-
         # Determinar urgência
         urgente = data.get("urgente", "não")
         if isinstance(urgente, str):
             urgente = urgente.lower() in ['sim', 'true', 'urgente', '1', 'yes']
-        elif isinstance(urgente, bool):
-            urgente = urgente
         else:
             urgente = False
 
-        supabase = get_supabase_client()
+        # Geocodificar endereço para determinar grupo logístico
+        coordenadas = await geocodificar_endereco(endereco)
+        grupo_logistico = determine_logistics_group(endereco, coordenadas)
 
-        # 1. Criar pré-agendamento
-        dados_agendamento = {
-            "nome": nome,
-            "endereco": endereco,
-            "equipamento": primeiro_equipamento,  # Equipamento principal
-            "problema": problemas[0] if problemas else "Não especificado",  # Problema principal
-            "urgente": urgente,
-            "status": "confirmado",
-            "telefone": telefone,
-            "cpf": data.get("cpf", ""),
-            "email": data.get("email", ""),
-            "origem": "clientechat_inteligente",
-            "tecnico": tecnico,
-            "data_agendada": horario_dt.isoformat(),
-            "equipamentos": json.dumps([eq["equipamento"] for eq in equipamentos]),
-            "problemas": json.dumps(problemas),
-            "tipos_atendimento": json.dumps(["em_domicilio"]),
-            "tipos_equipamentos": json.dumps([eq["tipo"] for eq in equipamentos])
-        }
+        # Determinar técnico baseado no primeiro equipamento
+        lista_equipamentos = [eq["equipamento"] for eq in equipamentos]
+        tecnico_info = await determinar_tecnico_otimizado(lista_equipamentos, grupo_logistico, urgente)
 
-        response_agendamento = supabase.table("agendamentos_ai").insert(dados_agendamento).execute()
+        # Buscar horários disponíveis usando a função existente
+        data_inicio = datetime.now().date()
+        dias = 7
+        horarios_disponiveis = await obter_horarios_disponiveis(data_inicio, dias)
 
-        if not response_agendamento.data:
-            raise Exception("Erro ao criar pré-agendamento")
+        if not horarios_disponiveis:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": "⚠️ Não há horários disponíveis no momento. Nossa equipe entrará em contato para agendar.",
+                    "horarios": [],
+                    "action": "contact_later"
+                }
+            )
 
-        agendamento_id = response_agendamento.data[0]["id"]
+        # Formatar resposta para o cliente
+        horarios_formatados = []
+        for i, horario in enumerate(horarios_disponiveis[:3], 1):  # Máximo 3 opções
+            dt = datetime.fromisoformat(horario['datetime_agendamento'])
+            data_formatada = dt.strftime('%d/%m')
+            hora_inicio = dt.strftime('%H:%M')
+            hora_fim = (dt + timedelta(hours=1)).strftime('%H:%M')
 
-        # 2. Criar ordem de serviço usando o mesmo sistema dos modais
-        try:
-            import uuid
+            horarios_formatados.append({
+                "numero": i,
+                "texto": f"{data_formatada} das {hora_inicio} às {hora_fim}",
+                "datetime_agendamento": horario['datetime_agendamento']
+            })
 
-            # Determinar tipo de serviço e valor baseado nos equipamentos (mesma lógica dos modais)
-            service_type = "em_domicilio"
-            final_cost = 120.00  # Valor padrão
+        # Resposta limpa para o cliente
+        equipamento_principal = equipamentos[0]["equipamento"] if equipamentos else "equipamento"
+        mensagem = f"✅ Encontrei horários disponíveis para {equipamento_principal}:\n\n"
+        for h in horarios_formatados:
+            mensagem += f"{h['numero']}. {h['texto']}\n"
 
-            # Ajustar valor baseado nos equipamentos
-            for eq in equipamentos:
-                if "coifa" in eq["equipamento"].lower():
-                    final_cost = max(final_cost, 150.00)
-                elif "forno" in eq["equipamento"].lower():
-                    final_cost = max(final_cost, 130.00)
+        mensagem += f"\nResponda com o número da opção desejada (1, 2 ou 3)."
 
-            # Se múltiplos equipamentos, adicionar taxa
-            if len(equipamentos) > 1:
-                final_cost += (len(equipamentos) - 1) * 30.00
-
-            # Consolidar descrição dos problemas
-            descricao_completa = " | ".join(problemas) if problemas else "Não especificado"
-            tipos_equipamentos = ", ".join([eq["equipamento"] for eq in equipamentos])
-
-            # 2.1. Criar cliente automaticamente usando função RPC (mesmo sistema dos modais)
-            client_data = {
-                "name": nome,
-                "email": data.get("email", ""),
-                "phone": telefone,
-                "address": endereco
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": mensagem,
+                "horarios": horarios_formatados,
+                "action": "select_time"
             }
+        )
 
-            client_id = None
-            if client_data["name"]:
-                try:
-                    # Usar função RPC para criar cliente (bypassa RLS como nos modais)
-                    response_client = supabase.rpc('create_client', {
-                        'client_name': client_data["name"],
-                        'client_email': client_data["email"] if client_data["email"] else None,
-                        'client_phone': client_data["phone"] if client_data["phone"] else None,
-                        'client_address': client_data["address"] if client_data["address"] else None,
-                        'client_city': None,
-                        'client_state': None,
-                        'client_zip_code': None
-                    }).execute()
+    except Exception as e:
+        logger.error(f"Erro ao consultar disponibilidade: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"Erro ao processar consulta: {str(e)}"}
+        )
 
-                    if response_client.data:
-                        if isinstance(response_client.data, list) and len(response_client.data) > 0:
-                            client_id = response_client.data[0]["id"]
-                        elif isinstance(response_client.data, dict):
-                            client_id = response_client.data["id"]
 
-                        logger.info(f"✅ Cliente criado automaticamente: {client_id}")
 
-                        # Criar conta de usuário com senha padrão 123456 (mesmo sistema dos modais)
-                        if client_data["email"]:
-                            try:
-                                user_response = supabase.auth.admin.create_user({
-                                    "email": client_data["email"],
-                                    "password": "123456",
-                                    "email_confirm": True,
-                                    "user_metadata": {
-                                        "name": client_data["name"],
-                                        "role": "client"
-                                    }
-                                })
-                                if user_response.user:
-                                    logger.info(f"✅ Conta de usuário criada: {client_data['email']} (senha: 123456)")
-                            except Exception as user_error:
-                                logger.warning(f"⚠️ Erro ao criar conta de usuário: {user_error}")
-
-                except Exception as client_error:
-                    logger.warning(f"⚠️ Erro ao criar cliente: {client_error}")
-
-            # 2.2. Criar ordem de serviço (mesmo formato dos modais)
-            order_number = f"OS-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
-
-            dados_os = {
-                "id": str(uuid.uuid4()),
-                "order_number": order_number,
-                "client_name": nome,
-                "client_phone": telefone,
-                "client_email": client_data["email"],
-                "client_id": client_id,  # Vinculação com cliente criado
-                "pickup_address": endereco,
-                "equipment_type": tipos_equipamentos,
-                "description": descricao_completa,
-                "service_attendance_type": service_type,
-                "status": "agendado",
-                "scheduled_date": data_agendada,
-                "scheduled_time": hora_agendada,
-                "technician_name": tecnico_info["nome"],
-                "technician_id": tecnico_info["tecnico_id"],
-                "estimated_cost": final_cost,
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat(),
-                "origem_agendamento_id": agendamento_id,
-                "logistics_group": grupo_logistico,
-                "priority": "high" if urgente else "medium",
-                "notes": f"Agendamento inteligente - Score técnico: {tecnico_info['score']}"
-            }
-
-            response_os = supabase.table("service_orders").insert(dados_os).execute()
 
             if not response_os.data:
                 raise Exception("Erro ao criar ordem de serviço")
