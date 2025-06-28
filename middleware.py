@@ -367,7 +367,30 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
 
         # Processar horário escolhido
         try:
-            horario_dt = datetime.fromisoformat(horario_escolhido)
+            # Se é um número (1, 2, 3), converter para horário ISO
+            if horario_escolhido.strip().isdigit():
+                opcao = int(horario_escolhido.strip())
+                # Gerar os mesmos horários da ETAPA 1
+                horarios_disponiveis = await consultar_disponibilidade_v4(data)
+                if horarios_disponiveis.get("sucesso") and horarios_disponiveis.get("horarios"):
+                    horarios = horarios_disponiveis["horarios"]
+                    if 1 <= opcao <= len(horarios):
+                        horario_selecionado = horarios[opcao - 1]
+                        horario_iso = horario_selecionado.get('datetime_agendamento')
+                        horario_dt = datetime.fromisoformat(horario_iso)
+                    else:
+                        return {
+                            "sucesso": False,
+                            "mensagem": f"Opção inválida. Escolha entre 1 e {len(horarios)}."
+                        }
+                else:
+                    return {
+                        "sucesso": False,
+                        "mensagem": "Erro ao recuperar horários disponíveis"
+                    }
+            else:
+                # Se já é ISO, usar diretamente
+                horario_dt = datetime.fromisoformat(horario_escolhido)
         except:
             return {
                 "sucesso": False,
