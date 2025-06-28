@@ -189,13 +189,14 @@ async def processar_primeira_consulta_clientechat(mensagem: str, telefone: str):
         # Consultar horários disponíveis usando a lógica existente
         resultado = await consultar_disponibilidade_v4(dados_extraidos)
 
-        # Salvar dados temporariamente para a segunda etapa
-        await salvar_dados_temporarios(telefone, dados_extraidos)
-
         # Retornar horários formatados para ClienteChat
         if resultado.get('sucesso'):
             horarios = resultado.get('horarios_disponiveis', [])
             if horarios:
+                # Salvar dados E horários temporariamente para a segunda etapa
+                dados_extraidos['horarios_disponiveis'] = horarios
+                await salvar_dados_temporarios(telefone, dados_extraidos)
+
                 response = "✅ Encontrei horários disponíveis para você:\n\n"
                 for i, horario in enumerate(horarios[:3], 1):  # Máximo 3 opções
                     response += f"{i}️⃣ {horario}\n"
@@ -221,11 +222,35 @@ async def processar_escolha_horario_clientechat(telefone: str, escolha: str):
                 "response": "❌ Não encontrei seus dados. Por favor, inicie o agendamento novamente com seus dados completos."
             }
 
-        # Adicionar escolha de horário aos dados
-        dados_salvos['horario_escolhido'] = escolha
+        # Recuperar horários disponíveis salvos
+        horarios_disponiveis = dados_salvos.get('horarios_disponiveis', [])
+
+        if not horarios_disponiveis:
+            return {
+                "response": "❌ Não encontrei os horários disponíveis. Por favor, inicie o agendamento novamente."
+            }
+
+        # Converter escolha numérica em horário real
+        try:
+            indice = int(escolha) - 1  # Converter 1,2,3 para 0,1,2
+            if indice < 0 or indice >= len(horarios_disponiveis):
+                return {
+                    "response": f"❌ Opção inválida. Escolha entre 1 e {len(horarios_disponiveis)}."
+                }
+
+            horario_escolhido = horarios_disponiveis[indice]
+            logger.info(f"🎯 Horário escolhido: {horario_escolhido}")
+
+        except ValueError:
+            return {
+                "response": "❌ Por favor, envie apenas o número da opção (1, 2 ou 3)."
+            }
+
+        # Adicionar horário escolhido aos dados
+        dados_salvos['horario_escolhido'] = horario_escolhido
 
         # Confirmar agendamento usando a lógica existente
-        resultado = await confirmar_agendamento_v4(dados_salvos, escolha)
+        resultado = await confirmar_agendamento_v4(dados_salvos, horario_escolhido)
 
         # Limpar dados temporários
         await limpar_dados_temporarios(telefone)
