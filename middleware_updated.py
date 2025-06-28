@@ -1427,7 +1427,10 @@ async def agendamento_inteligente_completo(request: Request):
         else:
             # ETAPA 2: CONFIRMAR AGENDAMENTO
             logger.info("Executando ETAPA 2: Confirmação de agendamento")
-            return await confirmar_agendamento_final(data, horario_escolhido)
+            logger.info(f"🎯 PRESTES A CHAMAR confirmar_agendamento_final com data={data} e horario_escolhido='{horario_escolhido}'")
+            resultado = await confirmar_agendamento_final(data, horario_escolhido)
+            logger.info(f"🎯 RESULTADO DA CHAMADA: {resultado}")
+            return resultado
 
     except Exception as e:
         logger.error(f"Erro no agendamento inteligente: {e}")
