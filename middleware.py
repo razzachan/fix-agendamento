@@ -1370,8 +1370,8 @@ async def consultar_disponibilidade_interna(data: dict):
             content={"success": False, "message": f"Erro ao processar consulta: {str(e)}"}
         )
 
-# Função para confirmar agendamento final (ETAPA 2)
-async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
+# Função para confirmar agendamento final (ETAPA 2) - TEMPORARIAMENTE DESABILITADA
+async def confirmar_agendamento_final_disabled(data: dict, horario_escolhido: str):
     """
     Confirma o agendamento criando pré-agendamento e OS usando o mesmo sistema dos modais
     """
