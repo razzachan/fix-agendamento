@@ -884,6 +884,28 @@ async def criar_ou_buscar_cliente(supabase, agendamento_data):
         if response.data:
             cliente_id = response.data[0]["id"]
             logger.info(f"✅ Novo cliente criado: {nome} (ID: {cliente_id})")
+
+            # Criar usuário no Supabase Auth
+            try:
+                auth_response = supabase.auth.admin.create_user({
+                    "email": email_cliente,
+                    "password": "123456",
+                    "email_confirm": True,
+                    "user_metadata": {
+                        "name": nome,
+                        "phone": telefone if telefone else None,
+                        "client_id": cliente_id
+                    }
+                })
+
+                if auth_response.user:
+                    logger.info(f"✅ Usuário Auth criado: {email_cliente}")
+                else:
+                    logger.warning(f"⚠️ Falha ao criar usuário Auth para {email_cliente}")
+
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao criar usuário Auth: {e}")
+
             return cliente_id
         else:
             logger.error("❌ Erro ao criar cliente - resposta vazia")
