@@ -1538,10 +1538,24 @@ async def agendamento_inteligente_completo(request: Request):
         else:
             # ETAPA 2: CONFIRMAR AGENDAMENTO
             logger.info("🚀 EXECUTANDO ETAPA 2: Confirmação de agendamento")
-            logger.info(f"🎯 PRESTES A CHAMAR confirmar_agendamento_final com data={data} e horario_escolhido='{horario_escolhido}'")
-            resultado = await confirmar_agendamento_final(data, horario_escolhido)
-            logger.info(f"🎯 RESULTADO DA CHAMADA: {resultado}")
-            return resultado
+            logger.info(f"🎯 DADOS COMPLETOS RECEBIDOS NA ETAPA 2:")
+            for key, value in data.items():
+                logger.info(f"🎯   {key}: '{value}'")
+            logger.info(f"🎯 HORARIO_ESCOLHIDO: '{horario_escolhido}'")
+            logger.info(f"🎯 PRESTES A CHAMAR confirmar_agendamento_final")
+
+            try:
+                resultado = await confirmar_agendamento_final(data, horario_escolhido)
+                logger.info(f"✅ RESULTADO DA ETAPA 2: {resultado}")
+                return resultado
+            except Exception as e:
+                logger.error(f"❌ ERRO NA ETAPA 2: {e}")
+                import traceback
+                logger.error(f"❌ TRACEBACK: {traceback.format_exc()}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"success": False, "message": f"Erro na confirmação: {str(e)}"}
+                )
 
     except Exception as e:
         import traceback
