@@ -806,11 +806,16 @@ async def criar_ou_buscar_cliente(supabase, agendamento_data):
     Cria ou busca um cliente baseado no CPF/telefone
     """
     try:
+        # DEBUG: Verificar dados recebidos
+        logger.info(f"🔍 DEBUG - agendamento_data recebido: {agendamento_data}")
+
         cpf = agendamento_data.get("cpf", "").replace(".", "").replace("-", "").strip()
         telefone = agendamento_data.get("telefone", "").strip()
         nome = agendamento_data.get("nome", "").strip()
+        email_debug = agendamento_data.get("email")
 
         logger.info(f"🔍 Buscando cliente: CPF={cpf}, Telefone={telefone}, Nome={nome}")
+        logger.info(f"🔍 DEBUG - Email extraído: '{email_debug}'")
 
         # Tentar buscar cliente existente por CPF
         if cpf and len(cpf) >= 10:
