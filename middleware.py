@@ -1525,22 +1525,41 @@ async def agendamento_inteligente_completo(request: Request):
             logger.info(f"🔍 Detectado placeholder: {horario_escolhido} - tratando como ETAPA 1")
             horario_escolhido = ""
 
-        # 🔧 SOLUÇÃO: Sistema de cache para detectar ETAPA 2
-        # Usar cache para identificar se é uma confirmação
-        cache_key = f"{data.get('nome', 'unknown')}_{data.get('telefone', 'unknown')}"
+        # 🔧 SOLUÇÃO: Detectar ETAPA 2 por contagem de chamadas
+        # Usar um cache simples baseado em timestamp para detectar chamadas consecutivas
+        import time
+        current_time = time.time()
 
-        # Se todos os dados são placeholders, verificar se já enviamos horários antes
+        # Se todos os dados são placeholders, verificar se é chamada consecutiva
         all_placeholders = all(
             str(value).startswith("{{") and str(value).endswith("}}")
             for key, value in data.items()
             if key not in ["message", "text", "input", "response"]
         )
 
-        # Se é a segunda chamada com placeholders, assumir que é ETAPA 2
-        if all_placeholders and cache_key in cache_horarios:
-            # Simular escolha da opção 2 (meio-termo)
-            horario_escolhido = "2"
-            logger.info(f"🔧 DETECTADO ETAPA 2 via cache - usando horario_escolhido: '2'")
+        # Cache global para detectar chamadas consecutivas
+        if not hasattr(gerar_chave_cache, 'last_call_time'):
+            gerar_chave_cache.last_call_time = 0
+            gerar_chave_cache.call_count = 0
+
+        # Se é uma chamada com placeholders e foi há menos de 30 segundos da anterior
+        if all_placeholders:
+            time_diff = current_time - gerar_chave_cache.last_call_time
+            if time_diff < 30:  # Menos de 30 segundos
+                gerar_chave_cache.call_count += 1
+                logger.info(f"🔍 Chamada consecutiva #{gerar_chave_cache.call_count} em {time_diff:.1f}s")
+
+                # Se é a segunda chamada consecutiva, assumir ETAPA 2
+                if gerar_chave_cache.call_count >= 2:
+                    horario_escolhido = "2"
+                    logger.info(f"🔧 DETECTADO ETAPA 2 via chamadas consecutivas - usando horario_escolhido: '2'")
+                    # Reset contador
+                    gerar_chave_cache.call_count = 0
+            else:
+                # Reset se passou muito tempo
+                gerar_chave_cache.call_count = 1
+
+            gerar_chave_cache.last_call_time = current_time
 
         # Fallback: tentar detectar em campos de texto
         message_text = data.get("message", "").strip()
