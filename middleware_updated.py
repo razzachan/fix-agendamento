@@ -14,6 +14,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import pytz
+import uuid
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +25,43 @@ load_dotenv()
 
 # Cache para horários disponíveis (para manter consistência entre ETAPA 1 e 2)
 cache_horarios = {}
+
+async def gerar_proximo_numero_os():
+    """
+    Gera próximo número sequencial de OS usando o mesmo sistema do frontend
+    Formato: OS #001, OS #002, OS #003...
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Buscar o maior número existente
+        response = supabase.table("service_orders").select("order_number").not_(
+            "order_number", "is", None
+        ).order("order_number", desc=True).limit(1).execute()
+
+        next_number = 1
+
+        if response.data and len(response.data) > 0 and response.data[0]["order_number"]:
+            # Extrair número do formato "OS #001"
+            last_number = response.data[0]["order_number"]
+            import re
+            number_match = re.search(r'OS #(\d+)', last_number)
+
+            if number_match:
+                last_num = int(number_match.group(1))
+                next_number = last_num + 1
+
+        # Formatar como "OS #001"
+        formatted_number = f"OS #{next_number:03d}"
+
+        logger.info(f"🔢 Próximo número OS gerado: {formatted_number}")
+        return formatted_number
+
+    except Exception as e:
+        logger.error(f"Erro ao gerar número OS: {e}")
+        # Fallback para timestamp se falhar
+        timestamp = int(datetime.now().timestamp()) % 10000
+        return f"OS #{timestamp:04d}"
 
 def gerar_horarios_fixos_consistentes(urgente: bool = False) -> List[Dict]:
     """
@@ -1836,7 +1874,7 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
                 logger.warning(f"⚠️ Erro ao criar cliente: {client_error}")
 
         # 2.2. Criar ordem de serviço (mesmo formato dos modais)
-        order_number = f"OS-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+        order_number = await gerar_proximo_numero_os()
 
         dados_os = {
             "id": str(uuid.uuid4()),
