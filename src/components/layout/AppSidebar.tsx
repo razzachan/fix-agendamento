@@ -241,24 +241,8 @@ const AppSidebar: React.FC = () => {
     }
   ];
 
-  // Estrutura hierárquica do menu para clientes
-  const clientMenuStructure = [
-    {
-      category: 'Visão Geral',
-      emoji: '📊',
-      items: [
-        { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', emoji: '📊' }
-      ]
-    },
-    {
-      category: 'Serviços',
-      emoji: '📋',
-      items: [
-        { to: '/orders', icon: FileText, label: 'Meus Serviços', emoji: '📋' },
-        { to: '/new-service', icon: Plus, label: 'Solicitar Serviço', emoji: '➕' }
-      ]
-    }
-  ];
+  // Clientes não devem usar este sidebar - eles têm o ClientLayout
+  const clientMenuStructure: any[] = [];
 
   // Determinar qual estrutura de menu usar com base na role do usuário
   let menuStructure = [];

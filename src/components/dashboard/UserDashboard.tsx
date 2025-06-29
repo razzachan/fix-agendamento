@@ -1,9 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ServiceOrder } from '@/types';
 import UserServiceOrders from './UserServiceOrders';
 import { useAuth } from '@/contexts/AuthContext';
-import QuickAccessCard from './QuickAccessCard';
 import TechnicianDashboard from './TechnicianDashboard';
 import WorkshopDashboard from './WorkshopDashboard';
 import { technicianService } from '@/services';
@@ -28,11 +28,20 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   updateServiceOrder
 }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isTechnician = userRole === 'technician';
   const [technicianId, setTechnicianId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [showAllOrders, setShowAllOrders] = useState(false);
+
+  // Redirecionar clientes para o portal correto
+  useEffect(() => {
+    if (user?.role === 'client') {
+      navigate('/client/portal', { replace: true });
+      return;
+    }
+  }, [user?.role, navigate]);
 
   useEffect(() => {
     if (isTechnician && user?.id) {
@@ -109,18 +118,17 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
     );
   }
 
+  // Se chegou até aqui e não é técnico nem workshop, não deveria estar aqui
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <QuickAccessCard userRole={userRole} />
-      <UserServiceOrders
-        serviceOrders={displayedOrders}
-        userRole={userRole}
-        formatDate={formatDate}
-        getStatusColor={getStatusColor}
-        getStatusLabel={getStatusLabel}
-        showAllOrders={showAllOrders}
-        setShowAllOrders={setShowAllOrders}
-      />
+    <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          Acesso Restrito
+        </h2>
+        <p className="text-gray-600">
+          Esta área é restrita a administradores e técnicos.
+        </p>
+      </div>
     </div>
   );
 };

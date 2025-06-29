@@ -12,7 +12,7 @@ interface AppLayoutProps {
 }
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
   // Se ainda estiver carregando, mostra um indicador de carregamento
@@ -27,6 +27,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   // Somente redireciona quando o carregamento estiver completo e o usuário não estiver autenticado
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Redirecionar clientes para o portal correto
+  if (user?.role === 'client') {
+    return <Navigate to="/client/portal" replace />;
   }
 
   console.log('🔔 [AppLayout] Renderizando AppLayout');
