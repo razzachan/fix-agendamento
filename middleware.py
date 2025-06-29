@@ -1525,15 +1525,32 @@ async def agendamento_inteligente_completo(request: Request):
             logger.info(f"🔍 Detectado placeholder: {horario_escolhido} - tratando como ETAPA 1")
             horario_escolhido = ""
 
-        # 🔧 SOLUÇÃO: Detectar escolha na mensagem de texto também
+        # 🔧 SOLUÇÃO: Detectar escolha em vários campos possíveis
         message_text = data.get("message", "").strip()
-        if not horario_escolhido and message_text in ["1", "2", "3"]:
-            horario_escolhido = message_text
-            logger.info(f"🔧 DETECTADO horario_escolhido na mensagem: '{horario_escolhido}'")
+        text_field = data.get("text", "").strip()
+        input_field = data.get("input", "").strip()
+        response_field = data.get("response", "").strip()
+
+        # Tentar detectar a escolha em qualquer campo de texto
+        possible_choices = [message_text, text_field, input_field, response_field]
+        detected_choice = None
+
+        for choice in possible_choices:
+            if choice in ["1", "2", "3"]:
+                detected_choice = choice
+                break
+
+        if not horario_escolhido and detected_choice:
+            horario_escolhido = detected_choice
+            logger.info(f"🔧 DETECTADO horario_escolhido: '{horario_escolhido}'")
 
         logger.info(f"🔍 DEBUG ETAPA - horario_escolhido RAW: '{data.get('horario_escolhido')}'")
         logger.info(f"🔍 DEBUG ETAPA - horario_escolhido FINAL: '{horario_escolhido}'")
         logger.info(f"🔍 DEBUG ETAPA - message_text: '{message_text}'")
+        logger.info(f"🔍 DEBUG ETAPA - text_field: '{text_field}'")
+        logger.info(f"🔍 DEBUG ETAPA - input_field: '{input_field}'")
+        logger.info(f"🔍 DEBUG ETAPA - response_field: '{response_field}'")
+        logger.info(f"🔍 DEBUG ETAPA - ALL DATA KEYS: {list(data.keys())}")
 
         if not horario_escolhido:
             # ETAPA 1: CONSULTAR DISPONIBILIDADE
