@@ -4,3 +4,5 @@ supabase>=1.0.3
 python-dotenv>=1.0.0
 requests>=2.28.2
 pydantic>=1.10.7
+pytz>=2023.3
+httpx>=0.24.0
