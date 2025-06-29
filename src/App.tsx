@@ -76,17 +76,23 @@ function App() {
               {/* Rota pública de rastreamento por QR Code */}
               <Route path="/track/:qrCode" element={<TrackingPage />} />
 
-              {/* Rotas acessíveis a todos os usuários autenticados */}
+              {/* Rota raiz - redireciona baseado no role */}
               <Route
                 path="/"
                 element={
-                  <AppLayout><Index /></AppLayout>
+                  <ProtectedRoute allowedRoles={['admin', 'technician', 'workshop']}>
+                    <AppLayout><Index /></AppLayout>
+                  </ProtectedRoute>
                 }
               />
+
+              {/* Dashboard para admin, técnicos e oficinas */}
               <Route
                 path="/dashboard"
                 element={
-                  <AppLayout><Dashboard /></AppLayout>
+                  <ProtectedRoute allowedRoles={['admin', 'technician', 'workshop']}>
+                    <AppLayout><Dashboard /></AppLayout>
+                  </ProtectedRoute>
                 }
               />
 

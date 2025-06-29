@@ -43,8 +43,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Se o usuário não tiver a role necessária, redireciona para a página especificada
+  // Se o usuário não tiver a role necessária, redireciona para a página apropriada
   if (user && !allowedRoles.includes(user.role as UserRole)) {
+    // Redirecionar clientes para o portal do cliente
+    if (user.role === 'client') {
+      return <Navigate to="/client/portal" state={{ from: location }} replace />;
+    }
+    // Outros usuários para o dashboard padrão
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
