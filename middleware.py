@@ -202,6 +202,7 @@ async def confirmar_agendamento_simples(data: dict, horario_escolhido: str):
         endereco = data.get("endereco", "").strip()
         equipamento = data.get("equipamento", "").strip()
         telefone = data.get("telefone", "").strip()
+        email = data.get("email", "").strip()  # ✅ EXTRAIR EMAIL
         problema = data.get("problema", "Não especificado").strip()
 
         # Processar horário escolhido
@@ -217,6 +218,7 @@ async def confirmar_agendamento_simples(data: dict, horario_escolhido: str):
         agendamento_data = {
             "nome": nome,
             "telefone": telefone,
+            "email": email,  # ✅ ADICIONADO EMAIL
             "endereco": endereco,
             "equipamento": equipamento,
             "problema": problema,
@@ -363,6 +365,7 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
         endereco = data.get("endereco", "").strip()
         equipamento = data.get("equipamento", "").strip()
         telefone = data.get("telefone", "").strip()
+        email = data.get("email", "").strip()  # ✅ EXTRAIR EMAIL
         problema = data.get("problema", "Não especificado").strip()
 
         # Extrair múltiplos equipamentos
@@ -419,6 +422,7 @@ async def confirmar_agendamento_v4(data: dict, horario_escolhido: str):
         agendamento_data = {
             "nome": nome,
             "telefone": telefone,
+            "email": email,  # ✅ ADICIONADO EMAIL
             "endereco": endereco,
             "equipamento": equipamento,
             "problema": problema,
