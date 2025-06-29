@@ -1586,27 +1586,17 @@ async def consultar_disponibilidade_interna(data: dict):
             if problema:
                 problemas.append(problema)
 
-        # Validar dados obrigatórios
-        if not nome:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Nome é obrigatório"}
-            )
-        if not endereco:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Endereço é obrigatório"}
-            )
-        if not telefone:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Telefone é obrigatório"}
-            )
-        if not equipamentos:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Pelo menos um equipamento deve ser informado"}
-            )
+        # ETAPA 1: Validação flexível - dados podem estar vazios (placeholders filtrados)
+        # Na ETAPA 1, geramos horários genéricos. Dados reais virão na ETAPA 2.
+        logger.info(f"🔍 ETAPA 1 - Dados após filtro: nome='{nome}', endereco='{endereco}', telefone='{telefone}', equipamentos={len(equipamentos)}")
+
+        # Se todos os dados estão vazios (placeholders filtrados), usar dados padrão para gerar horários
+        if not nome and not endereco and not telefone and not equipamentos:
+            logger.info("🔍 ETAPA 1 - Todos os dados filtrados (placeholders), usando dados padrão para gerar horários")
+            nome = "Cliente"
+            endereco = "Balneário Camboriú, SC"  # Padrão para determinar grupo logístico
+            telefone = "48999999999"
+            equipamentos = [{"equipamento": "Equipamento", "tipo": "Não especificado"}]
         # Esta função é para consulta de disponibilidade, não para confirmação
         # Determinar técnico baseado no primeiro equipamento
         primeiro_equipamento = equipamentos[0]["equipamento"]
@@ -1615,14 +1605,12 @@ async def consultar_disponibilidade_interna(data: dict):
         # Determinar grupo logístico
         grupo_logistico = determinar_grupo_logistico(endereco)
 
-        # Determinar urgência
-        urgente = data.get("urgente", "não")
-        if isinstance(urgente, str):
-            urgente = urgente.lower() in ['sim', 'true', 'urgente', '1', 'yes']
-        elif isinstance(urgente, bool):
-            urgente = urgente
+        # Determinar urgência (filtrar placeholders)
+        urgente_str = filtrar_placeholders(data.get("urgente", "não"))
+        if urgente_str:
+            urgente = urgente_str.lower() in ['sim', 'true', 'urgente', '1', 'yes']
         else:
-            urgente = False
+            urgente = False  # Padrão quando placeholder filtrado
 
         # 🕐 ETAPA 1: Gerar horários fixos e consistentes
         logger.info(f"🕐 ETAPA 1: Gerando horários fixos para consistência")
