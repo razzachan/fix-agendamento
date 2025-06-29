@@ -1525,11 +1525,15 @@ async def agendamento_inteligente_completo(request: Request):
             logger.info(f"🔍 Detectado placeholder: {horario_escolhido} - tratando como ETAPA 1")
             horario_escolhido = ""
 
+        # 🔧 SOLUÇÃO: Detectar escolha na mensagem de texto também
+        message_text = data.get("message", "").strip()
+        if not horario_escolhido and message_text in ["1", "2", "3"]:
+            horario_escolhido = message_text
+            logger.info(f"🔧 DETECTADO horario_escolhido na mensagem: '{horario_escolhido}'")
+
         logger.info(f"🔍 DEBUG ETAPA - horario_escolhido RAW: '{data.get('horario_escolhido')}'")
-        logger.info(f"🔍 DEBUG ETAPA - horario_escolhido STRIP: '{horario_escolhido}'")
-        logger.info(f"🔍 DEBUG ETAPA - not horario_escolhido: {not horario_escolhido}")
-        logger.info(f"🔍 DEBUG ETAPA - bool(horario_escolhido): {bool(horario_escolhido)}")
-        logger.info(f"🔍 DEBUG ETAPA - len(horario_escolhido): {len(horario_escolhido)}")
+        logger.info(f"🔍 DEBUG ETAPA - horario_escolhido FINAL: '{horario_escolhido}'")
+        logger.info(f"🔍 DEBUG ETAPA - message_text: '{message_text}'")
 
         if not horario_escolhido:
             # ETAPA 1: CONSULTAR DISPONIBILIDADE
