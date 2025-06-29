@@ -838,9 +838,11 @@ async def criar_ou_buscar_cliente(supabase, agendamento_data):
             return None
 
         # Usar email do agendamento ou gerar um padrão
-        email_cliente = agendamento_data.get("email")
-        if not email_cliente or email_cliente.strip() == "":
+        email_cliente = agendamento_data.get("email", "").strip()
+        if not email_cliente:
             email_cliente = f"{nome.lower().replace(' ', '.')}@cliente.com"
+
+        logger.info(f"📧 Email do agendamento: '{agendamento_data.get('email')}' → Email final: '{email_cliente}'")
 
         dados_cliente = {
             "name": nome,
