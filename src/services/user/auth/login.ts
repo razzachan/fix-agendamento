@@ -410,6 +410,16 @@ export async function login(email: string, password: string): Promise<User | nul
       role: user.role
     });
 
+    // Limpar cache antigo se necessário
+    if (email === 'admin@fixfogoes.com.br' && user.role !== 'admin') {
+      console.log('🚨 [Login] Role incorreto detectado para admin, limpando cache...');
+      localStorage.clear();
+      sessionStorage.clear();
+      // Forçar reload da página
+      window.location.reload();
+      return null;
+    }
+
     // Salvar sessão no localStorage
     saveUserSession(user);
 
