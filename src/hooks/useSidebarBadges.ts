@@ -220,27 +220,12 @@ export function useSidebarBadges(): SidebarBadgeStats {
   };
 
   /**
-   * Busca técnicos com atualizações pendentes
+   * Badge de técnicos - sem notificações
+   * A rota de técnicos é apenas para gerenciamento, não precisa de alertas
    */
   const fetchTechniciansBadge = async (badges: SidebarBadgeData) => {
-    try {
-      // Como a tabela technicians não tem coluna status, vamos contar técnicos com ordens ativas
-      const { count, error } = await supabase
-        .from('service_orders')
-        .select('technician_id', { count: 'exact', head: true })
-        .not('technician_id', 'is', null)
-        .in('status', ['scheduled', 'in_progress', 'on_the_way']);
-
-      if (error) {
-        console.warn('Erro ao buscar técnicos ocupados:', error);
-        badges.technicians = 0;
-      } else {
-        badges.technicians = count || 0;
-      }
-    } catch (error) {
-      console.error('Erro geral ao buscar técnicos:', error);
-      badges.technicians = 0;
-    }
+    // Sem notificações para a rota de técnicos
+    badges.technicians = 0;
   };
 
   /**
