@@ -181,8 +181,8 @@ class AgendamentosService {
 
       if (error) {
         console.error('Erro ao buscar agendamentos do Supabase:', error);
-        // Fallback para dados mock em caso de erro
-        return this.agendamentos;
+        // Retornar array vazio em caso de erro
+        return [];
       }
 
       if (data && data.length > 0) {
@@ -209,13 +209,13 @@ class AgendamentosService {
           cpf: item.cpf
         }));
       } else {
-        console.log('Nenhum agendamento encontrado no Supabase, usando dados mock');
-        return this.agendamentos;
+        console.log('Nenhum agendamento encontrado no Supabase');
+        return [];
       }
     } catch (error) {
       console.error('Erro ao buscar agendamentos:', error);
-      // Fallback para dados mock em caso de erro
-      return this.agendamentos;
+      // Retornar array vazio em caso de erro
+      return [];
     }
   }
 

@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { AgendamentoAI } from '@/services/agendamentos';
-import { sampleAgendamentos } from './utils/sampleData';
 
 interface UseSchedulesFiltersProps {
   agendamentos: AgendamentoAI[];
@@ -18,10 +17,8 @@ export const useSchedulesFilters = ({ agendamentos }: UseSchedulesFiltersProps) 
 
   // Apply filters
   useEffect(() => {
-    // Se não tiver agendamentos reais, use os dados de exemplo
-    let dataToFilter = agendamentos && agendamentos.length > 0
-      ? [...agendamentos]
-      : [...sampleAgendamentos];
+    // Usar apenas agendamentos reais do Supabase
+    let dataToFilter = agendamentos ? [...agendamentos] : [];
 
     let filtered = dataToFilter;
 
@@ -101,9 +98,7 @@ export const useSchedulesFilters = ({ agendamentos }: UseSchedulesFiltersProps) 
 
   // Get unique technicians from the agendamentos data
   const getTechnicians = () => {
-    const allAgendamentos = agendamentos && agendamentos.length > 0
-      ? agendamentos
-      : sampleAgendamentos;
+    const allAgendamentos = agendamentos || [];
 
     const technicians = new Set<string>();
     allAgendamentos.forEach(agendamento => {
