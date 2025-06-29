@@ -837,12 +837,19 @@ async def criar_ou_buscar_cliente(supabase, agendamento_data):
             logger.error("❌ Nome do cliente é obrigatório para criar novo cliente")
             return None
 
+        # Usar email do agendamento ou gerar um padrão
+        email_cliente = agendamento_data.get("email")
+        if not email_cliente or email_cliente.strip() == "":
+            email_cliente = f"{nome.lower().replace(' ', '.')}@cliente.com"
+
         dados_cliente = {
             "name": nome,
             "phone": telefone if telefone else None,
-            "email": agendamento_data.get("email") if agendamento_data.get("email") else f"{nome.lower().replace(' ', '.')}@cliente.com",
+            "email": email_cliente,
             "cpf_cnpj": cpf if cpf else None,
-            "address": agendamento_data.get("endereco") if agendamento_data.get("endereco") else None
+            "address": agendamento_data.get("endereco") if agendamento_data.get("endereco") else None,
+            "password": "123456",  # Senha padrão
+            "created_at": datetime.now().isoformat()
         }
 
         logger.info(f"👤 Criando novo cliente: {dados_cliente}")
