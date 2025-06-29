@@ -1241,35 +1241,19 @@ async def inserir_agendamento(agendamento: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"Erro ao inserir agendamento: {e}")
         return {"success": False, "error": str(e)}
 
-# Endpoint para receber agendamentos do Clientechat
+# Endpoint para receber agendamentos do Clientechat - REDIRECIONADO PARA COMPLETO
 @app.post("/agendamento-inteligente")
 async def agendamento_inteligente(request: Request):
+    """
+    Endpoint que redireciona para o sistema completo (pré-agendamento + OS)
+    """
     try:
         data = await request.json()
-        logger.info(f"Dados recebidos: {data}")
-        
-        # Validar dados
-        if not data.get("nome") or not data.get("endereco") or not data.get("equipamento"):
-            logger.error("Dados incompletos")
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Dados incompletos"}
-            )
-        
-        # Inserir agendamento
-        resultado = await inserir_agendamento(data)
-        
-        if resultado["success"]:
-            return JSONResponse(
-                status_code=200,
-                content={"success": True, "message": "Agendamento recebido com sucesso"}
-            )
-        else:
-            return JSONResponse(
-                status_code=500,
-                content={"success": False, "message": f"Erro ao processar agendamento: {resultado.get('error')}"}
-            )
-    
+        logger.info(f"🔄 REDIRECIONANDO para endpoint completo - Dados recebidos: {data}")
+
+        # Redirecionar para o endpoint completo que cria pré-agendamento + OS
+        return await agendamento_inteligente_completo(request)
+
     except Exception as e:
         logger.error(f"Erro ao processar requisição: {e}")
         return JSONResponse(
@@ -1281,6 +1265,35 @@ async def agendamento_inteligente(request: Request):
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+# Endpoint de DEBUG para ver dados do ClienteChat
+@app.post("/debug-clientechat")
+async def debug_clientechat(request: Request):
+    try:
+        data = await request.json()
+        logger.info(f"🐛 DEBUG - Dados brutos recebidos do ClienteChat:")
+        logger.info(f"🐛 DEBUG - Tipo: {type(data)}")
+        logger.info(f"🐛 DEBUG - Conteúdo: {data}")
+
+        # Verificar cada campo individualmente
+        for key, value in data.items():
+            logger.info(f"🐛 DEBUG - Campo '{key}': '{value}' (tipo: {type(value)})")
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": "Debug realizado com sucesso",
+                "dados_recebidos": data,
+                "total_campos": len(data)
+            }
+        )
+    except Exception as e:
+        logger.error(f"🐛 DEBUG - Erro: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"Erro no debug: {str(e)}"}
+        )
 
 # Endpoint para listar agendamentos
 @app.get("/api/agendamentos")
