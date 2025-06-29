@@ -35,11 +35,11 @@ def gerar_horarios_fixos_consistentes(urgente: bool = False) -> List[Dict]:
         # Para urgente, começar amanhã. Para normal, começar em 2 dias
         inicio = agora + timedelta(days=1 if urgente else 2)
 
-        # Sempre gerar os mesmos 3 horários: 09:00, 14:00, 16:00
+        # Sempre gerar os mesmos 3 horários: 09:00-10:00, 14:00-15:00, 16:00-17:00
         horarios_fixos = [
-            {"hora": 9, "texto": "09:00"},
-            {"hora": 14, "texto": "14:00"},
-            {"hora": 16, "texto": "16:00"}
+            {"hora_inicio": 9, "hora_fim": 10, "texto_hora": "9h e 10h"},
+            {"hora_inicio": 14, "hora_fim": 15, "texto_hora": "14h e 15h"},
+            {"hora_inicio": 16, "hora_fim": 17, "texto_hora": "16h e 17h"}
         ]
 
         horarios = []
@@ -52,18 +52,32 @@ def gerar_horarios_fixos_consistentes(urgente: bool = False) -> List[Dict]:
         # Gerar os 3 horários fixos
         for i, horario_info in enumerate(horarios_fixos, 1):
             horario_dt = data_atual.replace(
-                hour=horario_info["hora"],
+                hour=horario_info["hora_inicio"],
                 minute=0,
                 second=0,
                 microsecond=0
             )
 
+            # Formatar data por extenso
+            dias_semana = {
+                'Monday': 'Segunda-feira',
+                'Tuesday': 'Terça-feira',
+                'Wednesday': 'Quarta-feira',
+                'Thursday': 'Quinta-feira',
+                'Friday': 'Sexta-feira',
+                'Saturday': 'Sábado',
+                'Sunday': 'Domingo'
+            }
+
+            dia_semana_pt = dias_semana.get(horario_dt.strftime('%A'), horario_dt.strftime('%A'))
+            data_formatada = f"{dia_semana_pt}, {horario_dt.strftime('%d/%m/%Y')}"
+
             horarios.append({
                 "numero": i,
-                "texto": f"{horario_dt.strftime('%d/%m')} às {horario_info['texto']}",
+                "texto": f"Previsão de chegada entre {horario_info['texto_hora']} - {data_formatada}",
                 "datetime_agendamento": horario_dt.isoformat(),
-                "dia_semana": horario_dt.strftime("%A, %d/%m/%Y"),
-                "hora_agendamento": horario_info["texto"]
+                "dia_semana": data_formatada,
+                "hora_agendamento": f"{horario_info['hora_inicio']:02d}:00"
             })
 
         logger.info(f"✅ Horários fixos gerados: {[h['texto'] for h in horarios]}")
