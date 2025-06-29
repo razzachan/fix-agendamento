@@ -1241,18 +1241,37 @@ async def inserir_agendamento(agendamento: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"Erro ao inserir agendamento: {e}")
         return {"success": False, "error": str(e)}
 
-# Endpoint para receber agendamentos do Clientechat - REDIRECIONADO PARA COMPLETO
+# Endpoint para receber agendamentos do Clientechat - VERSÃO ORIGINAL RESTAURADA
 @app.post("/agendamento-inteligente")
 async def agendamento_inteligente(request: Request):
     """
-    Endpoint que redireciona para o sistema completo (pré-agendamento + OS)
+    Endpoint original que funciona com ClienteChat - só cria pré-agendamento
     """
     try:
         data = await request.json()
-        logger.info(f"🔄 REDIRECIONANDO para endpoint completo - Dados recebidos: {data}")
+        logger.info(f"Dados recebidos: {data}")
 
-        # Redirecionar para o endpoint completo que cria pré-agendamento + OS
-        return await agendamento_inteligente_completo(request)
+        # Validar dados
+        if not data.get("nome") or not data.get("endereco") or not data.get("equipamento"):
+            logger.error("Dados incompletos")
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Dados incompletos"}
+            )
+
+        # Inserir agendamento (versão original que funcionava)
+        resultado = await inserir_agendamento(data)
+
+        if resultado["success"]:
+            return JSONResponse(
+                status_code=200,
+                content={"success": True, "message": "Agendamento recebido com sucesso"}
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "message": f"Erro ao processar agendamento: {resultado.get('error')}"}
+            )
 
     except Exception as e:
         logger.error(f"Erro ao processar requisição: {e}")
