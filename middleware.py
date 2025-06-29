@@ -825,10 +825,24 @@ async def criar_ou_buscar_cliente(supabase, agendamento_data):
         # Tentar buscar por telefone
         if telefone and len(telefone) >= 10:
             try:
-                response = supabase.table("clients").select("id").eq("phone", telefone).execute()
+                response = supabase.table("clients").select("id, email").eq("phone", telefone).execute()
                 if response.data:
+                    cliente_existente = response.data[0]
+                    cliente_id = cliente_existente["id"]
+                    email_existente = cliente_existente.get("email", "")
+
+                    # Verificar se precisa atualizar o email
+                    email_novo = agendamento_data.get("email", "").strip()
+                    if email_novo and email_novo != email_existente:
+                        logger.info(f"📧 Atualizando email do cliente: '{email_existente}' → '{email_novo}'")
+                        try:
+                            supabase.table("clients").update({"email": email_novo}).eq("id", cliente_id).execute()
+                            logger.info(f"✅ Email atualizado com sucesso!")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro ao atualizar email: {e}")
+
                     logger.info(f"👤 Cliente encontrado por telefone: {telefone}")
-                    return response.data[0]["id"]
+                    return cliente_id
             except Exception as e:
                 logger.warning(f"⚠️ Erro ao buscar por telefone: {e}")
 
