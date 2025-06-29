@@ -584,6 +584,9 @@ async def criar_os_individual(supabase, agendamento_data, agendamento_id, client
         except:
             valor_float = 0.0
 
+        # Determinar técnico automaticamente
+        tecnico_info = await determinar_tecnico_automatico(supabase, equipamento, agendamento_data["endereco"])
+
         # Dados da OS (usando exatamente os mesmos campos que funcionam)
         dados_os = {
             "client_name": agendamento_data["nome"],
@@ -601,7 +604,8 @@ async def criar_os_individual(supabase, agendamento_data, agendamento_id, client
             "final_cost": valor_float,
             "order_number": order_number,
             "notes": f"Criado automaticamente - Agendamento {agendamento_id} - Equipamento {numero_equipamento}",
-            "technician_id": None
+            "technician_id": tecnico_info["id"],
+            "technician_name": tecnico_info["name"]
         }
 
         logger.info(f"📝 Equipamento {numero_equipamento}: {equipamento} ({tipo_atendimento}) - R$ {valor_float}")
@@ -691,6 +695,111 @@ async def criar_ordens_servico_automaticamente(supabase, agendamento_data, agend
     except Exception as e:
         logger.error(f"❌ Erro ao criar ordens de serviço automaticamente: {e}")
         return []
+
+async def determinar_tecnico_automatico(supabase, equipamento, endereco):
+    """
+    Determina o técnico mais adequado baseado no equipamento e localização
+    Replica a lógica inteligente do sistema Fix Fogões
+    """
+    try:
+        # Buscar todos os técnicos ativos
+        response = supabase.table("technicians").select("id, name, email, phone, specialties").eq("is_active", True).execute()
+
+        if not response.data:
+            logger.warning("⚠️ Nenhum técnico ativo encontrado, usando fallback")
+            return {
+                "id": None,
+                "name": "Técnico Disponível",
+                "email": "contato@fixfogoes.com.br",
+                "score": 0
+            }
+
+        tecnicos = response.data
+        logger.info(f"🔍 Encontrados {len(tecnicos)} técnicos ativos")
+
+        # Lógica de scoring para cada técnico
+        melhor_tecnico = None
+        melhor_score = -1
+
+        equipamento_lower = equipamento.lower()
+
+        for tecnico in tecnicos:
+            score = 0
+            motivos = []
+
+            # SCORE POR ESPECIALIDADE
+            if tecnico.get("specialties"):
+                for especialidade in tecnico["specialties"]:
+                    especialidade_lower = especialidade.lower()
+
+                    # Coifas - Marcelo é especialista
+                    if "coifa" in equipamento_lower and "coifa" in especialidade_lower:
+                        score += 50
+                        motivos.append("Especialista em coifas")
+
+                    # Equipamentos à gás - Paulo Cesar é especialista
+                    elif any(termo in equipamento_lower for termo in ["fogão", "forno", "cooktop"]) and "gás" in especialidade_lower:
+                        score += 50
+                        motivos.append("Especialista em equipamentos à gás")
+
+                    # Outros equipamentos
+                    elif any(termo in equipamento_lower for termo in ["geladeira", "freezer"]) and "refrigeração" in especialidade_lower:
+                        score += 40
+                        motivos.append("Especialista em refrigeração")
+
+                    elif any(termo in equipamento_lower for termo in ["máquina", "lavar", "secar"]) and "máquina" in especialidade_lower:
+                        score += 40
+                        motivos.append("Especialista em máquinas")
+
+                    # Bonus genérico para qualquer especialidade relacionada
+                    elif any(termo in especialidade_lower for termo in equipamento_lower.split()):
+                        score += 20
+                        motivos.append("Especialidade relacionada")
+
+            # SCORE BASE (todos os técnicos podem atender)
+            score += 10
+            motivos.append("Técnico ativo")
+
+            # BONUS POR NOME (baseado no sistema atual)
+            if tecnico["name"].lower() == "marcelo" and "coifa" in equipamento_lower:
+                score += 30
+                motivos.append("Técnico preferencial para coifas")
+            elif tecnico["name"].lower().startswith("paulo") and any(termo in equipamento_lower for termo in ["fogão", "forno", "cooktop"]):
+                score += 30
+                motivos.append("Técnico preferencial para equipamentos à gás")
+
+            logger.info(f"👤 {tecnico['name']}: {score} pontos - {', '.join(motivos)}")
+
+            # Verificar se é o melhor até agora
+            if score > melhor_score:
+                melhor_score = score
+                melhor_tecnico = tecnico
+
+        if melhor_tecnico:
+            logger.info(f"✅ Técnico selecionado: {melhor_tecnico['name']} (Score: {melhor_score})")
+            return {
+                "id": melhor_tecnico["id"],
+                "name": melhor_tecnico["name"],
+                "email": melhor_tecnico["email"],
+                "score": melhor_score
+            }
+        else:
+            logger.warning("⚠️ Nenhum técnico adequado encontrado")
+            return {
+                "id": None,
+                "name": "Técnico Disponível",
+                "email": "contato@fixfogoes.com.br",
+                "score": 0
+            }
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao determinar técnico: {e}")
+        return {
+            "id": None,
+            "name": "Técnico Disponível",
+            "email": "contato@fixfogoes.com.br",
+            "score": 0
+        }
 
 async def criar_ou_buscar_cliente(supabase, agendamento_data):
     """
