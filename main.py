@@ -1,7 +1,7 @@
 # main.py - Arquivo de entrada para o Railway
-# Importa e executa o middleware.py atualizado
+# Importa e executa o middleware_updated.py atualizado
 
-from middleware import app
+from middleware_updated import app
 import uvicorn
 import os
 
