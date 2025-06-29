@@ -894,12 +894,57 @@ async def criar_ou_buscar_cliente(supabase, agendamento_data):
                     "user_metadata": {
                         "name": nome,
                         "phone": telefone if telefone else None,
-                        "client_id": cliente_id
+                        "client_id": cliente_id,
+                        "role": "client"
                     }
                 })
 
                 if auth_response.user:
                     logger.info(f"✅ Usuário Auth criado: {email_cliente}")
+
+                    # Criar usuário na tabela public.users
+                    try:
+                        user_data = {
+                            "id": auth_response.user.id,
+                            "name": nome,
+                            "email": email_cliente,
+                            "role": "client",
+                            "phone": telefone if telefone else None,
+                            "address": agendamento_data.get("endereco"),
+                            "password": "123456"
+                        }
+
+                        user_response = supabase.table("users").insert(user_data).execute()
+
+                        if user_response.data:
+                            logger.info(f"✅ Usuário criado na tabela users: {email_cliente}")
+                        else:
+                            logger.warning(f"⚠️ Falha ao criar usuário na tabela users")
+
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro ao criar usuário na tabela users: {e}")
+
+                    # Criar perfil na tabela profiles
+                    try:
+                        profile_data = {
+                            "id": auth_response.user.id,
+                            "name": nome,
+                            "email": email_cliente,
+                            "role": "client",
+                            "phone": telefone if telefone else None,
+                            "address": agendamento_data.get("endereco")
+                        }
+
+                        profile_response = supabase.table("profiles").insert(profile_data).execute()
+
+                        if profile_response.data:
+                            logger.info(f"✅ Perfil criado na tabela profiles: {email_cliente}")
+                        else:
+                            logger.warning(f"⚠️ Falha ao criar perfil na tabela profiles")
+
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro ao criar perfil na tabela profiles: {e}")
+
                 else:
                     logger.warning(f"⚠️ Falha ao criar usuário Auth para {email_cliente}")
 
