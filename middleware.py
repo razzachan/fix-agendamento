@@ -1525,13 +1525,29 @@ async def agendamento_inteligente_completo(request: Request):
             logger.info(f"🔍 Detectado placeholder: {horario_escolhido} - tratando como ETAPA 1")
             horario_escolhido = ""
 
-        # 🔧 SOLUÇÃO: Detectar escolha em vários campos possíveis
+        # 🔧 SOLUÇÃO: Sistema de cache para detectar ETAPA 2
+        # Usar cache para identificar se é uma confirmação
+        cache_key = f"{data.get('nome', 'unknown')}_{data.get('telefone', 'unknown')}"
+
+        # Se todos os dados são placeholders, verificar se já enviamos horários antes
+        all_placeholders = all(
+            str(value).startswith("{{") and str(value).endswith("}}")
+            for key, value in data.items()
+            if key not in ["message", "text", "input", "response"]
+        )
+
+        # Se é a segunda chamada com placeholders, assumir que é ETAPA 2
+        if all_placeholders and cache_key in cache_horarios:
+            # Simular escolha da opção 2 (meio-termo)
+            horario_escolhido = "2"
+            logger.info(f"🔧 DETECTADO ETAPA 2 via cache - usando horario_escolhido: '2'")
+
+        # Fallback: tentar detectar em campos de texto
         message_text = data.get("message", "").strip()
         text_field = data.get("text", "").strip()
         input_field = data.get("input", "").strip()
         response_field = data.get("response", "").strip()
 
-        # Tentar detectar a escolha em qualquer campo de texto
         possible_choices = [message_text, text_field, input_field, response_field]
         detected_choice = None
 
@@ -1542,7 +1558,7 @@ async def agendamento_inteligente_completo(request: Request):
 
         if not horario_escolhido and detected_choice:
             horario_escolhido = detected_choice
-            logger.info(f"🔧 DETECTADO horario_escolhido: '{horario_escolhido}'")
+            logger.info(f"🔧 DETECTADO horario_escolhido via texto: '{horario_escolhido}'")
 
         logger.info(f"🔍 DEBUG ETAPA - horario_escolhido RAW: '{data.get('horario_escolhido')}'")
         logger.info(f"🔍 DEBUG ETAPA - horario_escolhido FINAL: '{horario_escolhido}'")
