@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Teste Múltiplos Equipamentos</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 { color: #e5b034; text-align: center; margin-bottom: 30px; }
+        h3 { color: #333; border-bottom: 2px solid #e5b034; padding-bottom: 10px; }
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 5px solid #e5b034;
+        }
+        button {
+            background: linear-gradient(45deg, #e5b034, #f4c430);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(229, 176, 52, 0.4);
+        }
+        .resultado {
+            background: #f1f3f4;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #ddd;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status-200 { border-left: 5px solid #28a745; }
+        .status-error { border-left: 5px solid #dc3545; }
+        .dados-enviados { background: #e3f2fd; }
+        .resposta-recebida { background: #f3e5f5; }
+        .timestamp { color: #666; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste Múltiplos Equipamentos - Sistema V4.0</h1>
+        
+        <div class="test-section">
+            <h3>🎯 CENÁRIO 1: Cliente com 2 Equipamentos (Tipos Diferentes)</h3>
+            <p><strong>Situação:</strong> Fogão com problema desconhecido + Forno que precisa trocar resistência</p>
+            <button onclick="testarCenario1Etapa1()">🚀 ETAPA 1: Consultar Horários</button>
+            <button onclick="testarCenario1Etapa2()">✅ ETAPA 2: Confirmar (Opção 2)</button>
+            <div id="resultado-cenario1" class="resultado"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 CENÁRIO 2: Cliente com 3 Equipamentos (Todos Tipos)</h3>
+            <p><strong>Situação:</strong> Fogão (diagnóstico) + Forno (conserto) + Cooktop (domicílio)</p>
+            <button onclick="testarCenario2Etapa1()">🚀 ETAPA 1: Consultar Horários</button>
+            <button onclick="testarCenario2Etapa2()">✅ ETAPA 2: Confirmar (Opção 1)</button>
+            <div id="resultado-cenario2" class="resultado"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 CENÁRIO 3: Cliente Novo (Verificar Criação no Banco)</h3>
+            <p><strong>Situação:</strong> Cliente completamente novo para testar criação automática</p>
+            <button onclick="testarCenario3Etapa1()">🚀 ETAPA 1: Consultar Horários</button>
+            <button onclick="testarCenario3Etapa2()">✅ ETAPA 2: Confirmar (Opção 3)</button>
+            <div id="resultado-cenario3" class="resultado"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 CENÁRIO 4: TESTE CRIAÇÃO DE OS (Novo Cliente)</h3>
+            <p><strong>Situação:</strong> Teste específico para verificar criação automática de OS</p>
+            <button onclick="testarCenario4Etapa2()">🚀 TESTE DIRETO: Criar OS Automaticamente</button>
+            <div id="resultado-cenario4" class="resultado"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 CENÁRIO 5: TESTE ATRIBUIÇÃO TÉCNICOS ESPECÍFICOS</h3>
+            <p><strong>Situação:</strong> Coifa (Marcelo) + Fogão (Paulo Cesar)</p>
+            <button onclick="testarCenario5Etapa2()">🚀 TESTE TÉCNICOS: Coifa + Fogão</button>
+            <div id="resultado-cenario5" class="resultado"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 CENÁRIO 6: TESTE CRIAÇÃO CLIENTE COMPLETA</h3>
+            <p><strong>Situação:</strong> Verificar email correto + senha 123456</p>
+            <button onclick="testarCenario6Etapa2()">🚀 TESTE CLIENTE: Email + Senha</button>
+            <div id="resultado-cenario6" class="resultado"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 CENÁRIO 7: TESTE ATUALIZAÇÃO EMAIL EXISTENTE</h3>
+            <p><strong>Situação:</strong> Usar telefone existente para testar atualização</p>
+            <button onclick="testarCenario7Etapa2()">🚀 TESTE ATUALIZAÇÃO: Email Existente</button>
+            <div id="resultado-cenario7" class="resultado"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 CENÁRIO 8: TESTE DEBUG EMAIL</h3>
+            <p><strong>Situação:</strong> Teste simples para debug de email</p>
+            <button onclick="testarCenario8Etapa2()">🚀 TESTE DEBUG: Email Simples</button>
+            <div id="resultado-cenario8" class="resultado"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 CENÁRIO 9: TESTE CRIAÇÃO AUTH SUPABASE</h3>
+            <p><strong>Situação:</strong> Verificar se usuário Auth é criado automaticamente</p>
+            <button onclick="testarCenario9Etapa2()">🚀 TESTE AUTH: Novo Cliente + Login</button>
+            <div id="resultado-cenario9" class="resultado"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://fix-agendamento-production.up.railway.app/agendamento-inteligente';
+
+        function getTimestamp() {
+            return new Date().toLocaleTimeString('pt-BR');
+        }
+
+        async function fazerRequisicao(dados, elementoId, etapa) {
+            const elemento = document.getElementById(elementoId);
+            
+            try {
+                elemento.innerHTML += `\n[${getTimestamp()}] 🚀 Iniciando ${etapa}...\n`;
+                elemento.innerHTML += `📤 DADOS ENVIADOS:\n${JSON.stringify(dados, null, 2)}\n`;
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dados)
+                });
+
+                const resultado = await response.json();
+                
+                elemento.innerHTML += `\n[${getTimestamp()}] 📡 Status: ${response.status}\n`;
+                elemento.innerHTML += `📥 RESPOSTA RECEBIDA:\n${JSON.stringify(resultado, null, 2)}\n`;
+                elemento.className = `resultado ${response.ok ? 'status-200' : 'status-error'}`;
+                
+                if (resultado.sucesso) {
+                    elemento.innerHTML += `\n✅ ${etapa} executada com SUCESSO!\n`;
+                } else {
+                    elemento.innerHTML += `\n❌ ${etapa} FALHOU: ${resultado.mensagem}\n`;
+                }
+                
+            } catch (error) {
+                elemento.innerHTML += `\n[${getTimestamp()}] ❌ ERRO: ${error.message}\n`;
+                elemento.className = 'resultado status-error';
+            }
+            
+            elemento.scrollTop = elemento.scrollHeight;
+        }
+
+        // CENÁRIO 1: 2 Equipamentos com tipos diferentes
+        async function testarCenario1Etapa1() {
+            const dados = {
+                "cpf": "111.222.333-44",
+                "nome": "Maria Silva",
+                "email": "maria.silva@email.com",
+                "urgente": "não",
+                "endereco": "Rua das Palmeiras, 456, Centro, Florianópolis, SC",
+                "telefone": "48999887766",
+                
+                "equipamento": "fogão",
+                "problema": "não está funcionando direito, não sei o que é",
+                "tipo_atendimento_1": "coleta_diagnostico",
+                "valor_os_1": "350",
+                
+                "equipamento_2": "forno",
+                "problema_2": "precisa trocar a resistência",
+                "tipo_atendimento_2": "coleta_conserto", 
+                "valor_os_2": "120",
+                
+                "equipamento_3": "",
+                "problema_3": "",
+                "tipo_atendimento_3": "",
+                "valor_os_3": ""
+            };
+            
+            await fazerRequisicao(dados, 'resultado-cenario1', 'ETAPA 1 - CENÁRIO 1');
+        }
+
+        async function testarCenario1Etapa2() {
+            const dados = {
+                "cpf": "111.222.333-44",
+                "nome": "Maria Silva", 
+                "email": "maria.silva@email.com",
+                "urgente": "não",
+                "endereco": "Rua das Palmeiras, 456, Centro, Florianópolis, SC",
+                "telefone": "48999887766",
+                
+                "equipamento": "fogão",
+                "problema": "não está funcionando direito, não sei o que é",
+                "tipo_atendimento_1": "coleta_diagnostico",
+                "valor_os_1": "350",
+                
+                "equipamento_2": "forno",
+                "problema_2": "precisa trocar a resistência", 
+                "tipo_atendimento_2": "coleta_conserto",
+                "valor_os_2": "120",
+                
+                "equipamento_3": "",
+                "problema_3": "",
+                "tipo_atendimento_3": "",
+                "valor_os_3": "",
+                
+                "horario_escolhido": "2"
+            };
+            
+            await fazerRequisicao(dados, 'resultado-cenario1', 'ETAPA 2 - CENÁRIO 1');
+        }
+
+        // CENÁRIO 2: 3 Equipamentos (todos os tipos)
+        async function testarCenario2Etapa1() {
+            const dados = {
+                "cpf": "555.666.777-88",
+                "nome": "João Santos",
+                "email": "joao.santos@email.com", 
+                "urgente": "sim",
+                "endereco": "Av. Beira Mar, 789, Trindade, Florianópolis, SC",
+                "telefone": "48988776655",
+                
+                "equipamento": "fogão",
+                "problema": "deu defeito mas não sei o que é",
+                "tipo_atendimento_1": "coleta_diagnostico",
+                "valor_os_1": "350",
+                
+                "equipamento_2": "forno",
+                "problema_2": "sei que é o termostato",
+                "tipo_atendimento_2": "coleta_conserto",
+                "valor_os_2": "180",
+                
+                "equipamento_3": "cooktop",
+                "problema_3": "não pode sair de casa",
+                "tipo_atendimento_3": "em_domicilio", 
+                "valor_os_3": "100"
+            };
+            
+            await fazerRequisicao(dados, 'resultado-cenario2', 'ETAPA 1 - CENÁRIO 2');
+        }
+
+        async function testarCenario2Etapa2() {
+            const dados = {
+                "cpf": "555.666.777-88",
+                "nome": "João Santos",
+                "email": "joao.santos@email.com",
+                "urgente": "sim", 
+                "endereco": "Av. Beira Mar, 789, Trindade, Florianópolis, SC",
+                "telefone": "48988776655",
+                
+                "equipamento": "fogão",
+                "problema": "deu defeito mas não sei o que é",
+                "tipo_atendimento_1": "coleta_diagnostico",
+                "valor_os_1": "350",
+                
+                "equipamento_2": "forno",
+                "problema_2": "sei que é o termostato",
+                "tipo_atendimento_2": "coleta_conserto",
+                "valor_os_2": "180",
+                
+                "equipamento_3": "cooktop", 
+                "problema_3": "não pode sair de casa",
+                "tipo_atendimento_3": "em_domicilio",
+                "valor_os_3": "100",
+                
+                "horario_escolhido": "1"
+            };
+            
+            await fazerRequisicao(dados, 'resultado-cenario2', 'ETAPA 2 - CENÁRIO 2');
+        }
+
+        // CENÁRIO 4: Teste direto de criação de OS
+        async function testarCenario4Etapa2() {
+            const dados = {
+                "cpf": "555.444.333-22",
+                "nome": "Teste Técnicos Auto",
+                "email": "teste.tecnicos@email.com",
+                "urgente": "não",
+                "endereco": "Rua Técnicos, 333, Centro, Florianópolis, SC",
+                "telefone": "48955443322",
+
+                "equipamento": "coifa",
+                "problema": "não funciona",
+                "tipo_atendimento_1": "em_domicilio",
+                "valor_os_1": "200",
+
+                "equipamento_2": "fogão",
+                "problema_2": "não acende",
+                "tipo_atendimento_2": "coleta_conserto",
+                "valor_os_2": "150",
+
+                "equipamento_3": "",
+                "problema_3": "",
+                "tipo_atendimento_3": "",
+                "valor_os_3": "",
+
+                "horario_escolhido": "1"
+            };
+
+            await fazerRequisicao(dados, 'resultado-cenario4', 'TESTE ATRIBUIÇÃO TÉCNICOS - CENÁRIO 4');
+        }
+
+        // CENÁRIO 5: Teste técnicos específicos
+        async function testarCenario5Etapa2() {
+            const dados = {
+                "cpf": "999.888.777-66",
+                "nome": "Teste Especialistas",
+                "email": "teste.especialistas@email.com",
+                "urgente": "não",
+                "endereco": "Rua Especialistas, 444, Trindade, Florianópolis, SC",
+                "telefone": "48999887766",
+
+                "equipamento": "coifa",
+                "problema": "não aspira",
+                "tipo_atendimento_1": "em_domicilio",
+                "valor_os_1": "250",
+
+                "equipamento_2": "fogão",
+                "problema_2": "não acende",
+                "tipo_atendimento_2": "coleta_conserto",
+                "valor_os_2": "180",
+
+                "equipamento_3": "",
+                "problema_3": "",
+                "tipo_atendimento_3": "",
+                "valor_os_3": "",
+
+                "horario_escolhido": "2"
+            };
+
+            await fazerRequisicao(dados, 'resultado-cenario5', 'TESTE ESPECIALISTAS - CENÁRIO 5');
+        }
+
+        // CENÁRIO 6: Teste criação cliente completa
+        async function testarCenario6Etapa2() {
+            const dados = {
+                "cpf": "111.333.555-77",
+                "nome": "Cliente Email Senha",
+                "email": "email.atualizado.agora@teste.com",
+                "urgente": "não",
+                "endereco": "Rua Email Atualizado, 777, Kobrasol, São José, SC",
+                "telefone": "48911335577",
+
+                "equipamento": "aspirador",
+                "problema": "não aspira",
+                "tipo_atendimento_1": "coleta_conserto",
+                "valor_os_1": "200",
+
+                "equipamento_2": "",
+                "problema_2": "",
+                "tipo_atendimento_2": "",
+                "valor_os_2": "",
+
+                "equipamento_3": "",
+                "problema_3": "",
+                "tipo_atendimento_3": "",
+                "valor_os_3": "",
+
+                "horario_escolhido": "3"
+            };
+
+            await fazerRequisicao(dados, 'resultado-cenario6', 'TESTE ATUALIZAÇÃO EMAIL - CENÁRIO 6');
+        }
+
+        // CENÁRIO 7: Teste atualização email existente
+        async function testarCenario7Etapa2() {
+            const dados = {
+                "cpf": "111.333.555-77",
+                "nome": "Cliente Email Senha",
+                "email": "email.super.novo@teste.com",
+                "urgente": "não",
+                "endereco": "Rua Email Super Novo, 888, Kobrasol, São José, SC",
+                "telefone": "48911335577", // MESMO TELEFONE DO CLIENTE EXISTENTE
+
+                "equipamento": "ferro de passar",
+                "problema": "não esquenta",
+                "tipo_atendimento_1": "em_domicilio",
+                "valor_os_1": "80",
+
+                "equipamento_2": "",
+                "problema_2": "",
+                "tipo_atendimento_2": "",
+                "valor_os_2": "",
+
+                "equipamento_3": "",
+                "problema_3": "",
+                "tipo_atendimento_3": "",
+                "valor_os_3": "",
+
+                "horario_escolhido": "1"
+            };
+
+            await fazerRequisicao(dados, 'resultado-cenario7', 'TESTE ATUALIZAÇÃO EMAIL - CENÁRIO 7');
+        }
+
+        // CENÁRIO 8: Teste debug email
+        async function testarCenario8Etapa2() {
+            const dados = {
+                "cpf": "999.111.222-33",
+                "nome": "Debug Email Teste",
+                "email": "debug.email.teste@teste.com",
+                "urgente": "não",
+                "endereco": "Rua Debug, 999, Centro, Florianópolis, SC",
+                "telefone": "48999111222",
+
+                "equipamento": "cafeteira",
+                "problema": "não funciona",
+                "tipo_atendimento_1": "em_domicilio",
+                "valor_os_1": "100",
+
+                "equipamento_2": "",
+                "problema_2": "",
+                "tipo_atendimento_2": "",
+                "valor_os_2": "",
+
+                "equipamento_3": "",
+                "problema_3": "",
+                "tipo_atendimento_3": "",
+                "valor_os_3": "",
+
+                "horario_escolhido": "1"
+            };
+
+            await fazerRequisicao(dados, 'resultado-cenario8', 'TESTE DEBUG EMAIL - CENÁRIO 8');
+        }
+
+        // CENÁRIO 9: Teste criação Auth Supabase
+        async function testarCenario9Etapa2() {
+            const dados = {
+                "cpf": "555.999.888-77",
+                "nome": "Cliente Login Completo",
+                "email": "cliente.login.completo@teste.com",
+                "urgente": "não",
+                "endereco": "Av. Login Completo, 555, Ingleses, Florianópolis, SC",
+                "telefone": "48955999888",
+
+                "equipamento": "batedeira",
+                "problema": "não mistura",
+                "tipo_atendimento_1": "em_domicilio",
+                "valor_os_1": "90",
+
+                "equipamento_2": "",
+                "problema_2": "",
+                "tipo_atendimento_2": "",
+                "valor_os_2": "",
+
+                "equipamento_3": "",
+                "problema_3": "",
+                "tipo_atendimento_3": "",
+                "valor_os_3": "",
+
+                "horario_escolhido": "3"
+            };
+
+            await fazerRequisicao(dados, 'resultado-cenario9', 'TESTE LOGIN COMPLETO - CENÁRIO 9');
+        }
+
+        // CENÁRIO 3: Cliente novo
+        async function testarCenario3Etapa1() {
+            const dados = {
+                "cpf": "999.888.777-66",
+                "nome": "Ana Costa",
+                "email": "ana.costa@email.com",
+                "urgente": "não",
+                "endereco": "Rua Nova, 123, Kobrasol, São José, SC", 
+                "telefone": "48977665544",
+                
+                "equipamento": "fogão",
+                "problema": "não acende",
+                "tipo_atendimento_1": "em_domicilio",
+                "valor_os_1": "80",
+                
+                "equipamento_2": "",
+                "problema_2": "",
+                "tipo_atendimento_2": "",
+                "valor_os_2": "",
+                
+                "equipamento_3": "",
+                "problema_3": "",
+                "tipo_atendimento_3": "",
+                "valor_os_3": ""
+            };
+            
+            await fazerRequisicao(dados, 'resultado-cenario3', 'ETAPA 1 - CENÁRIO 3');
+        }
+
+        async function testarCenario3Etapa2() {
+            const dados = {
+                "cpf": "999.888.777-66",
+                "nome": "Ana Costa",
+                "email": "ana.costa@email.com",
+                "urgente": "não",
+                "endereco": "Rua Nova, 123, Kobrasol, São José, SC",
+                "telefone": "48977665544",
+                
+                "equipamento": "fogão",
+                "problema": "não acende",
+                "tipo_atendimento_1": "em_domicilio",
+                "valor_os_1": "80",
+                
+                "equipamento_2": "",
+                "problema_2": "",
+                "tipo_atendimento_2": "",
+                "valor_os_2": "",
+                
+                "equipamento_3": "",
+                "problema_3": "",
+                "tipo_atendimento_3": "",
+                "valor_os_3": "",
+                
+                "horario_escolhido": "3"
+            };
+            
+            await fazerRequisicao(dados, 'resultado-cenario3', 'ETAPA 2 - CENÁRIO 3');
+        }
+    </script>
+</body>
+</html>

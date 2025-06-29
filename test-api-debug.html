@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Debug API - Duas Etapas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #E5B034;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #d4a02a;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { border-color: #28a745; background: #d4edda; }
+        .error { border-color: #dc3545; background: #f8d7da; }
+        .info { border-color: #17a2b8; background: #d1ecf1; }
+        .json-key { color: #0066cc; }
+        .json-string { color: #009900; }
+        .json-number { color: #cc6600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug API - Sistema Duas Etapas</h1>
+        <p><strong>Objetivo:</strong> Entender por que a ETAPA 2 está falhando</p>
+
+        <div class="test-section">
+            <h3>🎯 ETAPA 1: Consulta (SEM horario_escolhido)</h3>
+            <button onclick="testarEtapa1()">🚀 Executar ETAPA 1</button>
+            <div id="resultado1" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 ETAPA 2: Confirmação (COM horario_escolhido = "2")</h3>
+            <button onclick="testarEtapa2()">🚀 Executar ETAPA 2</button>
+            <div id="resultado2" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 COMPARAÇÃO DOS DADOS</h3>
+            <button onclick="compararDados()">📊 Comparar Etapas</button>
+            <div id="comparacao" class="result" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://fix-agendamento-production.up.railway.app/agendamento-inteligente';
+        
+        let dadosEtapa1 = null;
+        let dadosEtapa2 = null;
+
+        // Dados base para os testes
+        const dadosBase = {
+            "cpf": "123.456.789-00",
+            "nome": "João Silva",
+            "email": "joao.silva@email.com",
+            "urgente": "não",
+            "endereco": "Rua das Flores, 123, Centro, Florianópolis, SC",
+            "problema": "não está acendendo",
+            "telefone": "48988332664",
+            "equipamento": "fogão",
+            "equipamento_2": "",
+            "equipamento_3": "",
+            "problema_2": "",
+            "problema_3": "",
+            "tipo_equipamento_1": "",
+            "tipo_equipamento_2": "",
+            "tipo_equipamento_3": ""
+        };
+
+        async function fazerRequisicao(dados, resultadoId) {
+            const resultadoDiv = document.getElementById(resultadoId);
+            resultadoDiv.style.display = 'block';
+            resultadoDiv.textContent = '⏳ Enviando requisição...';
+            resultadoDiv.className = 'result info';
+
+            try {
+                console.log('📤 Enviando dados:', dados);
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dados)
+                });
+                
+                const resultado = await response.json();
+                console.log('📥 Resposta recebida:', resultado);
+                
+                const timestamp = new Date().toLocaleTimeString();
+                const jsonFormatado = JSON.stringify(resultado, null, 2);
+                
+                resultadoDiv.innerHTML = `
+<strong>[${timestamp}] 📡 Status: ${response.status}</strong>
+
+📤 <strong>DADOS ENVIADOS:</strong>
+${JSON.stringify(dados, null, 2)}
+
+📥 <strong>RESPOSTA RECEBIDA:</strong>
+${jsonFormatado}
+                `;
+                
+                resultadoDiv.className = response.ok ? 'result success' : 'result error';
+                
+                return resultado;
+            } catch (error) {
+                console.error('❌ Erro:', error);
+                const timestamp = new Date().toLocaleTimeString();
+                resultadoDiv.textContent = `[${timestamp}] ❌ Erro: ${error.message}`;
+                resultadoDiv.className = 'result error';
+                return null;
+            }
+        }
+
+        async function testarEtapa1() {
+            console.log('🎯 Iniciando ETAPA 1');
+            dadosEtapa1 = await fazerRequisicao(dadosBase, 'resultado1');
+        }
+
+        async function testarEtapa2() {
+            console.log('🎯 Iniciando ETAPA 2');
+            const dadosEtapa2Request = {
+                ...dadosBase,
+                "horario_escolhido": "2"  // Escolha da opção 2
+            };
+            dadosEtapa2 = await fazerRequisicao(dadosEtapa2Request, 'resultado2');
+        }
+
+        function compararDados() {
+            const comparacaoDiv = document.getElementById('comparacao');
+            comparacaoDiv.style.display = 'block';
+            
+            if (!dadosEtapa1 || !dadosEtapa2) {
+                comparacaoDiv.textContent = '⚠️ Execute as ETAPAS 1 e 2 primeiro!';
+                comparacaoDiv.className = 'result error';
+                return;
+            }
+
+            const analise = `
+🔍 ANÁLISE COMPARATIVA:
+
+📊 ETAPA 1 (Consulta):
+- Sucesso: ${dadosEtapa1.sucesso || 'N/A'}
+- Horários retornados: ${dadosEtapa1.horarios_disponiveis ? dadosEtapa1.horarios_disponiveis.length : 0}
+- Action: ${dadosEtapa1.action || 'N/A'}
+
+📊 ETAPA 2 (Confirmação):
+- Sucesso: ${dadosEtapa2.sucesso || 'N/A'}
+- Mensagem: ${dadosEtapa2.mensagem || 'N/A'}
+
+🎯 HORÁRIOS DA ETAPA 1:
+${dadosEtapa1.horarios_disponiveis ? 
+  dadosEtapa1.horarios_disponiveis.map((h, i) => 
+    `${i+1}. ${h.texto} (${h.datetime_agendamento})`
+  ).join('\n') : 'Nenhum horário encontrado'}
+
+❓ PROBLEMA IDENTIFICADO:
+${dadosEtapa2.sucesso === false ? 
+  'A ETAPA 2 falhou. Possíveis causas:\n' +
+  '1. API está gerando horários diferentes na ETAPA 2\n' +
+  '2. Formato de horário incompatível\n' +
+  '3. Lógica de processamento da escolha com erro' :
+  'ETAPA 2 funcionou corretamente!'}
+            `;
+
+            comparacaoDiv.textContent = analise;
+            comparacaoDiv.className = 'result info';
+        }
+    </script>
+</body>
+</html>

@@ -19,7 +19,8 @@ import {
   Settings,
   Camera,
   Lock,
-  ChevronDown
+  ChevronDown,
+  RefreshCw
 } from 'lucide-react';
 import {
   DropdownMenu,
