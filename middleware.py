@@ -222,6 +222,22 @@ class AgendamentoInteligente(BaseModel):
     email: Optional[str] = None
     horario_escolhido: str  # "2025-06-28T14:00:00"
 
+# Função para filtrar placeholders do ClienteChat
+def filtrar_placeholders(valor: str) -> str:
+    """
+    Remove placeholders do ClienteChat ({{variavel}}) e retorna string limpa
+    """
+    if not valor or not isinstance(valor, str):
+        return ""
+
+    valor = valor.strip()
+
+    # Se é um placeholder, retornar string vazia
+    if valor.startswith("{{") and valor.endswith("}}"):
+        return ""
+
+    return valor
+
 # Função para obter cliente Supabase
 def get_supabase_client() -> Client:
     url = os.environ.get("SUPABASE_URL")
@@ -1504,6 +1520,11 @@ async def agendamento_inteligente_completo(request: Request):
         # DETECTAR QUAL ETAPA EXECUTAR
         horario_escolhido = data.get("horario_escolhido", "").strip()
 
+        # FILTRAR PLACEHOLDERS DO CLIENTECHAT
+        if horario_escolhido.startswith("{{") and horario_escolhido.endswith("}}"):
+            logger.info(f"🔍 Detectado placeholder: {horario_escolhido} - tratando como ETAPA 1")
+            horario_escolhido = ""
+
         logger.info(f"🔍 DEBUG ETAPA - horario_escolhido RAW: '{data.get('horario_escolhido')}'")
         logger.info(f"🔍 DEBUG ETAPA - horario_escolhido STRIP: '{horario_escolhido}'")
         logger.info(f"🔍 DEBUG ETAPA - not horario_escolhido: {not horario_escolhido}")
@@ -1535,21 +1556,21 @@ async def agendamento_inteligente_completo(request: Request):
 # Função interna para consulta de disponibilidade
 async def consultar_disponibilidade_interna(data: dict):
     try:
-        # Extrair dados básicos
-        endereco = data.get("endereco", "").strip()
-        nome = data.get("nome", "").strip()
-        telefone = data.get("telefone", "").strip()
-        cpf = data.get("cpf", "").strip()
-        email = data.get("email", "").strip()
+        # Extrair dados básicos e filtrar placeholders
+        endereco = filtrar_placeholders(data.get("endereco", ""))
+        nome = filtrar_placeholders(data.get("nome", ""))
+        telefone = filtrar_placeholders(data.get("telefone", ""))
+        cpf = filtrar_placeholders(data.get("cpf", ""))
+        email = filtrar_placeholders(data.get("email", ""))
 
-        # Consolidar equipamentos
+        # Consolidar equipamentos e filtrar placeholders
         equipamentos = []
         for i in range(1, 4):
             eq_key = "equipamento" if i == 1 else f"equipamento_{i}"
             tipo_key = f"tipo_equipamento_{i}"
 
-            equipamento = data.get(eq_key, "").strip()
-            tipo_equipamento = data.get(tipo_key, "").strip()
+            equipamento = filtrar_placeholders(data.get(eq_key, ""))
+            tipo_equipamento = filtrar_placeholders(data.get(tipo_key, ""))
 
             if equipamento:
                 equipamentos.append({
@@ -1557,11 +1578,11 @@ async def consultar_disponibilidade_interna(data: dict):
                     "tipo": tipo_equipamento or "Não especificado"
                 })
 
-        # Consolidar problemas
+        # Consolidar problemas e filtrar placeholders
         problemas = []
         for i in range(1, 4):
             prob_key = "problema" if i == 1 else f"problema_{i}"
-            problema = data.get(prob_key, "").strip()
+            problema = filtrar_placeholders(data.get(prob_key, ""))
             if problema:
                 problemas.append(problema)
 
@@ -1666,22 +1687,23 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         supabase = get_supabase_client()
         logger.info(f"✅ ETAPA 2: Supabase client criado com sucesso")
 
-        # Extrair dados básicos
-        endereco = data.get("endereco", "").strip()
-        nome = data.get("nome", "").strip()
-        telefone = data.get("telefone", "").strip()
-        cpf = data.get("cpf", "").strip()
-        email = data.get("email", "").strip()
-        urgente = data.get("urgente", "não").lower() in ['sim', 'true', 'urgente', '1', 'yes']
+        # Extrair dados básicos e filtrar placeholders
+        endereco = filtrar_placeholders(data.get("endereco", ""))
+        nome = filtrar_placeholders(data.get("nome", ""))
+        telefone = filtrar_placeholders(data.get("telefone", ""))
+        cpf = filtrar_placeholders(data.get("cpf", ""))
+        email = filtrar_placeholders(data.get("email", ""))
+        urgente_str = filtrar_placeholders(data.get("urgente", "não"))
+        urgente = urgente_str.lower() in ['sim', 'true', 'urgente', '1', 'yes'] if urgente_str else False
 
-        # Consolidar equipamentos
+        # Consolidar equipamentos e filtrar placeholders
         equipamentos = []
         for i in range(1, 4):
             eq_key = "equipamento" if i == 1 else f"equipamento_{i}"
             tipo_key = f"tipo_equipamento_{i}"
 
-            equipamento = data.get(eq_key, "").strip()
-            tipo_equipamento = data.get(tipo_key, "").strip()
+            equipamento = filtrar_placeholders(data.get(eq_key, ""))
+            tipo_equipamento = filtrar_placeholders(data.get(tipo_key, ""))
 
             if equipamento:
                 equipamentos.append({
@@ -1689,11 +1711,11 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
                     "tipo": tipo_equipamento or "Não especificado"
                 })
 
-        # Consolidar problemas
+        # Consolidar problemas e filtrar placeholders
         problemas = []
         for i in range(1, 4):
             prob_key = "problema" if i == 1 else f"problema_{i}"
-            problema = data.get(prob_key, "").strip()
+            problema = filtrar_placeholders(data.get(prob_key, ""))
             if problema:
                 problemas.append(problema)
 
