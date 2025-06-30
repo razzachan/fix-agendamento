@@ -1257,37 +1257,43 @@ async def inserir_agendamento(agendamento: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"Erro ao inserir agendamento: {e}")
         return {"success": False, "error": str(e)}
 
-# Endpoint para receber agendamentos do Clientechat - VERSÃO ORIGINAL RESTAURADA
+# Endpoint para receber agendamentos do Clientechat - SISTEMA DE 2 ETAPAS
 @app.post("/agendamento-inteligente")
 async def agendamento_inteligente(request: Request):
     """
-    Endpoint original que funciona com ClienteChat - só cria pré-agendamento
+    Sistema inteligente de 2 etapas:
+    ETAPA 1: Consultar horários (quando horario_escolhido é placeholder)
+    ETAPA 2: Confirmar agendamento (quando horario_escolhido é 1, 2 ou 3)
     """
     try:
         data = await request.json()
-        logger.info(f"Dados recebidos: {data}")
+        logger.info(f"Agendamento inteligente - dados recebidos: {data}")
 
-        # Validar dados
-        if not data.get("nome") or not data.get("endereco") or not data.get("equipamento"):
-            logger.error("Dados incompletos")
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Dados incompletos"}
-            )
+        # DETECTAR QUAL ETAPA EXECUTAR
+        horario_escolhido = data.get("horario_escolhido", "").strip()
 
-        # Inserir agendamento (versão original que funcionava)
-        resultado = await inserir_agendamento(data)
-
-        if resultado["success"]:
-            return JSONResponse(
-                status_code=200,
-                content={"success": True, "message": "Agendamento recebido com sucesso"}
-            )
+        # 🔧 SOLUÇÃO PARA 2 NEURAL CHAINS: Detectar se é placeholder ou valor real
+        if horario_escolhido.startswith("{{") and horario_escolhido.endswith("}}"):
+            logger.info(f"🔍 NEURAL CHAIN 1: Detectado placeholder {horario_escolhido} - consultando horários")
+            horario_escolhido = ""
+        elif horario_escolhido in ["1", "2", "3"]:
+            logger.info(f"🔍 NEURAL CHAIN 2: Detectado escolha {horario_escolhido} - confirmando agendamento")
         else:
-            return JSONResponse(
-                status_code=500,
-                content={"success": False, "message": f"Erro ao processar agendamento: {resultado.get('error')}"}
-            )
+            logger.info(f"🔍 NEURAL CHAIN 1: Sem horário escolhido - consultando horários")
+            horario_escolhido = ""
+
+        # 🔧 LOGS PARA DEBUG (remover após funcionar)
+        logger.info(f"🔍 horario_escolhido recebido: '{data.get('horario_escolhido')}'")
+        logger.info(f"🔍 horario_escolhido processado: '{horario_escolhido}'")
+
+        if not horario_escolhido:
+            # ETAPA 1: CONSULTAR DISPONIBILIDADE
+            logger.info("🚀 EXECUTANDO ETAPA 1: Consulta de disponibilidade")
+            return await consultar_disponibilidade_interna(data)
+        else:
+            # ETAPA 2: CONFIRMAR AGENDAMENTO
+            logger.info("🚀 EXECUTANDO ETAPA 2: Confirmação de agendamento")
+            return await confirmar_agendamento_final(data, horario_escolhido)
 
     except Exception as e:
         logger.error(f"Erro ao processar requisição: {e}")
