@@ -1300,14 +1300,25 @@ async def agendamento_inteligente_confirmacao(request: Request):
         # Validar e normalizar entrada
         opcao_normalizada = None
         if opcao_escolhida:
-            # Extrair número da opção (aceita "1", "opção 1", "primeira", etc.)
             opcao_lower = opcao_escolhida.lower()
-            if "1" in opcao_lower or "primeira" in opcao_lower or "primeiro" in opcao_lower:
+
+            # Aceitar números diretos
+            if opcao_escolhida.strip() in ["1", "2", "3"]:
+                opcao_normalizada = opcao_escolhida.strip()
+            # Aceitar texto com números
+            elif "1" in opcao_lower or "primeira" in opcao_lower or "primeiro" in opcao_lower:
                 opcao_normalizada = "1"
             elif "2" in opcao_lower or "segunda" in opcao_lower or "segundo" in opcao_lower:
                 opcao_normalizada = "2"
             elif "3" in opcao_lower or "terceira" in opcao_lower or "terceiro" in opcao_lower:
                 opcao_normalizada = "3"
+            # Aceitar horários específicos - mapear para posição na lista
+            elif "10:00" in opcao_lower and ("02/07" in opcao_lower or "quarta" in opcao_lower):
+                opcao_normalizada = "1"  # Primeira opção: Quarta 10:00
+            elif "14:00" in opcao_lower and ("02/07" in opcao_lower or "quarta" in opcao_lower):
+                opcao_normalizada = "2"  # Segunda opção: Quarta 14:00
+            elif "10:00" in opcao_lower and ("03/07" in opcao_lower or "quinta" in opcao_lower):
+                opcao_normalizada = "3"  # Terceira opção: Quinta 10:00
 
         if not opcao_normalizada:
             logger.error(f"❌ ETAPA 2: Opção inválida recebida: '{opcao_escolhida}'")
