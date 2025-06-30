@@ -149,33 +149,42 @@ async def estrategia_grupo_b(technician_id: str, technician_name: str, coordenad
 
 async def estrategia_grupo_c(technician_id: str, technician_name: str, coordenadas: Optional[Tuple[float, float]], endereco: str, urgente: bool, agora: datetime, supabase) -> List[Dict]:
     """
-    🏖️ GRUPO C - LITORAL/INTERIOR
-    ESTRATÉGIA: Agrupamento obrigatório no mesmo dia
-    - Verificar se já há agendamentos C no dia
-    - Se sim: sugerir horários próximos (otimização de rota)
-    - Se não: sugerir dias com potencial de agrupamento
-    - Tarde prioritária: 14h-17h (tempo para deslocamento)
+    🏖️ GRUPO C - ROTA SEQUENCIAL LITORAL
+    ESTRATÉGIA: Otimização por distanciamento sequencial
+
+    🗺️ ROTA REAL:
+    - MANHÃ: Tijucas (35km) → Itapema (55km)
+    - TARDE: BC (75km) → Itajaí (95km) → Navegantes (105km)
+
+    ⚡ REGRAS:
+    - Tijucas/Itapema: Priorizar manhã (8h-12h)
+    - BC/Itajaí/Navegantes: Priorizar tarde (13h-17h)
+    - Agrupar no mesmo dia quando possível
     """
-    logger.info("🏖️ Aplicando estratégia GRUPO C - Agrupamento inteligente")
+    logger.info("🏖️ Aplicando estratégia GRUPO C - Rota sequencial litoral")
 
-    # 1. VERIFICAR DIAS COM AGENDAMENTOS GRUPO C EXISTENTES
-    dias_com_grupo_c = await buscar_dias_com_agendamentos_grupo_c(agora, supabase)
-    logger.info(f"📅 Dias com agendamentos Grupo C: {len(dias_com_grupo_c)}")
+    # Determinar período ideal baseado na localização
+    periodo_ideal = determinar_periodo_ideal_por_rota(endereco)
+    logger.info(f"🗺️ Período ideal determinado: {periodo_ideal.upper()}")
 
-    # 2. VERIFICAR AGENDAMENTOS PRÓXIMOS GEOGRAFICAMENTE
-    agendamentos_proximos = await buscar_agendamentos_proximos_grupo_c(coordenadas, agora, supabase)
-    logger.info(f"📍 Agendamentos próximos encontrados: {len(agendamentos_proximos)}")
+    # 1. BUSCAR AGENDAMENTOS NA MESMA ROTA SEQUENCIAL
+    agendamentos_rota = await buscar_agendamentos_rota_sequencial(periodo_ideal, agora, supabase)
+    logger.info(f"🗺️ Agendamentos na rota {periodo_ideal}: {len(agendamentos_rota)}")
 
-    # 3. ESTRATÉGIA DE AGRUPAMENTO
-    if dias_com_grupo_c or agendamentos_proximos:
-        # CENÁRIO 1: Agrupar com agendamentos existentes
-        return await agrupar_com_agendamentos_existentes(
-            technician_id, technician_name, dias_com_grupo_c,
-            agendamentos_proximos, urgente, agora, supabase
+    # 2. ESTRATÉGIA BASEADA NO PERÍODO IDEAL
+    if periodo_ideal == "manha":
+        # MANHÃ: Tijucas + Itapema (próximos)
+        return await estrategia_rota_manha(
+            technician_id, technician_name, endereco, agendamentos_rota, urgente, agora, supabase
+        )
+    elif periodo_ideal == "tarde":
+        # TARDE: BC + Itajaí + Navegantes (distantes)
+        return await estrategia_rota_tarde(
+            technician_id, technician_name, endereco, agendamentos_rota, urgente, agora, supabase
         )
     else:
-        # CENÁRIO 2: Criar novo dia de agendamentos Grupo C
-        return await criar_novo_dia_grupo_c(
+        # QUALQUER: Usar estratégia flexível
+        return await estrategia_rota_flexivel(
             technician_id, technician_name, coordenadas, urgente, agora, supabase
         )
 
@@ -488,6 +497,45 @@ GROUP_A_RADIUS = 10  # Até 10km do centro
 GROUP_B_RADIUS = 25  # Entre 10km e 25km do centro
 # Grupo C: Acima de 25km do centro
 
+# 🗺️ ROTA SEQUENCIAL LITORAL - Ordem por distanciamento real
+ROTA_LITORAL_SEQUENCIAL = [
+    {"cidade": "Florianópolis", "distancia_km": 0, "grupo": "A", "periodo_ideal": "qualquer"},
+    {"cidade": "São José", "distancia_km": 8, "grupo": "A", "periodo_ideal": "qualquer"},
+    {"cidade": "Palhoça", "distancia_km": 12, "grupo": "A", "periodo_ideal": "qualquer"},
+    {"cidade": "Biguaçu", "distancia_km": 18, "grupo": "B", "periodo_ideal": "qualquer"},
+    {"cidade": "Tijucas", "distancia_km": 35, "grupo": "B", "periodo_ideal": "manha"},
+    {"cidade": "Itapema", "distancia_km": 55, "grupo": "C", "periodo_ideal": "manha"},
+    {"cidade": "Balneário Camboriú", "distancia_km": 75, "grupo": "C", "periodo_ideal": "tarde"},
+    {"cidade": "Itajaí", "distancia_km": 95, "grupo": "C", "periodo_ideal": "tarde"},
+    {"cidade": "Navegantes", "distancia_km": 105, "grupo": "C", "periodo_ideal": "tarde"}
+]
+
+# Mapeamento de CEPs para rota sequencial
+CEPS_ROTA_SEQUENCIAL = {
+    # Tijucas - MANHÃ (mais próximo)
+    "88200": {"cidade": "Tijucas", "distancia": 35, "grupo": "B", "periodo": "manha"},
+
+    # Itapema - MANHÃ (próximo)
+    "88220": {"cidade": "Itapema", "distancia": 55, "grupo": "C", "periodo": "manha"},
+
+    # Balneário Camboriú - TARDE (médio)
+    "88330": {"cidade": "Balneário Camboriú", "distancia": 75, "grupo": "C", "periodo": "tarde"},
+    "88337": {"cidade": "Balneário Camboriú", "distancia": 75, "grupo": "C", "periodo": "tarde"},
+    "88339": {"cidade": "Balneário Camboriú", "distancia": 75, "grupo": "C", "periodo": "tarde"},
+
+    # Itajaí - TARDE (distante)
+    "88300": {"cidade": "Itajaí", "distancia": 95, "grupo": "C", "periodo": "tarde"},
+    "88301": {"cidade": "Itajaí", "distancia": 95, "grupo": "C", "periodo": "tarde"},
+    "88302": {"cidade": "Itajaí", "distancia": 95, "grupo": "C", "periodo": "tarde"},
+    "88303": {"cidade": "Itajaí", "distancia": 95, "grupo": "C", "periodo": "tarde"},
+    "88304": {"cidade": "Itajaí", "distancia": 95, "grupo": "C", "periodo": "tarde"},
+    "88306": {"cidade": "Itajaí", "distancia": 95, "grupo": "C", "periodo": "tarde"},
+    "88307": {"cidade": "Itajaí", "distancia": 95, "grupo": "C", "periodo": "tarde"},
+
+    # Navegantes - TARDE (mais distante)
+    "88370": {"cidade": "Navegantes", "distancia": 105, "grupo": "C", "periodo": "tarde"}
+}
+
 # CEPs por grupo logístico
 CEPS_GRUPO_A = ['88000', '88010', '88015', '88020', '88025', '88030', '88035',
                 '88040', '88045', '88050', '88053', '88054', '88055', '88056', '88058', '88060']
@@ -765,6 +813,51 @@ async def geocodificar_endereco(endereco: str) -> Optional[Tuple[float, float]]:
     except Exception as e:
         logger.error(f"Erro na geocodificação: {e}")
         return None
+
+def determinar_periodo_ideal_por_rota(endereco: str) -> str:
+    """
+    🗺️ Determina período ideal baseado na rota sequencial litoral
+
+    ESTRATÉGIA:
+    - Tijucas, Itapema → MANHÃ (mais próximos, começar cedo)
+    - BC, Itajaí, Navegantes → TARDE (mais distantes, após almoço)
+    """
+    try:
+        endereco_lower = endereco.lower()
+
+        # Extrair CEP do endereço
+        cep = extract_cep_from_address(endereco)
+        if cep:
+            cep_prefix = cep.replace('-', '')[:5]
+            if cep_prefix in CEPS_ROTA_SEQUENCIAL:
+                periodo = CEPS_ROTA_SEQUENCIAL[cep_prefix]["periodo"]
+                cidade = CEPS_ROTA_SEQUENCIAL[cep_prefix]["cidade"]
+                logger.info(f"🗺️ Rota sequencial: {cidade} → Período ideal: {periodo.upper()}")
+                return periodo
+
+        # Análise textual como fallback
+        if any(cidade in endereco_lower for cidade in ['tijucas']):
+            logger.info("🗺️ Tijucas detectado → Período ideal: MANHÃ")
+            return "manha"
+        elif any(cidade in endereco_lower for cidade in ['itapema']):
+            logger.info("🗺️ Itapema detectado → Período ideal: MANHÃ")
+            return "manha"
+        elif any(cidade in endereco_lower for cidade in ['balneário camboriú', 'balneario camboriu', 'bc']):
+            logger.info("🗺️ Balneário Camboriú detectado → Período ideal: TARDE")
+            return "tarde"
+        elif any(cidade in endereco_lower for cidade in ['itajaí', 'itajai']):
+            logger.info("🗺️ Itajaí detectado → Período ideal: TARDE")
+            return "tarde"
+        elif any(cidade in endereco_lower for cidade in ['navegantes']):
+            logger.info("🗺️ Navegantes detectado → Período ideal: TARDE")
+            return "tarde"
+        else:
+            logger.info("🗺️ Cidade não identificada na rota sequencial → Período: QUALQUER")
+            return "qualquer"
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao determinar período ideal: {e}")
+        return "qualquer"
 
 def determine_logistics_group(endereco: str, coordinates: Optional[Tuple[float, float]] = None) -> str:
     """
@@ -1345,6 +1438,199 @@ async def analisar_carga_trabalho_por_grupo(data_inicio: datetime, dias: int) ->
     except Exception as e:
         logger.error(f"Erro ao analisar carga de trabalho: {e}")
         return {}
+
+async def buscar_agendamentos_rota_sequencial(periodo_ideal: str, agora: datetime, supabase) -> List[Dict]:
+    """
+    🗺️ Busca agendamentos na mesma rota sequencial (manhã ou tarde)
+    """
+    try:
+        data_inicio = agora.strftime('%Y-%m-%d')
+        data_fim = (agora + timedelta(days=15)).strftime('%Y-%m-%d')
+
+        # Definir cidades do período
+        if periodo_ideal == "manha":
+            cidades_periodo = ["Tijucas", "Itapema"]
+        elif periodo_ideal == "tarde":
+            cidades_periodo = ["Balneário Camboriú", "Itajaí", "Navegantes"]
+        else:
+            cidades_periodo = []
+
+        if not cidades_periodo:
+            return []
+
+        # Buscar agendamentos das cidades do período
+        agendamentos_periodo = []
+        for cidade in cidades_periodo:
+            response = supabase.table("agendamentos_ai").select("*").ilike(
+                "endereco", f"%{cidade}%"
+            ).gte(
+                "data_agendada", data_inicio
+            ).lte(
+                "data_agendada", data_fim
+            ).eq("status", "pendente").execute()
+
+            if response.data:
+                for ag in response.data:
+                    ag['cidade_detectada'] = cidade
+                    agendamentos_periodo.extend(response.data)
+
+        logger.info(f"🗺️ Encontrados {len(agendamentos_periodo)} agendamentos na rota {periodo_ideal}")
+        return agendamentos_periodo
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao buscar agendamentos da rota: {e}")
+        return []
+
+async def estrategia_rota_manha(
+    technician_id: str, technician_name: str, endereco: str,
+    agendamentos_rota: List[Dict], urgente: bool, agora: datetime, supabase
+) -> List[Dict]:
+    """
+    🌅 ESTRATÉGIA MANHÃ: Tijucas (35km) → Itapema (55km)
+    Horários: 8h-12h (começar cedo para otimizar deslocamento)
+    """
+    logger.info("🌅 Aplicando estratégia ROTA MANHÃ (Tijucas → Itapema)")
+
+    # Horários otimizados para manhã (rota sequencial)
+    horarios_manha = [
+        {"hora": 8, "texto": "8h e 9h", "score": 25},    # Muito cedo (ideal)
+        {"hora": 9, "texto": "9h e 10h", "score": 22},   # Cedo (ótimo)
+        {"hora": 10, "texto": "10h e 11h", "score": 20}, # Manhã (bom)
+        {"hora": 11, "texto": "11h e 12h", "score": 15}  # Final manhã (ok)
+    ]
+
+    return await processar_horarios_rota_sequencial(
+        technician_id, horarios_manha, agendamentos_rota,
+        "MANHÃ", endereco, urgente, agora, supabase
+    )
+
+async def estrategia_rota_tarde(
+    technician_id: str, technician_name: str, endereco: str,
+    agendamentos_rota: List[Dict], urgente: bool, agora: datetime, supabase
+) -> List[Dict]:
+    """
+    🌇 ESTRATÉGIA TARDE: BC (75km) → Itajaí (95km) → Navegantes (105km)
+    Horários: 13h-17h (após almoço, tempo para deslocamento longo)
+    """
+    logger.info("🌇 Aplicando estratégia ROTA TARDE (BC → Itajaí → Navegantes)")
+
+    # Horários otimizados para tarde (rota sequencial)
+    horarios_tarde = [
+        {"hora": 13, "texto": "13h e 14h", "score": 25}, # Pós-almoço (ideal)
+        {"hora": 14, "texto": "14h e 15h", "score": 22}, # Tarde cedo (ótimo)
+        {"hora": 15, "texto": "15h e 16h", "score": 20}, # Tarde (bom)
+        {"hora": 16, "texto": "16h e 17h", "score": 18}  # Final tarde (ok)
+    ]
+
+    return await processar_horarios_rota_sequencial(
+        technician_id, horarios_tarde, agendamentos_rota,
+        "TARDE", endereco, urgente, agora, supabase
+    )
+
+async def estrategia_rota_flexivel(
+    technician_id: str, technician_name: str, coordenadas: Optional[Tuple[float, float]],
+    urgente: bool, agora: datetime, supabase
+) -> List[Dict]:
+    """
+    🔄 ESTRATÉGIA FLEXÍVEL: Para cidades não mapeadas na rota sequencial
+    """
+    logger.info("🔄 Aplicando estratégia FLEXÍVEL (cidade não mapeada)")
+
+    # Horários balanceados
+    horarios_flexiveis = [
+        {"hora": 9, "texto": "9h e 10h", "score": 18},
+        {"hora": 14, "texto": "14h e 15h", "score": 20},
+        {"hora": 15, "texto": "15h e 16h", "score": 16}
+    ]
+
+    return await processar_horarios_rota_sequencial(
+        technician_id, horarios_flexiveis, [],
+        "FLEXÍVEL", "", urgente, agora, supabase
+    )
+
+async def processar_horarios_rota_sequencial(
+    technician_id: str, horarios_prioritarios: List[Dict], agendamentos_rota: List[Dict],
+    tipo_rota: str, endereco: str, urgente: bool, agora: datetime, supabase
+) -> List[Dict]:
+    """
+    🎯 Processa horários com otimização da rota sequencial
+    """
+    horarios_disponiveis = []
+    inicio = agora + timedelta(days=1 if urgente else 2)
+
+    # Agrupar agendamentos por data
+    agendamentos_por_data = {}
+    for ag in agendamentos_rota:
+        data_ag = ag['data_agendada'][:10]
+        if data_ag not in agendamentos_por_data:
+            agendamentos_por_data[data_ag] = []
+        agendamentos_por_data[data_ag].append(ag)
+
+    # Verificar próximos 10 dias úteis
+    for dia_offset in range(10):
+        data_verificacao = inicio + timedelta(days=dia_offset)
+
+        if data_verificacao.weekday() >= 5:  # Pular fins de semana
+            continue
+
+        data_str = data_verificacao.strftime('%Y-%m-%d')
+
+        # Bonus por agrupamento na mesma rota
+        bonus_agrupamento = len(agendamentos_por_data.get(data_str, [])) * 15
+
+        for horario_info in horarios_prioritarios:
+            if len(horarios_disponiveis) >= 3:
+                break
+
+            # Verificar disponibilidade do técnico
+            disponivel = await verificar_horario_tecnico_disponivel(
+                technician_id, data_str, horario_info["hora"]
+            )
+
+            if disponivel:
+                score_total = horario_info["score"] + bonus_agrupamento + (20 if urgente else 0)
+
+                # Criar horário otimizado
+                horario_dt = data_verificacao.replace(
+                    hour=horario_info["hora"], minute=0, second=0, microsecond=0
+                )
+
+                dias_semana = {
+                    'Monday': 'Segunda-feira', 'Tuesday': 'Terça-feira',
+                    'Wednesday': 'Quarta-feira', 'Thursday': 'Quinta-feira',
+                    'Friday': 'Sexta-feira'
+                }
+
+                dia_semana_pt = dias_semana.get(horario_dt.strftime('%A'), horario_dt.strftime('%A'))
+                data_formatada = f"{dia_semana_pt}, {horario_dt.strftime('%d/%m/%Y')}"
+
+                # Texto personalizado por rota
+                if bonus_agrupamento > 0:
+                    texto_rota = f"Previsão de chegada entre {horario_info['texto']} - {data_formatada} (Rota {tipo_rota} otimizada)"
+                else:
+                    texto_rota = f"Previsão de chegada entre {horario_info['texto']} - {data_formatada} (Rota {tipo_rota})"
+
+                horarios_disponiveis.append({
+                    "numero": len(horarios_disponiveis) + 1,
+                    "texto": texto_rota,
+                    "datetime_agendamento": horario_dt.isoformat(),
+                    "dia_semana": data_formatada,
+                    "hora_agendamento": f"{horario_info['hora']:02d}:00",
+                    "score_otimizacao": score_total,
+                    "grupo_logistico": "C",
+                    "tipo_rota": tipo_rota,
+                    "agendamentos_agrupados": len(agendamentos_por_data.get(data_str, []))
+                })
+
+                logger.info(f"✅ Rota {tipo_rota}: {data_formatada} {horario_info['hora']}h (Score: {score_total}, Agrupados: {len(agendamentos_por_data.get(data_str, []))})")
+
+        if len(horarios_disponiveis) >= 3:
+            break
+
+    # Ordenar por score (melhor otimização primeiro)
+    horarios_disponiveis.sort(key=lambda x: x.get("score_otimizacao", 0), reverse=True)
+
+    return horarios_disponiveis[:3]
 
 async def buscar_dias_com_agendamentos_grupo_c(agora: datetime, supabase) -> List[Dict]:
     """
