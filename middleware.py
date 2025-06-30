@@ -1520,13 +1520,7 @@ async def agendamento_inteligente_completo(request: Request):
         # DETECTAR QUAL ETAPA EXECUTAR
         horario_escolhido = data.get("horario_escolhido", "").strip()
 
-        # FILTRAR PLACEHOLDERS DO CLIENTECHAT
-        if horario_escolhido.startswith("{{") and horario_escolhido.endswith("}}"):
-            logger.info(f"🔍 Detectado placeholder: {horario_escolhido} - tratando como ETAPA 1")
-            horario_escolhido = ""
-
-        # 🔧 SOLUÇÃO: Detectar ETAPA 2 por contagem de chamadas
-        # Usar um cache simples baseado em timestamp para detectar chamadas consecutivas
+        # 🔧 SOLUÇÃO: Detectar ETAPA 2 por contagem de chamadas PRIMEIRO
         import time
         current_time = time.time()
 
@@ -1560,6 +1554,11 @@ async def agendamento_inteligente_completo(request: Request):
                 gerar_chave_cache.call_count = 1
 
             gerar_chave_cache.last_call_time = current_time
+
+        # FILTRAR PLACEHOLDERS DO CLIENTECHAT (só se não foi detectado como ETAPA 2)
+        if horario_escolhido.startswith("{{") and horario_escolhido.endswith("}}") and horario_escolhido != "2":
+            logger.info(f"🔍 Detectado placeholder: {horario_escolhido} - tratando como ETAPA 1")
+            horario_escolhido = ""
 
         # Fallback: tentar detectar em campos de texto
         message_text = data.get("message", "").strip()
