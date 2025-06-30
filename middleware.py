@@ -1355,6 +1355,18 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
         tecnico_sugerido = pre_agendamento.get("tecnico_sugerido", "Simão")
         urgente = pre_agendamento.get("urgente", False)
 
+        # Verificar se horarios_oferecidos é string (JSON) e converter
+        if isinstance(horarios_oferecidos, str):
+            import json
+            try:
+                horarios_oferecidos = json.loads(horarios_oferecidos)
+            except:
+                logger.error(f"❌ Erro ao parsear horarios_oferecidos: {horarios_oferecidos}")
+                horarios_oferecidos = []
+
+        logger.info(f"🔍 ETAPA 2: Horários oferecidos: {horarios_oferecidos}")
+        logger.info(f"🔍 ETAPA 2: Tipo: {type(horarios_oferecidos)}")
+
         # Validar opção escolhida
         opcao_index = int(opcao_escolhida) - 1
         if opcao_index < 0 or opcao_index >= len(horarios_oferecidos):
@@ -1364,8 +1376,16 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
             )
 
         horario_selecionado = horarios_oferecidos[opcao_index]
-        horario_escolhido = horario_selecionado.get('datetime_agendamento')
-        logger.info(f"✅ ETAPA 2: Horário escolhido: {horario_selecionado}")
+        logger.info(f"🔍 ETAPA 2: Horário selecionado: {horario_selecionado}")
+        logger.info(f"🔍 ETAPA 2: Tipo do horário selecionado: {type(horario_selecionado)}")
+
+        # Verificar se é dict ou string
+        if isinstance(horario_selecionado, dict):
+            horario_escolhido = horario_selecionado.get('datetime_agendamento')
+        else:
+            # Se for string, usar como está (fallback)
+            horario_escolhido = horario_selecionado
+
         logger.info(f"✅ ETAPA 2: Datetime agendamento: {horario_escolhido}")
 
         # Dados realistas para criação da OS (substituindo placeholders)
