@@ -1520,58 +1520,15 @@ async def agendamento_inteligente_completo(request: Request):
         # DETECTAR QUAL ETAPA EXECUTAR
         horario_escolhido = data.get("horario_escolhido", "").strip()
 
-        # 🔧 SOLUÇÃO: Detectar ETAPA 2 por contagem de chamadas PRIMEIRO
-        import time
-        current_time = time.time()
-
-        # Se todos os dados são placeholders, verificar se é chamada consecutiva
-        all_placeholders = all(
-            str(value).startswith("{{") and str(value).endswith("}}")
-            for key, value in data.items()
-            if key not in ["message", "text", "input", "response"]
-        )
-
-        logger.info(f"🔍 DEBUG - all_placeholders: {all_placeholders}")
-
-        # Cache global para detectar chamadas consecutivas
-        if not hasattr(gerar_chave_cache, 'last_call_time'):
-            gerar_chave_cache.last_call_time = 0
-            gerar_chave_cache.call_count = 0
-            logger.info(f"🔍 DEBUG - Inicializando cache: last_call_time=0, call_count=0")
-
-        logger.info(f"🔍 DEBUG - Cache atual: last_call_time={gerar_chave_cache.last_call_time}, call_count={gerar_chave_cache.call_count}")
-
-        # Se é uma chamada com placeholders e foi há menos de 30 segundos da anterior
-        if all_placeholders:
-            time_diff = current_time - gerar_chave_cache.last_call_time
-            logger.info(f"🔍 DEBUG - time_diff: {time_diff:.1f}s (limite: 30s)")
-
-            if time_diff < 30:  # Menos de 30 segundos
-                gerar_chave_cache.call_count += 1
-                logger.info(f"🔍 Chamada consecutiva #{gerar_chave_cache.call_count} em {time_diff:.1f}s")
-
-                # Se é a segunda chamada consecutiva, assumir ETAPA 2
-                if gerar_chave_cache.call_count >= 2:
-                    horario_escolhido = "2"
-                    logger.info(f"🔧 DETECTADO ETAPA 2 via chamadas consecutivas - usando horario_escolhido: '2'")
-                    # Reset contador
-                    gerar_chave_cache.call_count = 0
-            else:
-                # Reset se passou muito tempo
-                gerar_chave_cache.call_count = 1
-                logger.info(f"🔍 DEBUG - Reset contador para 1 (tempo > 30s)")
-
-            gerar_chave_cache.last_call_time = current_time
-            logger.info(f"🔍 DEBUG - Atualizando last_call_time para: {current_time}")
-        else:
-            logger.info(f"🔍 DEBUG - NÃO é all_placeholders, pulando lógica de detecção")
+        # 🔧 SOLUÇÃO SIMPLES: Sistema já funciona via resposta do cliente
 
         # FILTRAR PLACEHOLDERS DO CLIENTECHAT (só se não foi detectado como ETAPA 2)
         if horario_escolhido.startswith("{{") and horario_escolhido.endswith("}}") and horario_escolhido != "2":
             logger.info(f"🔍 Detectado placeholder: {horario_escolhido} - tratando como ETAPA 1")
             horario_escolhido = ""
 
-        # Fallback: tentar detectar em campos de texto
+        # 🔧 SOLUÇÃO DEFINITIVA: Detectar pela resposta do cliente
+        # Se todos os dados são placeholders, mas há uma resposta do cliente, é ETAPA 2
         message_text = data.get("message", "").strip()
         text_field = data.get("text", "").strip()
         input_field = data.get("input", "").strip()
@@ -1585,9 +1542,10 @@ async def agendamento_inteligente_completo(request: Request):
                 detected_choice = choice
                 break
 
+        # Se não há horario_escolhido válido, mas há uma escolha detectada, é ETAPA 2
         if not horario_escolhido and detected_choice:
             horario_escolhido = detected_choice
-            logger.info(f"🔧 DETECTADO horario_escolhido via texto: '{horario_escolhido}'")
+            logger.info(f"🔧 DETECTADO ETAPA 2 via resposta do cliente: '{horario_escolhido}'")
 
         logger.info(f"🔍 DEBUG ETAPA - horario_escolhido RAW: '{data.get('horario_escolhido')}'")
         logger.info(f"🔍 DEBUG ETAPA - horario_escolhido FINAL: '{horario_escolhido}'")
