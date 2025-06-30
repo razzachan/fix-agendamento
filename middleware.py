@@ -1921,13 +1921,13 @@ async def consultar_disponibilidade_interna(data: dict):
         supabase = get_supabase_client()
 
         pre_agendamento_data = {
-            "nome": "{{nome}}",  # Manter placeholders para identificar na ETAPA 2
-            "telefone": "48988332664",  # Usar telefone real para busca na ETAPA 2
-            "endereco": "{{endereco}}",
-            "equipamento": "{{equipamento}}",
-            "problema": "{{problema}}",
-            "cpf": "{{cpf}}",
-            "email": "{{email}}",
+            "nome": nome or "Cliente",  # Usar dados reais ou fallback
+            "telefone": telefone or "48988332664",  # Usar telefone real
+            "endereco": endereco or "Endereço não informado",
+            "equipamento": primeiro_equipamento or "Equipamento não especificado",
+            "problema": problemas[0] if problemas else "Problema não especificado",
+            "cpf": cpf or "",
+            "email": email or "",
             "status": "pendente",
             "tipo_agendamento": "inteligente",
             "horarios_oferecidos": horarios_disponiveis[:3],
@@ -1986,17 +1986,20 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         supabase = get_supabase_client()
         logger.info(f"✅ ETAPA 2: Supabase client criado com sucesso")
 
-        # 🔍 BUSCAR PRÉ-AGENDAMENTO MAIS RECENTE COM PLACEHOLDERS
-        logger.info("🔍 ETAPA 2: Buscando pré-agendamento mais recente com placeholders...")
+        # 🔍 BUSCAR PRÉ-AGENDAMENTO MAIS RECENTE POR TELEFONE
+        logger.info("🔍 ETAPA 2: Buscando pré-agendamento mais recente por telefone...")
+        cinco_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=5)
         response_busca = supabase.table("agendamentos_ai").select("*").eq(
-            "nome", "{{nome}}"
-        ).eq("status", "pendente").order("created_at", desc=True).limit(1).execute()
+            "telefone", "48988332664"
+        ).eq("status", "pendente").gte(
+            "created_at", cinco_minutos_atras.isoformat()
+        ).order("created_at", desc=True).limit(1).execute()
 
         if not response_busca.data:
-            logger.error("❌ ETAPA 2: Nenhum pré-agendamento encontrado com placeholders")
+            logger.error("❌ ETAPA 2: Nenhum pré-agendamento encontrado por telefone")
             return JSONResponse(
                 status_code=400,
-                content={"success": False, "message": "Pré-agendamento não encontrado"}
+                content={"success": False, "message": "Pré-agendamento não encontrado. Inicie o processo novamente."}
             )
 
         pre_agendamento = response_busca.data[0]
