@@ -1480,15 +1480,19 @@ async def criar_os_completa(dados: dict):
         # Criar OS
         os_data = {
             "client_id": cliente_id,
-            "equipment": dados["equipamento"],
-            "problem_description": dados["problema"],
-            "service_type": dados.get("tipo_atendimento", "em_domicilio"),
+            "client_name": dados["nome"],
+            "client_phone": dados["telefone"],
+            "client_email": dados.get("email", ""),
+            "client_cpf_cnpj": dados.get("cpf", ""),
+            "equipment_type": dados["equipamento"],
+            "description": dados["problema"],
+            "service_attendance_type": dados.get("tipo_atendimento", "em_domicilio"),
             "status": "agendado",
-            "technician": dados.get("tecnico", "Simão"),
+            "technician_name": dados.get("tecnico", "Simão"),
             "scheduled_date": datetime.now().isoformat(),
-            "urgent": dados.get("urgente", False),
-            "total_amount": dados.get("valor_os", 150.00),
-            "os_number": os_numero
+            "final_cost": dados.get("valor_os", 150.00),
+            "order_number": os_numero,
+            "pickup_address": dados["endereco"]
         }
 
         response_os = supabase.table("service_orders").insert(os_data).execute()
