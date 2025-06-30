@@ -2443,6 +2443,18 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
                 "success": True,
                 "message": mensagem_confirmacao,
                 "agendamento_confirmado": True,
+                # ✅ PARÂMETROS NO NÍVEL RAIZ PARA CLIENTECHAT
+                "ordem_servico_numero": order_number,
+                "cliente": nome,
+                "data_agendada": data_formatada,  # Data formatada para exibição
+                "hora_agendada": hora_formatada,  # Hora formatada para exibição
+                "equipamento": tipos_equipamentos,
+                "endereco": endereco,
+                "telefone_contato": telefone,
+                "tecnico_nome": tecnico_info["nome"],
+                "tecnico_telefone": tecnico_info["telefone"],
+                "valor_estimado": f"R$ {final_cost:.2f}",
+                # ✅ MANTER DADOS ANINHADOS PARA COMPATIBILIDADE
                 "dados_agendamento": {
                     "agendamento_id": agendamento_id,
                     "ordem_servico_id": os_id,
