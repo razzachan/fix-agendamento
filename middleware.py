@@ -1922,9 +1922,9 @@ async def consultar_disponibilidade_interna(data: dict):
             telefone = "48999999999"
             equipamentos = [{"equipamento": "Equipamento", "tipo": "Não especificado"}]
         # Esta função é para consulta de disponibilidade, não para confirmação
-        # Determinar técnico baseado no primeiro equipamento
+        # Determinar técnico baseado no primeiro equipamento usando sistema otimizado
         primeiro_equipamento = equipamentos[0]["equipamento"]
-        tecnico = determinar_tecnico(primeiro_equipamento)
+        lista_equipamentos = [eq["equipamento"] for eq in equipamentos]
 
         # Determinar grupo logístico
         grupo_logistico = determinar_grupo_logistico(endereco)
@@ -1935,6 +1935,10 @@ async def consultar_disponibilidade_interna(data: dict):
             urgente = urgente_str.lower() in ['sim', 'true', 'urgente', '1', 'yes']
         else:
             urgente = False  # Padrão quando placeholder filtrado
+
+        # Determinar técnico otimizado para ETAPA 1
+        tecnico_info = await determinar_tecnico_otimizado(lista_equipamentos, grupo_logistico, urgente)
+        tecnico = f"{tecnico_info['nome']} ({tecnico_info['email']})"
 
         # 🕐 ETAPA 1: Gerar horários fixos e consistentes
         logger.info(f"🕐 ETAPA 1: Gerando horários fixos para consistência")
@@ -1970,6 +1974,7 @@ async def consultar_disponibilidade_interna(data: dict):
             "tipo_agendamento": "inteligente",
             "horarios_oferecidos": horarios_disponiveis[:3],
             "tecnico_sugerido": tecnico,
+            "technician_id": tecnico_info["tecnico_id"],  # ✅ ADICIONADO: ID do técnico
             "urgente": urgente
         }
 
@@ -2266,6 +2271,7 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
             "problema": problemas[0] if problemas else "Não especificado",
             "data_agendada": horario_dt.isoformat(),
             "tecnico": tecnico_info["nome"],
+            "technician_id": tecnico_info["tecnico_id"],  # ✅ ADICIONADO: ID do técnico
             "urgente": urgente,
             "status": "confirmado",
             "origem": "clientechat_inteligente",
