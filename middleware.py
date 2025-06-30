@@ -1533,8 +1533,18 @@ async def agendamento_inteligente_completo(request: Request):
         text_field = data.get("text", "").strip()
         input_field = data.get("input", "").strip()
         response_field = data.get("response", "").strip()
+        user_input = data.get("user_input", "").strip()
+        client_response = data.get("client_response", "").strip()
+        answer = data.get("answer", "").strip()
+        choice = data.get("choice", "").strip()
+        user_message = data.get("user_message", "").strip()
+        client_message = data.get("client_message", "").strip()
+        user_text = data.get("user_text", "").strip()
+        client_text = data.get("client_text", "").strip()
 
-        possible_choices = [message_text, text_field, input_field, response_field]
+        possible_choices = [message_text, text_field, input_field, response_field,
+                          user_input, client_response, answer, choice,
+                          user_message, client_message, user_text, client_text]
         detected_choice = None
 
         for choice in possible_choices:
@@ -1553,6 +1563,14 @@ async def agendamento_inteligente_completo(request: Request):
         logger.info(f"🔍 DEBUG ETAPA - text_field: '{text_field}'")
         logger.info(f"🔍 DEBUG ETAPA - input_field: '{input_field}'")
         logger.info(f"🔍 DEBUG ETAPA - response_field: '{response_field}'")
+        logger.info(f"🔍 DEBUG ETAPA - user_input: '{user_input}'")
+        logger.info(f"🔍 DEBUG ETAPA - client_response: '{client_response}'")
+        logger.info(f"🔍 DEBUG ETAPA - answer: '{answer}'")
+        logger.info(f"🔍 DEBUG ETAPA - choice: '{choice}'")
+        logger.info(f"🔍 DEBUG ETAPA - user_message: '{user_message}'")
+        logger.info(f"🔍 DEBUG ETAPA - client_message: '{client_message}'")
+        logger.info(f"🔍 DEBUG ETAPA - user_text: '{user_text}'")
+        logger.info(f"🔍 DEBUG ETAPA - client_text: '{client_text}'")
         logger.info(f"🔍 DEBUG ETAPA - ALL DATA KEYS: {list(data.keys())}")
 
         # 🔍 DEBUG: Mostrar TODOS os valores para encontrar onde está a resposta "2"
