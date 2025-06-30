@@ -1319,12 +1319,25 @@ async def agendamento_inteligente_confirmacao(request: Request):
                 opcao_normalizada = "2"  # Segunda opção: Quarta 14:00
             elif "10:00" in opcao_lower and ("03/07" in opcao_lower or "quinta" in opcao_lower):
                 opcao_normalizada = "3"  # Terceira opção: Quinta 10:00
+            # Aceitar termos genéricos baseados nos horários fixos
+            elif "manhã" in opcao_lower or "manha" in opcao_lower or ("9" in opcao_lower and "10" in opcao_lower):
+                opcao_normalizada = "1"  # Manhã = primeira opção (9h-10h)
+            elif "tarde" in opcao_lower or ("14" in opcao_lower and "15" in opcao_lower):
+                opcao_normalizada = "2"  # Tarde = segunda opção (14h-15h)
+            elif "final" in opcao_lower and "tarde" in opcao_lower or ("16" in opcao_lower and "17" in opcao_lower):
+                opcao_normalizada = "3"  # Final da tarde = terceira opção (16h-17h)
 
         if not opcao_normalizada:
             logger.error(f"❌ ETAPA 2: Opção inválida recebida: '{opcao_escolhida}'")
+            logger.error(f"❌ ETAPA 2: Opções válidas: 1, 2, 3, manhã, tarde, ou horários específicos")
             return JSONResponse(
                 status_code=400,
-                content={"success": False, "message": f"Opção inválida: '{opcao_escolhida}'. Escolha 1, 2 ou 3."}
+                content={
+                    "success": False,
+                    "message": f"Opção inválida: '{opcao_escolhida}'. Use: 1, 2, 3, manhã, tarde",
+                    "opcoes_validas": ["1", "2", "3", "manhã", "tarde"],
+                    "exemplo": "Digite '2' ou 'tarde' para escolher o horário da tarde"
+                }
             )
 
         logger.info(f"✅ ETAPA 2: Opção normalizada: '{opcao_escolhida}' → '{opcao_normalizada}'")
