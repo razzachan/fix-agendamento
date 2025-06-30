@@ -1272,17 +1272,24 @@ async def agendamento_inteligente(request: Request):
         # 🔧 NOVA LÓGICA: DETECTAR ETAPA 2 POR CONTEXTO (1 NEURAL CHAIN)
         horario_escolhido = data.get("horario_escolhido", "").strip()
 
-        # Verificar se existe pré-agendamento recente (últimos 5 minutos)
+        # Verificar se existe pré-agendamento recente (últimos 2 minutos)
         supabase = get_supabase_client()
-        cinco_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=5)
+        dois_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=2)
 
+        # Buscar qualquer registro recente com placeholders (não por nome específico)
         response_recente = supabase.table("agendamentos_ai").select("*").eq(
-            "nome", "{{nome}}"
-        ).eq("status", "pendente").gte(
-            "created_at", cinco_minutos_atras.isoformat()
-        ).order("created_at", desc=True).limit(1).execute()
+            "status", "pendente"
+        ).gte(
+            "created_at", dois_minutos_atras.isoformat()
+        ).order("created_at", desc=True).limit(5).execute()
 
-        tem_pre_agendamento = len(response_recente.data) > 0
+        # Verificar se algum registro tem placeholders (indica ETAPA 1 recente)
+        tem_pre_agendamento = False
+        for registro in response_recente.data:
+            if registro.get("nome") == "{{nome}}" or "{{" in str(registro.get("nome", "")):
+                tem_pre_agendamento = True
+                logger.info(f"🔍 Encontrado pré-agendamento com placeholders: {registro.get('id')}")
+                break
 
         # 🎯 LÓGICA DE DETECÇÃO:
         if tem_pre_agendamento:
@@ -1692,6 +1699,31 @@ async def consultar_disponibilidade_interna(data: dict):
 
         # 🔧 SALVAR HORÁRIOS NO CACHE PARA ETAPA 2
         salvar_horarios_cache(data, horarios_disponiveis[:3])
+
+        # 💾 CRIAR PRÉ-AGENDAMENTO NO SUPABASE (ETAPA 1)
+        logger.info("💾 ETAPA 1: Criando pré-agendamento no Supabase...")
+        supabase = get_supabase_client()
+
+        pre_agendamento_data = {
+            "nome": "{{nome}}",  # Manter placeholders para identificar na ETAPA 2
+            "telefone": "{{telefone_contato}}",
+            "endereco": "{{endereco}}",
+            "equipamento": "{{equipamento}}",
+            "problema": "{{problema}}",
+            "cpf": "{{cpf}}",
+            "email": "{{email}}",
+            "status": "pendente",
+            "tipo_agendamento": "inteligente",
+            "horarios_oferecidos": [h['texto'] for h in horarios_disponiveis[:3]],
+            "tecnico_sugerido": tecnico,
+            "urgente": urgente
+        }
+
+        try:
+            response_pre = supabase.table("agendamentos_ai").insert(pre_agendamento_data).execute()
+            logger.info(f"✅ ETAPA 1: Pré-agendamento criado: {response_pre.data[0]['id']}")
+        except Exception as e:
+            logger.error(f"❌ ETAPA 1: Erro ao criar pré-agendamento: {e}")
 
         # Formatar resposta para o cliente
         mensagem = f"✅ Encontrei horários disponíveis para {primeiro_equipamento}:\n\n"
