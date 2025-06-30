@@ -1555,6 +1555,11 @@ async def agendamento_inteligente_completo(request: Request):
         logger.info(f"🔍 DEBUG ETAPA - response_field: '{response_field}'")
         logger.info(f"🔍 DEBUG ETAPA - ALL DATA KEYS: {list(data.keys())}")
 
+        # 🔍 DEBUG: Mostrar TODOS os valores para encontrar onde está a resposta "2"
+        logger.info(f"🔍 DEBUG TODOS OS VALORES:")
+        for key, value in data.items():
+            logger.info(f"🔍   {key}: '{value}'")
+
         if not horario_escolhido:
             # ETAPA 1: CONSULTAR DISPONIBILIDADE
             logger.info("🚀 EXECUTANDO ETAPA 1: Consulta de disponibilidade")
