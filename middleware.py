@@ -1460,7 +1460,7 @@ async def criar_os_completa(dados: dict):
             "name": dados["nome"],
             "phone": dados["telefone"],
             "address": dados["endereco"],
-            "cpf": dados.get("cpf", ""),
+            "cpf_cnpj": dados.get("cpf", ""),
             "email": dados.get("email", ""),
             "password": "123456"  # Senha padrão
         }
