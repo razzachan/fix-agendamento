@@ -1520,68 +1520,42 @@ async def agendamento_inteligente_completo(request: Request):
         # DETECTAR QUAL ETAPA EXECUTAR
         horario_escolhido = data.get("horario_escolhido", "").strip()
 
-        # 🔧 SOLUÇÃO SIMPLES: Sistema já funciona via resposta do cliente
-
-        # FILTRAR PLACEHOLDERS DO CLIENTECHAT (só se não foi detectado como ETAPA 2)
-        if horario_escolhido.startswith("{{") and horario_escolhido.endswith("}}") and horario_escolhido != "2":
-            logger.info(f"🔍 Detectado placeholder: {horario_escolhido} - tratando como ETAPA 1")
+        # 🔧 SOLUÇÃO PARA 2 NEURAL CHAINS: Detectar se é placeholder ou valor real
+        if horario_escolhido.startswith("{{") and horario_escolhido.endswith("}}"):
+            logger.info(f"🔍 NEURAL CHAIN 1: Detectado placeholder {horario_escolhido} - consultando horários")
+            horario_escolhido = ""
+        elif horario_escolhido in ["1", "2", "3"]:
+            logger.info(f"🔍 NEURAL CHAIN 2: Detectado escolha {horario_escolhido} - confirmando agendamento")
+        else:
+            logger.info(f"🔍 NEURAL CHAIN 1: Sem horário escolhido - consultando horários")
             horario_escolhido = ""
 
-        # 🔧 SOLUÇÃO DEFINITIVA: Detectar pela resposta do cliente
-        # Se todos os dados são placeholders, mas há uma resposta do cliente, é ETAPA 2
-        message_text = data.get("message", "").strip()
-        text_field = data.get("text", "").strip()
-        input_field = data.get("input", "").strip()
-        response_field = data.get("response", "").strip()
-        user_input = data.get("user_input", "").strip()
-        client_response = data.get("client_response", "").strip()
-        answer = data.get("answer", "").strip()
-        choice = data.get("choice", "").strip()
-        user_message = data.get("user_message", "").strip()
-        client_message = data.get("client_message", "").strip()
-        user_text = data.get("user_text", "").strip()
-        client_text = data.get("client_text", "").strip()
+        # 🔧 LOGS PARA DEBUG (remover após funcionar)
+        logger.info(f"🔍 horario_escolhido recebido: '{data.get('horario_escolhido')}'")
+        logger.info(f"🔍 horario_escolhido processado: '{horario_escolhido}'")
 
-        possible_choices = [message_text, text_field, input_field, response_field,
-                          user_input, client_response, answer, choice,
-                          user_message, client_message, user_text, client_text]
-        detected_choice = None
-
-        for choice in possible_choices:
-            if choice in ["1", "2", "3"]:
-                detected_choice = choice
-                break
-
-        # Se não há horario_escolhido válido, mas há uma escolha detectada, é ETAPA 2
-        if not horario_escolhido and detected_choice:
-            horario_escolhido = detected_choice
-            logger.info(f"🔧 DETECTADO ETAPA 2 via resposta do cliente: '{horario_escolhido}'")
-
-        logger.info(f"🔍 DEBUG ETAPA - horario_escolhido RAW: '{data.get('horario_escolhido')}'")
-        logger.info(f"🔍 DEBUG ETAPA - horario_escolhido FINAL: '{horario_escolhido}'")
-        logger.info(f"🔍 DEBUG ETAPA - message_text: '{message_text}'")
-        logger.info(f"🔍 DEBUG ETAPA - text_field: '{text_field}'")
-        logger.info(f"🔍 DEBUG ETAPA - input_field: '{input_field}'")
-        logger.info(f"🔍 DEBUG ETAPA - response_field: '{response_field}'")
-        logger.info(f"🔍 DEBUG ETAPA - user_input: '{user_input}'")
-        logger.info(f"🔍 DEBUG ETAPA - client_response: '{client_response}'")
-        logger.info(f"🔍 DEBUG ETAPA - answer: '{answer}'")
-        logger.info(f"🔍 DEBUG ETAPA - choice: '{choice}'")
-        logger.info(f"🔍 DEBUG ETAPA - user_message: '{user_message}'")
-        logger.info(f"🔍 DEBUG ETAPA - client_message: '{client_message}'")
-        logger.info(f"🔍 DEBUG ETAPA - user_text: '{user_text}'")
-        logger.info(f"🔍 DEBUG ETAPA - client_text: '{client_text}'")
-        logger.info(f"🔍 DEBUG ETAPA - ALL DATA KEYS: {list(data.keys())}")
-
-        # 🔍 DEBUG: Mostrar TODOS os valores para encontrar onde está a resposta "2"
-        logger.info(f"🔍 DEBUG TODOS OS VALORES:")
-        for key, value in data.items():
-            logger.info(f"🔍   {key}: '{value}'")
+        # 🔍 DEBUG: Mostrar dados principais
+        logger.info(f"🔍 DEBUG DADOS PRINCIPAIS:")
+        logger.info(f"🔍   nome: '{data.get('nome', '')}'")
+        logger.info(f"🔍   telefone: '{data.get('telefone', '')}'")
+        logger.info(f"🔍   endereco: '{data.get('endereco', '')}'")
+        logger.info(f"🔍   equipamento: '{data.get('equipamento', '')}'")
+        logger.info(f"🔍   horario_escolhido: '{data.get('horario_escolhido', '')}'")
+        logger.info(f"🔍   ALL DATA KEYS: {list(data.keys())}")
 
         if not horario_escolhido:
             # ETAPA 1: CONSULTAR DISPONIBILIDADE
             logger.info("🚀 EXECUTANDO ETAPA 1: Consulta de disponibilidade")
-            return await consultar_disponibilidade_interna(data)
+
+            # 🔧 SOLUÇÃO ALTERNATIVA: Retornar horários com instruções para nova chamada
+            horarios = await consultar_disponibilidade_interna(data)
+
+            # Adicionar instruções para o ClienteChat fazer segunda chamada
+            if isinstance(horarios, dict) and "message" in horarios:
+                horarios["message"] += "\n\n⚠️ IMPORTANTE: Após o cliente escolher, faça nova chamada com horario_escolhido='1', '2' ou '3'"
+                horarios["next_step"] = "Aguardar resposta do cliente e fazer nova chamada HTTP"
+
+            return horarios
         else:
             # ETAPA 2: CONFIRMAR AGENDAMENTO
             logger.info("🚀 EXECUTANDO ETAPA 2: Confirmação de agendamento")
