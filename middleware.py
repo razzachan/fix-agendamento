@@ -1531,14 +1531,21 @@ async def agendamento_inteligente_completo(request: Request):
             if key not in ["message", "text", "input", "response"]
         )
 
+        logger.info(f"🔍 DEBUG - all_placeholders: {all_placeholders}")
+
         # Cache global para detectar chamadas consecutivas
         if not hasattr(gerar_chave_cache, 'last_call_time'):
             gerar_chave_cache.last_call_time = 0
             gerar_chave_cache.call_count = 0
+            logger.info(f"🔍 DEBUG - Inicializando cache: last_call_time=0, call_count=0")
+
+        logger.info(f"🔍 DEBUG - Cache atual: last_call_time={gerar_chave_cache.last_call_time}, call_count={gerar_chave_cache.call_count}")
 
         # Se é uma chamada com placeholders e foi há menos de 30 segundos da anterior
         if all_placeholders:
             time_diff = current_time - gerar_chave_cache.last_call_time
+            logger.info(f"🔍 DEBUG - time_diff: {time_diff:.1f}s (limite: 30s)")
+
             if time_diff < 30:  # Menos de 30 segundos
                 gerar_chave_cache.call_count += 1
                 logger.info(f"🔍 Chamada consecutiva #{gerar_chave_cache.call_count} em {time_diff:.1f}s")
@@ -1552,8 +1559,12 @@ async def agendamento_inteligente_completo(request: Request):
             else:
                 # Reset se passou muito tempo
                 gerar_chave_cache.call_count = 1
+                logger.info(f"🔍 DEBUG - Reset contador para 1 (tempo > 30s)")
 
             gerar_chave_cache.last_call_time = current_time
+            logger.info(f"🔍 DEBUG - Atualizando last_call_time para: {current_time}")
+        else:
+            logger.info(f"🔍 DEBUG - NÃO é all_placeholders, pulando lógica de detecção")
 
         # FILTRAR PLACEHOLDERS DO CLIENTECHAT (só se não foi detectado como ETAPA 2)
         if horario_escolhido.startswith("{{") and horario_escolhido.endswith("}}") and horario_escolhido != "2":
