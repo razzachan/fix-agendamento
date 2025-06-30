@@ -63,6 +63,205 @@ async def gerar_proximo_numero_os():
         timestamp = int(datetime.now().timestamp()) % 10000
         return f"OS #{timestamp:04d}"
 
+async def gerar_horarios_logistica_inteligente(
+    technician_id: str,
+    technician_name: str,
+    grupo_logistico: str,
+    coordenadas: Optional[Tuple[float, float]],
+    endereco: str,
+    urgente: bool = False
+) -> List[Dict]:
+    """
+    🚀 SISTEMA DE LOGÍSTICA INTELIGENTE COMPLETO
+
+    ESTRATÉGIAS POR GRUPO:
+    - GRUPO A: Otimização por trânsito urbano (manhã prioritária)
+    - GRUPO B: Balanceamento entre grupos A e C (tarde prioritária)
+    - GRUPO C: Agrupamento obrigatório no mesmo dia (máxima eficiência)
+    """
+    try:
+        logger.info(f"🚀 LOGÍSTICA INTELIGENTE: {technician_name} | Grupo {grupo_logistico} | Urgente: {urgente}")
+
+        agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
+        supabase = get_supabase_client()
+
+        # 🎯 ESTRATÉGIA ESPECÍFICA POR GRUPO
+        if grupo_logistico == 'A':
+            return await estrategia_grupo_a(technician_id, technician_name, coordenadas, urgente, agora, supabase)
+        elif grupo_logistico == 'B':
+            return await estrategia_grupo_b(technician_id, technician_name, coordenadas, urgente, agora, supabase)
+        else:  # Grupo C
+            return await estrategia_grupo_c(technician_id, technician_name, coordenadas, endereco, urgente, agora, supabase)
+
+    except Exception as e:
+        logger.error(f"❌ Erro na logística inteligente: {e}")
+        return gerar_horarios_fixos_consistentes(urgente)
+
+async def estrategia_grupo_a(technician_id: str, technician_name: str, coordenadas: Optional[Tuple[float, float]], urgente: bool, agora: datetime, supabase) -> List[Dict]:
+    """
+    🏙️ GRUPO A - FLORIANÓPOLIS CENTRO
+    ESTRATÉGIA: Otimização por trânsito urbano
+    - Manhã: 8h-11h (menos trânsito)
+    - Tarde: 14h-16h (pós-almoço)
+    - Evitar: 12h-13h (almoço), 17h+ (rush)
+    """
+    logger.info("🏙️ Aplicando estratégia GRUPO A - Otimização urbana")
+
+    # Horários otimizados para trânsito urbano
+    horarios_prioritarios = [
+        {"hora": 9, "texto": "9h e 10h", "score_base": 20},   # Manhã ideal
+        {"hora": 10, "texto": "10h e 11h", "score_base": 18}, # Manhã boa
+        {"hora": 14, "texto": "14h e 15h", "score_base": 15}, # Tarde boa
+        {"hora": 15, "texto": "15h e 16h", "score_base": 12}, # Tarde ok
+        {"hora": 8, "texto": "8h e 9h", "score_base": 10},    # Cedo
+        {"hora": 16, "texto": "16h e 17h", "score_base": 8}   # Final tarde
+    ]
+
+    return await processar_horarios_com_otimizacao(
+        technician_id, technician_name, horarios_prioritarios,
+        coordenadas, urgente, agora, supabase, "A"
+    )
+
+async def estrategia_grupo_b(technician_id: str, technician_name: str, coordenadas: Optional[Tuple[float, float]], urgente: bool, agora: datetime, supabase) -> List[Dict]:
+    """
+    🌆 GRUPO B - GRANDE FLORIANÓPOLIS
+    ESTRATÉGIA: Balanceamento entre A e C
+    - Tarde prioritária: 13h-16h (evita rush matinal)
+    - Manhã secundária: 9h-11h
+    - Flexibilidade para otimizar rotas
+    """
+    logger.info("🌆 Aplicando estratégia GRUPO B - Balanceamento regional")
+
+    # Horários balanceados para região metropolitana
+    horarios_prioritarios = [
+        {"hora": 14, "texto": "14h e 15h", "score_base": 20}, # Tarde ideal
+        {"hora": 13, "texto": "13h e 14h", "score_base": 18}, # Pós-almoço
+        {"hora": 15, "texto": "15h e 16h", "score_base": 16}, # Tarde boa
+        {"hora": 10, "texto": "10h e 11h", "score_base": 14}, # Manhã boa
+        {"hora": 9, "texto": "9h e 10h", "score_base": 12},   # Manhã ok
+        {"hora": 16, "texto": "16h e 17h", "score_base": 10}  # Final tarde
+    ]
+
+    return await processar_horarios_com_otimizacao(
+        technician_id, technician_name, horarios_prioritarios,
+        coordenadas, urgente, agora, supabase, "B"
+    )
+
+async def estrategia_grupo_c(technician_id: str, technician_name: str, coordenadas: Optional[Tuple[float, float]], endereco: str, urgente: bool, agora: datetime, supabase) -> List[Dict]:
+    """
+    🏖️ GRUPO C - LITORAL/INTERIOR
+    ESTRATÉGIA: Agrupamento obrigatório no mesmo dia
+    - Verificar se já há agendamentos C no dia
+    - Se sim: sugerir horários próximos (otimização de rota)
+    - Se não: sugerir dias com potencial de agrupamento
+    - Tarde prioritária: 14h-17h (tempo para deslocamento)
+    """
+    logger.info("🏖️ Aplicando estratégia GRUPO C - Agrupamento inteligente")
+
+    # 1. VERIFICAR DIAS COM AGENDAMENTOS GRUPO C EXISTENTES
+    dias_com_grupo_c = await buscar_dias_com_agendamentos_grupo_c(agora, supabase)
+    logger.info(f"📅 Dias com agendamentos Grupo C: {len(dias_com_grupo_c)}")
+
+    # 2. VERIFICAR AGENDAMENTOS PRÓXIMOS GEOGRAFICAMENTE
+    agendamentos_proximos = await buscar_agendamentos_proximos_grupo_c(coordenadas, agora, supabase)
+    logger.info(f"📍 Agendamentos próximos encontrados: {len(agendamentos_proximos)}")
+
+    # 3. ESTRATÉGIA DE AGRUPAMENTO
+    if dias_com_grupo_c or agendamentos_proximos:
+        # CENÁRIO 1: Agrupar com agendamentos existentes
+        return await agrupar_com_agendamentos_existentes(
+            technician_id, technician_name, dias_com_grupo_c,
+            agendamentos_proximos, urgente, agora, supabase
+        )
+    else:
+        # CENÁRIO 2: Criar novo dia de agendamentos Grupo C
+        return await criar_novo_dia_grupo_c(
+            technician_id, technician_name, coordenadas, urgente, agora, supabase
+        )
+
+async def processar_horarios_com_otimizacao(
+    technician_id: str, technician_name: str, horarios_prioritarios: List[Dict],
+    coordenadas: Optional[Tuple[float, float]], urgente: bool, agora: datetime,
+    supabase, grupo: str
+) -> List[Dict]:
+    """
+    🎯 Processa horários com otimização inteligente
+    """
+    horarios_disponiveis = []
+    inicio = agora + timedelta(days=1 if urgente else 2)
+
+    # Verificar próximos 10 dias úteis
+    for dia_offset in range(10):
+        data_verificacao = inicio + timedelta(days=dia_offset)
+
+        # Pular fins de semana
+        if data_verificacao.weekday() >= 5:
+            continue
+
+        data_str = data_verificacao.strftime('%Y-%m-%d')
+
+        # Calcular score do dia baseado na carga de trabalho
+        score_dia = await calcular_score_dia(data_str, grupo, supabase)
+
+        # Verificar cada horário prioritário
+        for horario_info in horarios_prioritarios:
+            if len(horarios_disponiveis) >= 3:
+                break
+
+            # Verificar disponibilidade do técnico
+            disponivel = await verificar_horario_tecnico_disponivel(
+                technician_id, data_str, horario_info["hora"]
+            )
+
+            if disponivel:
+                # Calcular score total
+                score_total = horario_info["score_base"] + score_dia
+
+                # Bonus por otimização de rota
+                if coordenadas:
+                    bonus_rota = await calcular_bonus_rota_inteligente(
+                        data_str, horario_info["hora"], coordenadas, grupo, supabase
+                    )
+                    score_total += bonus_rota
+
+                # Bonus por urgência
+                if urgente:
+                    score_total += 15
+
+                # Criar horário otimizado
+                horario_dt = data_verificacao.replace(
+                    hour=horario_info["hora"], minute=0, second=0, microsecond=0
+                )
+
+                dias_semana = {
+                    'Monday': 'Segunda-feira', 'Tuesday': 'Terça-feira',
+                    'Wednesday': 'Quarta-feira', 'Thursday': 'Quinta-feira',
+                    'Friday': 'Sexta-feira'
+                }
+
+                dia_semana_pt = dias_semana.get(horario_dt.strftime('%A'), horario_dt.strftime('%A'))
+                data_formatada = f"{dia_semana_pt}, {horario_dt.strftime('%d/%m/%Y')}"
+
+                horarios_disponiveis.append({
+                    "numero": len(horarios_disponiveis) + 1,
+                    "texto": f"Previsão de chegada entre {horario_info['texto']} - {data_formatada}",
+                    "datetime_agendamento": horario_dt.isoformat(),
+                    "dia_semana": data_formatada,
+                    "hora_agendamento": f"{horario_info['hora']:02d}:00",
+                    "score_otimizacao": score_total,
+                    "grupo_logistico": grupo
+                })
+
+                logger.info(f"✅ Horário otimizado: {data_formatada} {horario_info['hora']}h (Score: {score_total})")
+
+        if len(horarios_disponiveis) >= 3:
+            break
+
+    # Ordenar por score (melhor otimização primeiro)
+    horarios_disponiveis.sort(key=lambda x: x.get("score_otimizacao", 0), reverse=True)
+
+    return horarios_disponiveis[:3]
+
 async def gerar_horarios_com_disponibilidade_tecnico(technician_id: str, technician_name: str, urgente: bool = False) -> List[Dict]:
     """
     Gera horários baseados na disponibilidade real do técnico
@@ -1147,6 +1346,292 @@ async def analisar_carga_trabalho_por_grupo(data_inicio: datetime, dias: int) ->
         logger.error(f"Erro ao analisar carga de trabalho: {e}")
         return {}
 
+async def buscar_dias_com_agendamentos_grupo_c(agora: datetime, supabase) -> List[Dict]:
+    """
+    🔍 Busca dias que já têm agendamentos do Grupo C nos próximos 15 dias
+    """
+    try:
+        data_inicio = agora.strftime('%Y-%m-%d')
+        data_fim = (agora + timedelta(days=15)).strftime('%Y-%m-%d')
+
+        # Buscar agendamentos Grupo C existentes
+        response = supabase.table("agendamentos_ai").select("*").eq(
+            "grupo_logistico", "C"
+        ).gte(
+            "data_agendada", data_inicio
+        ).lte(
+            "data_agendada", data_fim
+        ).eq("status", "pendente").execute()
+
+        agendamentos = response.data if response.data else []
+
+        # Agrupar por data
+        dias_agrupados = {}
+        for ag in agendamentos:
+            data_ag = ag['data_agendada'][:10]  # YYYY-MM-DD
+            if data_ag not in dias_agrupados:
+                dias_agrupados[data_ag] = []
+            dias_agrupados[data_ag].append(ag)
+
+        return [{"data": data, "agendamentos": ags} for data, ags in dias_agrupados.items()]
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao buscar dias Grupo C: {e}")
+        return []
+
+async def buscar_agendamentos_proximos_grupo_c(coordenadas: Optional[Tuple[float, float]], agora: datetime, supabase) -> List[Dict]:
+    """
+    📍 Busca agendamentos Grupo C próximos geograficamente (raio de 20km)
+    """
+    try:
+        if not coordenadas:
+            return []
+
+        data_inicio = agora.strftime('%Y-%m-%d')
+        data_fim = (agora + timedelta(days=15)).strftime('%Y-%m-%d')
+
+        # Buscar todos agendamentos Grupo C com coordenadas
+        response = supabase.table("agendamentos_ai").select("*").eq(
+            "grupo_logistico", "C"
+        ).gte(
+            "data_agendada", data_inicio
+        ).lte(
+            "data_agendada", data_fim
+        ).eq("status", "pendente").not_.is_("coordenadas", "null").execute()
+
+        agendamentos = response.data if response.data else []
+        agendamentos_proximos = []
+
+        for ag in agendamentos:
+            if ag.get('coordenadas'):
+                try:
+                    coords_ag = ag['coordenadas']
+                    if isinstance(coords_ag, list) and len(coords_ag) == 2:
+                        distancia = calculate_distance(coordenadas, tuple(coords_ag))
+                        if distancia <= 20:  # 20km de raio
+                            ag['distancia'] = distancia
+                            agendamentos_proximos.append(ag)
+                except:
+                    continue
+
+        # Ordenar por distância
+        agendamentos_proximos.sort(key=lambda x: x.get('distancia', 999))
+
+        return agendamentos_proximos
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao buscar agendamentos próximos: {e}")
+        return []
+
+async def agrupar_com_agendamentos_existentes(
+    technician_id: str, technician_name: str, dias_com_grupo_c: List[Dict],
+    agendamentos_proximos: List[Dict], urgente: bool, agora: datetime, supabase
+) -> List[Dict]:
+    """
+    🎯 Agrupa novo agendamento com existentes do Grupo C
+    """
+    logger.info("🎯 Agrupando com agendamentos Grupo C existentes")
+
+    horarios_otimizados = []
+
+    # Priorizar dias com mais agendamentos (melhor aproveitamento)
+    dias_ordenados = sorted(dias_com_grupo_c, key=lambda x: len(x['agendamentos']), reverse=True)
+
+    for dia_info in dias_ordenados[:5]:  # Top 5 dias
+        data_str = dia_info['data']
+        agendamentos_dia = dia_info['agendamentos']
+
+        # Horários preferenciais para Grupo C (tarde)
+        horarios_grupo_c = [14, 15, 16, 17]
+
+        for hora in horarios_grupo_c:
+            if len(horarios_otimizados) >= 3:
+                break
+
+            # Verificar disponibilidade do técnico
+            disponivel = await verificar_horario_tecnico_disponivel(technician_id, data_str, hora)
+
+            if disponivel:
+                # Calcular score de agrupamento
+                score_agrupamento = len(agendamentos_dia) * 10  # Bonus por agendamento existente
+
+                # Bonus por proximidade geográfica
+                bonus_proximidade = 0
+                for ag_proximo in agendamentos_proximos:
+                    if ag_proximo['data_agendada'][:10] == data_str:
+                        bonus_proximidade += 15
+
+                score_total = score_agrupamento + bonus_proximidade + (20 if urgente else 0)
+
+                # Criar horário otimizado
+                data_dt = datetime.strptime(data_str, '%Y-%m-%d')
+                horario_dt = data_dt.replace(hour=hora, minute=0, second=0, microsecond=0)
+
+                dias_semana = {
+                    'Monday': 'Segunda-feira', 'Tuesday': 'Terça-feira',
+                    'Wednesday': 'Quarta-feira', 'Thursday': 'Quinta-feira',
+                    'Friday': 'Sexta-feira'
+                }
+
+                dia_semana_pt = dias_semana.get(horario_dt.strftime('%A'), horario_dt.strftime('%A'))
+                data_formatada = f"{dia_semana_pt}, {horario_dt.strftime('%d/%m/%Y')}"
+
+                horarios_otimizados.append({
+                    "numero": len(horarios_otimizados) + 1,
+                    "texto": f"Previsão de chegada entre {hora}h e {hora+1}h - {data_formatada} (Rota otimizada)",
+                    "datetime_agendamento": horario_dt.isoformat(),
+                    "dia_semana": data_formatada,
+                    "hora_agendamento": f"{hora:02d}:00",
+                    "score_otimizacao": score_total,
+                    "grupo_logistico": "C",
+                    "agendamentos_agrupados": len(agendamentos_dia)
+                })
+
+                logger.info(f"✅ Agrupamento C: {data_formatada} {hora}h (Score: {score_total}, Agrupados: {len(agendamentos_dia)})")
+
+    # Se não encontrou suficientes, completar com novo dia
+    if len(horarios_otimizados) < 3:
+        horarios_novos = await criar_novo_dia_grupo_c(technician_id, technician_name, None, urgente, agora, supabase)
+        horarios_otimizados.extend(horarios_novos[:3-len(horarios_otimizados)])
+
+    return horarios_otimizados[:3]
+
+async def criar_novo_dia_grupo_c(
+    technician_id: str, technician_name: str, coordenadas: Optional[Tuple[float, float]],
+    urgente: bool, agora: datetime, supabase
+) -> List[Dict]:
+    """
+    🆕 Cria novo dia otimizado para agendamentos Grupo C
+    """
+    logger.info("🆕 Criando novo dia para Grupo C")
+
+    horarios_disponiveis = []
+    inicio = agora + timedelta(days=3 if not urgente else 1)  # Grupo C precisa mais tempo
+
+    # Horários ideais para Grupo C (tarde para viagens longas)
+    horarios_grupo_c = [
+        {"hora": 14, "texto": "14h e 15h", "score": 20},
+        {"hora": 15, "texto": "15h e 16h", "score": 18},
+        {"hora": 16, "texto": "16h e 17h", "score": 15}
+    ]
+
+    for dia_offset in range(10):
+        data_verificacao = inicio + timedelta(days=dia_offset)
+
+        if data_verificacao.weekday() >= 5:  # Pular fins de semana
+            continue
+
+        data_str = data_verificacao.strftime('%Y-%m-%d')
+
+        # Verificar se não há conflito com grupos A/B
+        conflito = await verificar_conflito_grupos_no_dia(data_str, 'C')
+        if conflito:
+            continue
+
+        for horario_info in horarios_grupo_c:
+            if len(horarios_disponiveis) >= 3:
+                break
+
+            disponivel = await verificar_horario_tecnico_disponivel(
+                technician_id, data_str, horario_info["hora"]
+            )
+
+            if disponivel:
+                horario_dt = data_verificacao.replace(
+                    hour=horario_info["hora"], minute=0, second=0, microsecond=0
+                )
+
+                dias_semana = {
+                    'Monday': 'Segunda-feira', 'Tuesday': 'Terça-feira',
+                    'Wednesday': 'Quarta-feira', 'Thursday': 'Quinta-feira',
+                    'Friday': 'Sexta-feira'
+                }
+
+                dia_semana_pt = dias_semana.get(horario_dt.strftime('%A'), horario_dt.strftime('%A'))
+                data_formatada = f"{dia_semana_pt}, {horario_dt.strftime('%d/%m/%Y')}"
+
+                score_total = horario_info["score"] + (15 if urgente else 0)
+
+                horarios_disponiveis.append({
+                    "numero": len(horarios_disponiveis) + 1,
+                    "texto": f"Previsão de chegada entre {horario_info['texto']} - {data_formatada} (Dia dedicado)",
+                    "datetime_agendamento": horario_dt.isoformat(),
+                    "dia_semana": data_formatada,
+                    "hora_agendamento": f"{horario_info['hora']:02d}:00",
+                    "score_otimizacao": score_total,
+                    "grupo_logistico": "C",
+                    "novo_dia_grupo_c": True
+                })
+
+                logger.info(f"✅ Novo dia C: {data_formatada} {horario_info['hora']}h (Score: {score_total})")
+
+        if len(horarios_disponiveis) >= 3:
+            break
+
+    return horarios_disponiveis
+
+async def calcular_score_dia(data_str: str, grupo: str, supabase) -> float:
+    """
+    📊 Calcula score do dia baseado na carga de trabalho
+    """
+    try:
+        # Contar agendamentos existentes no dia
+        response = supabase.table("agendamentos_ai").select("*").eq(
+            "data_agendada", data_str
+        ).execute()
+
+        agendamentos_dia = len(response.data) if response.data else 0
+
+        # Score baseado na carga (menos agendamentos = melhor score)
+        if agendamentos_dia == 0:
+            return 15  # Dia vazio
+        elif agendamentos_dia <= 2:
+            return 10  # Baixa carga
+        elif agendamentos_dia <= 4:
+            return 5   # Média carga
+        else:
+            return 0   # Alta carga
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao calcular score do dia: {e}")
+        return 5
+
+async def calcular_bonus_rota_inteligente(data_str: str, hora: int, coordenadas: Tuple[float, float], grupo: str, supabase) -> float:
+    """
+    🗺️ Calcula bonus por otimização de rota (agendamentos próximos)
+    """
+    try:
+        # Buscar agendamentos no mesmo dia
+        response = supabase.table("agendamentos_ai").select("*").eq(
+            "data_agendada", data_str
+        ).not_.is_("coordenadas", "null").execute()
+
+        agendamentos = response.data if response.data else []
+        bonus_total = 0
+
+        for ag in agendamentos:
+            if ag.get('coordenadas'):
+                try:
+                    coords_ag = ag['coordenadas']
+                    if isinstance(coords_ag, list) and len(coords_ag) == 2:
+                        distancia = calculate_distance(coordenadas, tuple(coords_ag))
+
+                        # Bonus por proximidade
+                        if distancia <= 5:    # Muito próximo
+                            bonus_total += 10
+                        elif distancia <= 10: # Próximo
+                            bonus_total += 5
+                        elif distancia <= 15: # Razoável
+                            bonus_total += 2
+                except:
+                    continue
+
+        return min(bonus_total, 20)  # Máximo 20 pontos de bonus
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao calcular bonus de rota: {e}")
+        return 0
+
 async def calcular_bonus_rota(data_str: str, hora: int, coordenadas: Tuple[float, float], grupo_logistico: str) -> float:
     """
     Calcula bonus de rota baseado em agendamentos próximos no mesmo dia
@@ -2066,11 +2551,18 @@ async def consultar_disponibilidade_interna(data: dict):
         tecnico_info = await determinar_tecnico_otimizado(lista_equipamentos, grupo_logistico, urgente)
         tecnico = f"{tecnico_info['nome']} ({tecnico_info['email']})"
 
-        # 🕐 ETAPA 1: Gerar horários considerando disponibilidade do técnico
-        logger.info(f"🕐 ETAPA 1: Gerando horários baseados na disponibilidade do técnico {tecnico_info['nome']}")
-        horarios_disponiveis = await gerar_horarios_com_disponibilidade_tecnico(
+        # 🕐 ETAPA 1: Gerar horários com logística inteligente
+        logger.info(f"🕐 ETAPA 1: Gerando horários com logística inteligente para {tecnico_info['nome']} - Grupo {grupo_logistico}")
+
+        # Geocodificar endereço para otimização de rotas
+        coordenadas = await geocodificar_endereco(endereco)
+
+        horarios_disponiveis = await gerar_horarios_logistica_inteligente(
             tecnico_info['tecnico_id'],
             tecnico_info['nome'],
+            grupo_logistico,
+            coordenadas,
+            endereco,
             urgente
         )
 
