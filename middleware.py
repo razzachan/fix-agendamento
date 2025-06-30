@@ -874,7 +874,7 @@ async def obter_horarios_disponiveis(data_inicio: datetime, dias: int = 5) -> Li
 
             # Buscar ordens de serviço (múltiplos status ativos)
             response_os = supabase.table("service_orders").select("*").eq("scheduled_date", data_str).in_(
-                "status", ["agendado", "em_andamento", "a_caminho", "confirmado"]
+                "status", ["scheduled", "in_progress", "on_the_way", "scheduled"]
             ).execute()
             ordens_servico = response_os.data if response_os.data else []
 
@@ -2299,7 +2299,7 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
             "equipment_type": tipos_equipamentos,
             "description": descricao_completa,
             "service_attendance_type": service_type,
-            "status": "agendado",
+            "status": "scheduled",
             "scheduled_date": data_agendada,
             "scheduled_time": hora_agendada,
             "technician_name": tecnico_info["nome"],
