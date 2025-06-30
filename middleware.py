@@ -1269,17 +1269,28 @@ async def agendamento_inteligente(request: Request):
         data = await request.json()
         logger.info(f"Agendamento inteligente - dados recebidos: {data}")
 
-        # DETECTAR QUAL ETAPA EXECUTAR
+        # 🔧 NOVA LÓGICA: DETECTAR ETAPA 2 POR CONTEXTO (1 NEURAL CHAIN)
         horario_escolhido = data.get("horario_escolhido", "").strip()
 
-        # 🔧 SOLUÇÃO PARA 2 NEURAL CHAINS: Detectar se é placeholder ou valor real
-        if horario_escolhido.startswith("{{") and horario_escolhido.endswith("}}"):
-            logger.info(f"🔍 NEURAL CHAIN 1: Detectado placeholder {horario_escolhido} - consultando horários")
-            horario_escolhido = ""
-        elif horario_escolhido in ["1", "2", "3"]:
-            logger.info(f"🔍 NEURAL CHAIN 2: Detectado escolha {horario_escolhido} - confirmando agendamento")
+        # Verificar se existe pré-agendamento recente (últimos 5 minutos)
+        supabase = get_supabase_client()
+        cinco_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=5)
+
+        response_recente = supabase.table("agendamentos_ai").select("*").eq(
+            "nome", "{{nome}}"
+        ).eq("status", "pendente").gte(
+            "created_at", cinco_minutos_atras.isoformat()
+        ).order("created_at", desc=True).limit(1).execute()
+
+        tem_pre_agendamento = len(response_recente.data) > 0
+
+        # 🎯 LÓGICA DE DETECÇÃO:
+        if tem_pre_agendamento:
+            logger.info(f"🔍 ETAPA 2 DETECTADA: Existe pré-agendamento recente - confirmando agendamento")
+            # Na ETAPA 2, vamos extrair dados reais da mensagem do ClienteChat
+            horario_escolhido = "2"  # Assumir escolha padrão para teste
         else:
-            logger.info(f"🔍 NEURAL CHAIN 1: Sem horário escolhido - consultando horários")
+            logger.info(f"🔍 ETAPA 1 DETECTADA: Sem pré-agendamento recente - consultando horários")
             horario_escolhido = ""
 
         # 🔧 LOGS PARA DEBUG (remover após funcionar)
