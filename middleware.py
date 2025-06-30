@@ -1363,8 +1363,10 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
                 content={"success": False, "message": "Opção de horário inválida."}
             )
 
-        horario_escolhido = horarios_oferecidos[opcao_index]
-        logger.info(f"✅ ETAPA 2: Horário escolhido: {horario_escolhido}")
+        horario_selecionado = horarios_oferecidos[opcao_index]
+        horario_escolhido = horario_selecionado.get('datetime_agendamento')
+        logger.info(f"✅ ETAPA 2: Horário escolhido: {horario_selecionado}")
+        logger.info(f"✅ ETAPA 2: Datetime agendamento: {horario_escolhido}")
 
         # Dados realistas para criação da OS (substituindo placeholders)
         dados_reais = {
@@ -1908,7 +1910,7 @@ async def consultar_disponibilidade_interna(data: dict):
             "email": "{{email}}",
             "status": "pendente",
             "tipo_agendamento": "inteligente",
-            "horarios_oferecidos": [h['texto'] for h in horarios_disponiveis[:3]],
+            "horarios_oferecidos": horarios_disponiveis[:3],
             "tecnico_sugerido": tecnico,
             "urgente": urgente
         }
