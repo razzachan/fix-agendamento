@@ -1709,44 +1709,114 @@ async def consultar_disponibilidade_interna(data: dict):
 # Função para confirmar agendamento final (ETAPA 2)
 async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
     """
-    Confirma o agendamento criando pré-agendamento e OS usando o mesmo sistema dos modais
+    NOVA ESTRATÉGIA: Busca pré-agendamento existente (com placeholders) e atualiza com dados reais
     """
     try:
         logger.info(f"🚀 ETAPA 2: Iniciando confirmar_agendamento_final com horario_escolhido='{horario_escolhido}'")
         supabase = get_supabase_client()
         logger.info(f"✅ ETAPA 2: Supabase client criado com sucesso")
 
-        # Extrair dados básicos e filtrar placeholders
-        endereco = filtrar_placeholders(data.get("endereco", ""))
-        nome = filtrar_placeholders(data.get("nome", ""))
-        telefone = filtrar_placeholders(data.get("telefone", ""))
-        cpf = filtrar_placeholders(data.get("cpf", ""))
-        email = filtrar_placeholders(data.get("email", ""))
-        urgente_str = filtrar_placeholders(data.get("urgente", "não"))
+        # 🔍 BUSCAR PRÉ-AGENDAMENTO MAIS RECENTE COM PLACEHOLDERS
+        logger.info("🔍 ETAPA 2: Buscando pré-agendamento mais recente com placeholders...")
+        response_busca = supabase.table("agendamentos_ai").select("*").eq(
+            "nome", "{{nome}}"
+        ).eq("status", "pendente").order("created_at", desc=True).limit(1).execute()
+
+        if not response_busca.data:
+            logger.error("❌ ETAPA 2: Nenhum pré-agendamento encontrado com placeholders")
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Pré-agendamento não encontrado"}
+            )
+
+        pre_agendamento = response_busca.data[0]
+        agendamento_id = pre_agendamento["id"]
+        logger.info(f"✅ ETAPA 2: Pré-agendamento encontrado: {agendamento_id}")
+
+        # 🔧 EXTRAIR DADOS REAIS DO CLIENTECHAT (sem placeholders)
+        # Na ETAPA 2, o ClienteChat envia dados reais extraídos da conversa
+        endereco = data.get("endereco", "").strip()
+        nome = data.get("nome", "").strip()
+        telefone = data.get("telefone", "").strip()
+        cpf = data.get("cpf", "").strip()
+        email = data.get("email", "").strip()
+        urgente_str = data.get("urgente", "não").strip()
         urgente = urgente_str.lower() in ['sim', 'true', 'urgente', '1', 'yes'] if urgente_str else False
 
-        # Consolidar equipamentos e filtrar placeholders
-        equipamentos = []
-        for i in range(1, 4):
-            eq_key = "equipamento" if i == 1 else f"equipamento_{i}"
-            tipo_key = f"tipo_equipamento_{i}"
+        logger.info(f"🔧 ETAPA 2: Dados reais extraídos:")
+        logger.info(f"🔧   nome: '{nome}'")
+        logger.info(f"🔧   endereco: '{endereco}'")
+        logger.info(f"🔧   telefone: '{telefone}'")
+        logger.info(f"🔧   cpf: '{cpf}'")
+        logger.info(f"🔧   email: '{email}'")
+        logger.info(f"🔧   urgente: {urgente}")
 
-            equipamento = filtrar_placeholders(data.get(eq_key, ""))
-            tipo_equipamento = filtrar_placeholders(data.get(tipo_key, ""))
+        # 🔧 CONSOLIDAR EQUIPAMENTOS E PROBLEMAS REAIS
+        equipamentos = []
+        problemas = []
+        tipos_atendimento = []
+
+        # Equipamento principal
+        equipamento_1 = data.get("equipamento", "").strip()
+        problema_1 = data.get("problema", "").strip()
+        tipo_1 = data.get("tipo_atendimento_1", "em_domicilio").strip()
+
+        if equipamento_1:
+            equipamentos.append(equipamento_1)
+            problemas.append(problema_1 or "Não especificado")
+            tipos_atendimento.append(tipo_1)
+
+        # Equipamentos adicionais
+        for i in range(2, 4):
+            eq_key = f"equipamento_{i}"
+            prob_key = f"problema_{i}"
+            tipo_key = f"tipo_atendimento_{i}"
+
+            equipamento = data.get(eq_key, "").strip()
+            problema = data.get(prob_key, "").strip()
+            tipo = data.get(tipo_key, "em_domicilio").strip()
 
             if equipamento:
-                equipamentos.append({
-                    "equipamento": equipamento,
-                    "tipo": tipo_equipamento or "Não especificado"
-                })
+                equipamentos.append(equipamento)
+                problemas.append(problema or "Não especificado")
+                tipos_atendimento.append(tipo)
 
-        # Consolidar problemas e filtrar placeholders
-        problemas = []
-        for i in range(1, 4):
-            prob_key = "problema" if i == 1 else f"problema_{i}"
-            problema = filtrar_placeholders(data.get(prob_key, ""))
-            if problema:
-                problemas.append(problema)
+        logger.info(f"🔧 ETAPA 2: {len(equipamentos)} equipamentos encontrados: {equipamentos}")
+        logger.info(f"🔧 ETAPA 2: Problemas: {problemas}")
+        logger.info(f"🔧 ETAPA 2: Tipos atendimento: {tipos_atendimento}")
+
+        # 🔄 ATUALIZAR PRÉ-AGENDAMENTO COM DADOS REAIS
+        logger.info(f"🔄 ETAPA 2: Atualizando pré-agendamento {agendamento_id} com dados reais...")
+
+        dados_atualizacao = {
+            "nome": nome,
+            "endereco": endereco,
+            "telefone": telefone,
+            "equipamento": equipamentos[0] if equipamentos else "Não especificado",
+            "problema": problemas[0] if problemas else "Não especificado",
+            "urgente": urgente,
+            "status": "confirmado"  # Mudar status para confirmado
+        }
+
+        # Adicionar dados opcionais se disponíveis
+        if cpf:
+            dados_atualizacao["cpf"] = cpf
+        if email:
+            dados_atualizacao["email"] = email
+        if len(equipamentos) > 1:
+            dados_atualizacao["equipamentos"] = json.dumps(equipamentos)
+            dados_atualizacao["problemas"] = json.dumps(problemas)
+            dados_atualizacao["tipos_atendimento"] = json.dumps(tipos_atendimento)
+
+        try:
+            response_update = supabase.table("agendamentos_ai").update(dados_atualizacao).eq("id", agendamento_id).execute()
+            logger.info(f"✅ ETAPA 2: Pré-agendamento atualizado com sucesso: {response_update.data}")
+        except Exception as e:
+            logger.error(f"❌ ETAPA 2: Erro ao atualizar pré-agendamento: {e}")
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "message": f"Erro ao atualizar agendamento: {str(e)}"}
+            )
 
         # Validar dados obrigatórios
         if not nome or not endereco or not telefone or not equipamentos or not horario_escolhido:
