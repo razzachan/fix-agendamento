@@ -1297,12 +1297,26 @@ async def agendamento_inteligente_confirmacao(request: Request):
 
         logger.info(f"🔍 ETAPA 2: opcao_escolhida='{opcao_escolhida}', telefone='{telefone_contato}'")
 
-        # Validar entrada
-        if not opcao_escolhida or opcao_escolhida not in ["1", "2", "3"]:
+        # Validar e normalizar entrada
+        opcao_normalizada = None
+        if opcao_escolhida:
+            # Extrair número da opção (aceita "1", "opção 1", "primeira", etc.)
+            opcao_lower = opcao_escolhida.lower()
+            if "1" in opcao_lower or "primeira" in opcao_lower or "primeiro" in opcao_lower:
+                opcao_normalizada = "1"
+            elif "2" in opcao_lower or "segunda" in opcao_lower or "segundo" in opcao_lower:
+                opcao_normalizada = "2"
+            elif "3" in opcao_lower or "terceira" in opcao_lower or "terceiro" in opcao_lower:
+                opcao_normalizada = "3"
+
+        if not opcao_normalizada:
+            logger.error(f"❌ ETAPA 2: Opção inválida recebida: '{opcao_escolhida}'")
             return JSONResponse(
                 status_code=400,
-                content={"success": False, "message": "Opção inválida. Escolha 1, 2 ou 3."}
+                content={"success": False, "message": f"Opção inválida: '{opcao_escolhida}'. Escolha 1, 2 ou 3."}
             )
+
+        logger.info(f"✅ ETAPA 2: Opção normalizada: '{opcao_escolhida}' → '{opcao_normalizada}'")
 
         if not telefone_contato:
             return JSONResponse(
@@ -1333,7 +1347,7 @@ async def agendamento_inteligente_confirmacao(request: Request):
         logger.info(f"✅ ETAPA 2: Pré-agendamento encontrado: {agendamento_id}")
 
         # Processar confirmação final
-        return await processar_confirmacao_final(pre_agendamento, opcao_escolhida)
+        return await processar_confirmacao_final(pre_agendamento, opcao_normalizada)
 
     except Exception as e:
         logger.error(f"❌ ETAPA 2: Erro ao processar confirmação: {e}")
