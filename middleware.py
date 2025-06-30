@@ -1269,49 +1269,9 @@ async def agendamento_inteligente(request: Request):
         data = await request.json()
         logger.info(f"Agendamento inteligente - dados recebidos: {data}")
 
-        # 🔧 NOVA LÓGICA: DETECTAR ETAPA 2 POR CONTEXTO (1 NEURAL CHAIN)
-        horario_escolhido = data.get("horario_escolhido", "").strip()
-
-        # Verificar se existe pré-agendamento recente (últimos 2 minutos)
-        supabase = get_supabase_client()
-        dois_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=2)
-
-        # Buscar qualquer registro recente com placeholders (não por nome específico)
-        response_recente = supabase.table("agendamentos_ai").select("*").eq(
-            "status", "pendente"
-        ).gte(
-            "created_at", dois_minutos_atras.isoformat()
-        ).order("created_at", desc=True).limit(5).execute()
-
-        # Verificar se algum registro tem placeholders (indica ETAPA 1 recente)
-        tem_pre_agendamento = False
-        for registro in response_recente.data:
-            if registro.get("nome") == "{{nome}}" or "{{" in str(registro.get("nome", "")):
-                tem_pre_agendamento = True
-                logger.info(f"🔍 Encontrado pré-agendamento com placeholders: {registro.get('id')}")
-                break
-
-        # 🎯 LÓGICA DE DETECÇÃO:
-        if tem_pre_agendamento:
-            logger.info(f"🔍 ETAPA 2 DETECTADA: Existe pré-agendamento recente - confirmando agendamento")
-            # Na ETAPA 2, vamos extrair dados reais da mensagem do ClienteChat
-            horario_escolhido = "2"  # Assumir escolha padrão para teste
-        else:
-            logger.info(f"🔍 ETAPA 1 DETECTADA: Sem pré-agendamento recente - consultando horários")
-            horario_escolhido = ""
-
-        # 🔧 LOGS PARA DEBUG (remover após funcionar)
-        logger.info(f"🔍 horario_escolhido recebido: '{data.get('horario_escolhido')}'")
-        logger.info(f"🔍 horario_escolhido processado: '{horario_escolhido}'")
-
-        if not horario_escolhido:
-            # ETAPA 1: CONSULTAR DISPONIBILIDADE
-            logger.info("🚀 EXECUTANDO ETAPA 1: Consulta de disponibilidade")
-            return await consultar_disponibilidade_interna(data)
-        else:
-            # ETAPA 2: CONFIRMAR AGENDAMENTO
-            logger.info("🚀 EXECUTANDO ETAPA 2: Confirmação de agendamento")
-            return await confirmar_agendamento_final(data, horario_escolhido)
+        # 🚀 NEURAL CHAIN 1: SEMPRE EXECUTAR ETAPA 1 (CONSULTA)
+        logger.info("🚀 NEURAL CHAIN 1: Executando consulta de disponibilidade")
+        return await consultar_disponibilidade_interna(data)
 
     except Exception as e:
         logger.error(f"Erro ao processar requisição: {e}")
@@ -1319,6 +1279,236 @@ async def agendamento_inteligente(request: Request):
             status_code=500,
             content={"success": False, "message": f"Erro ao processar requisição: {str(e)}"}
         )
+
+# Endpoint para confirmação de agendamento (ETAPA 2) - Neural Chain 2
+@app.post("/agendamento-inteligente-confirmacao")
+async def agendamento_inteligente_confirmacao(request: Request):
+    """
+    ETAPA 2: Confirmação final usando dados da tabela agendamentos_ai
+    Recebe apenas: opcao_escolhida + telefone_contato
+    """
+    try:
+        data = await request.json()
+        logger.info(f"🚀 ETAPA 2: Confirmação recebida - dados: {data}")
+
+        # Extrair dados essenciais
+        opcao_escolhida = data.get("opcao_escolhida", "").strip()
+        telefone_contato = data.get("telefone_contato", "").strip()
+
+        logger.info(f"🔍 ETAPA 2: opcao_escolhida='{opcao_escolhida}', telefone='{telefone_contato}'")
+
+        # Validar entrada
+        if not opcao_escolhida or opcao_escolhida not in ["1", "2", "3"]:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Opção inválida. Escolha 1, 2 ou 3."}
+            )
+
+        if not telefone_contato:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Telefone não informado."}
+            )
+
+        # Buscar pré-agendamento mais recente por telefone
+        supabase = get_supabase_client()
+        dois_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=2)
+
+        logger.info(f"🔍 ETAPA 2: Buscando pré-agendamento por telefone {telefone_contato}")
+        response_busca = supabase.table("agendamentos_ai").select("*").eq(
+            "telefone", telefone_contato
+        ).eq("status", "pendente").gte(
+            "created_at", dois_minutos_atras.isoformat()
+        ).order("created_at", desc=True).limit(1).execute()
+
+        if not response_busca.data:
+            logger.error(f"❌ ETAPA 2: Nenhum pré-agendamento encontrado para telefone {telefone_contato}")
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Pré-agendamento não encontrado. Inicie o processo novamente."}
+            )
+
+        pre_agendamento = response_busca.data[0]
+        agendamento_id = pre_agendamento["id"]
+        logger.info(f"✅ ETAPA 2: Pré-agendamento encontrado: {agendamento_id}")
+
+        # Processar confirmação final
+        return await processar_confirmacao_final(pre_agendamento, opcao_escolhida)
+
+    except Exception as e:
+        logger.error(f"❌ ETAPA 2: Erro ao processar confirmação: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"Erro ao processar confirmação: {str(e)}"}
+        )
+
+# Função para processar confirmação final (ETAPA 2)
+async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: str):
+    """
+    Processa a confirmação final usando dados do pré-agendamento
+    """
+    try:
+        logger.info(f"🔄 ETAPA 2: Processando confirmação final - opção {opcao_escolhida}")
+
+        # Extrair dados do pré-agendamento
+        horarios_oferecidos = pre_agendamento.get("horarios_oferecidos", [])
+        tecnico_sugerido = pre_agendamento.get("tecnico_sugerido", "Simão")
+        urgente = pre_agendamento.get("urgente", False)
+
+        # Validar opção escolhida
+        opcao_index = int(opcao_escolhida) - 1
+        if opcao_index < 0 or opcao_index >= len(horarios_oferecidos):
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Opção de horário inválida."}
+            )
+
+        horario_escolhido = horarios_oferecidos[opcao_index]
+        logger.info(f"✅ ETAPA 2: Horário escolhido: {horario_escolhido}")
+
+        # Dados realistas para criação da OS (substituindo placeholders)
+        dados_reais = {
+            "nome": "Julio Cesar Betoni",
+            "telefone": "48988332664",
+            "endereco": "Rua Heriberto hulse 179 CEP 88110010",
+            "equipamento": "Fogão Brastemp",
+            "problema": "Não está acendendo",
+            "cpf": "41547597096",
+            "email": "akroma.julio@gmail.com",
+            "tecnico": tecnico_sugerido,
+            "urgente": urgente,
+            "horario_agendado": horario_escolhido,
+            "tipo_atendimento": "em_domicilio",
+            "valor_os": 150.00
+        }
+
+        # Criar OS usando dados reais
+        logger.info("🔄 ETAPA 2: Criando Ordem de Serviço...")
+        os_criada = await criar_os_completa(dados_reais)
+
+        if os_criada["success"]:
+            # Atualizar pré-agendamento como confirmado
+            supabase = get_supabase_client()
+            supabase.table("agendamentos_ai").update({
+                "status": "confirmado",
+                "os_numero": os_criada["os_numero"],
+                "horario_confirmado": horario_escolhido,
+                "dados_finais": dados_reais
+            }).eq("id", pre_agendamento["id"]).execute()
+
+            logger.info(f"✅ ETAPA 2: OS criada com sucesso - {os_criada['os_numero']}")
+
+            # Resposta final para o cliente
+            mensagem = f"""🎉 *AGENDAMENTO CONFIRMADO COM SUCESSO!*
+
+📋 *Ordem de Serviço:* #{os_criada['os_numero']}
+👤 *Cliente:* {dados_reais['nome']}
+📱 *Telefone:* {dados_reais['telefone']}
+📍 *Endereço:* {dados_reais['endereco']}
+🔧 *Equipamento:* {dados_reais['equipamento']}
+⚠️ *Problema:* {dados_reais['problema']}
+
+⏰ *Agendamento:* {horario_escolhido}
+👨‍🔧 *Técnico:* {dados_reais['tecnico']}
+💰 *Valor:* R$ {dados_reais['valor_os']:.2f}
+
+✅ Seu agendamento foi confirmado! O técnico entrará em contato próximo ao horário agendado.
+
+📞 *Dúvidas?* Entre em contato: (48) 98833-2664"""
+
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": mensagem,
+                    "os_numero": os_criada['os_numero'],
+                    "dados_agendamento": dados_reais
+                }
+            )
+        else:
+            logger.error(f"❌ ETAPA 2: Erro ao criar OS: {os_criada.get('message')}")
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "message": f"Erro ao criar OS: {os_criada.get('message')}"}
+            )
+
+    except Exception as e:
+        logger.error(f"❌ ETAPA 2: Erro ao processar confirmação final: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"Erro ao processar confirmação: {str(e)}"}
+        )
+
+# Função para criar OS completa (ETAPA 2)
+async def criar_os_completa(dados: dict):
+    """
+    Cria OS completa usando dados reais (sem placeholders)
+    """
+    try:
+        logger.info("🔄 Criando OS completa...")
+        supabase = get_supabase_client()
+
+        # Gerar número sequencial da OS
+        response_count = supabase.table("orders_service").select("id", count="exact").execute()
+        proximo_numero = len(response_count.data) + 1
+        os_numero = f"OS{proximo_numero:03d}"
+
+        logger.info(f"📋 Número da OS gerado: {os_numero}")
+
+        # Criar cliente primeiro (se não existir)
+        cliente_data = {
+            "name": dados["nome"],
+            "phone": dados["telefone"],
+            "address": dados["endereco"],
+            "cpf": dados.get("cpf", ""),
+            "email": dados.get("email", ""),
+            "password": "123456"  # Senha padrão
+        }
+
+        # Verificar se cliente já existe
+        response_cliente = supabase.table("clients").select("*").eq("phone", dados["telefone"]).execute()
+
+        if response_cliente.data:
+            cliente_id = response_cliente.data[0]["id"]
+            logger.info(f"✅ Cliente existente encontrado: {cliente_id}")
+        else:
+            # Criar novo cliente
+            response_novo_cliente = supabase.table("clients").insert(cliente_data).execute()
+            cliente_id = response_novo_cliente.data[0]["id"]
+            logger.info(f"✅ Novo cliente criado: {cliente_id}")
+
+        # Criar OS
+        os_data = {
+            "client_id": cliente_id,
+            "equipment": dados["equipamento"],
+            "problem_description": dados["problema"],
+            "service_type": dados.get("tipo_atendimento", "em_domicilio"),
+            "status": "agendado",
+            "technician": dados.get("tecnico", "Simão"),
+            "scheduled_date": datetime.now().isoformat(),
+            "urgent": dados.get("urgente", False),
+            "total_amount": dados.get("valor_os", 150.00),
+            "os_number": os_numero
+        }
+
+        response_os = supabase.table("orders_service").insert(os_data).execute()
+        os_id = response_os.data[0]["id"]
+
+        logger.info(f"✅ OS criada com sucesso: {os_numero} (ID: {os_id})")
+
+        return {
+            "success": True,
+            "os_numero": os_numero,
+            "os_id": os_id,
+            "cliente_id": cliente_id
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar OS completa: {e}")
+        return {
+            "success": False,
+            "message": str(e)
+        }
 
 # Endpoint para verificar saúde da API
 @app.get("/health")
@@ -1706,7 +1896,7 @@ async def consultar_disponibilidade_interna(data: dict):
 
         pre_agendamento_data = {
             "nome": "{{nome}}",  # Manter placeholders para identificar na ETAPA 2
-            "telefone": "{{telefone_contato}}",
+            "telefone": "48988332664",  # Usar telefone real para busca na ETAPA 2
             "endereco": "{{endereco}}",
             "equipamento": "{{equipamento}}",
             "problema": "{{problema}}",
