@@ -1983,20 +1983,25 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
     """
     try:
         logger.info(f"🚀 ETAPA 2: Iniciando confirmar_agendamento_final com horario_escolhido='{horario_escolhido}'")
+
+        # Extrair telefone dos dados recebidos
+        telefone_contato = data.get("telefone_contato", data.get("telefone", ""))
+        logger.info(f"📞 ETAPA 2: Telefone extraído: '{telefone_contato}'")
+
         supabase = get_supabase_client()
         logger.info(f"✅ ETAPA 2: Supabase client criado com sucesso")
 
         # 🔍 BUSCAR PRÉ-AGENDAMENTO MAIS RECENTE POR TELEFONE
-        logger.info("🔍 ETAPA 2: Buscando pré-agendamento mais recente por telefone...")
+        logger.info(f"🔍 ETAPA 2: Buscando pré-agendamento por telefone {telefone_contato}...")
         cinco_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=5)
         response_busca = supabase.table("agendamentos_ai").select("*").eq(
-            "telefone", "48988332664"
+            "telefone", telefone_contato
         ).eq("status", "pendente").gte(
             "created_at", cinco_minutos_atras.isoformat()
         ).order("created_at", desc=True).limit(1).execute()
 
         if not response_busca.data:
-            logger.error("❌ ETAPA 2: Nenhum pré-agendamento encontrado por telefone")
+            logger.error(f"❌ ETAPA 2: Nenhum pré-agendamento encontrado para telefone {telefone_contato}")
             return JSONResponse(
                 status_code=400,
                 content={"success": False, "message": "Pré-agendamento não encontrado. Inicie o processo novamente."}
