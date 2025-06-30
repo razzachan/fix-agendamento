@@ -2361,6 +2361,7 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
 
         # 2.2. Criar ordem de serviço (mesmo formato dos modais)
         order_number = await gerar_proximo_numero_os()
+        logger.info(f"🔢 ETAPA 2: Número OS gerado: {order_number}")
 
         dados_os = {
             "id": str(uuid.uuid4()),
