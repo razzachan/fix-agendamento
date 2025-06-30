@@ -63,9 +63,96 @@ async def gerar_proximo_numero_os():
         timestamp = int(datetime.now().timestamp()) % 10000
         return f"OS #{timestamp:04d}"
 
+async def gerar_horarios_com_disponibilidade_tecnico(technician_id: str, technician_name: str, urgente: bool = False) -> List[Dict]:
+    """
+    Gera horários baseados na disponibilidade real do técnico
+    """
+    try:
+        logger.info(f"🔍 Verificando disponibilidade real do técnico {technician_name} (ID: {technician_id})")
+
+        agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
+        inicio = agora + timedelta(days=1 if urgente else 2)
+
+        # Horários preferenciais para verificar
+        horarios_preferidos = [
+            {"hora": 9, "texto": "9h e 10h"},
+            {"hora": 14, "texto": "14h e 15h"},
+            {"hora": 16, "texto": "16h e 17h"}
+        ]
+
+        horarios_disponiveis = []
+        supabase = get_supabase_client()
+
+        # Verificar disponibilidade nos próximos 7 dias
+        for dia_offset in range(7):
+            data_verificacao = inicio + timedelta(days=dia_offset)
+
+            # Pular fins de semana
+            if data_verificacao.weekday() >= 5:
+                continue
+
+            data_str = data_verificacao.strftime('%Y-%m-%d')
+
+            # Verificar cada horário preferido
+            for horario_info in horarios_preferidos:
+                horario_dt = data_verificacao.replace(
+                    hour=horario_info["hora"],
+                    minute=0,
+                    second=0,
+                    microsecond=0
+                )
+
+                # Verificar se técnico está disponível neste horário
+                disponivel = await verificar_horario_tecnico_disponivel(
+                    technician_id,
+                    data_str,
+                    horario_info["hora"]
+                )
+
+                if disponivel:
+                    # Formatar data por extenso
+                    dias_semana = {
+                        'Monday': 'Segunda-feira', 'Tuesday': 'Terça-feira',
+                        'Wednesday': 'Quarta-feira', 'Thursday': 'Quinta-feira',
+                        'Friday': 'Sexta-feira'
+                    }
+
+                    dia_semana_pt = dias_semana.get(horario_dt.strftime('%A'), horario_dt.strftime('%A'))
+                    data_formatada = f"{dia_semana_pt}, {horario_dt.strftime('%d/%m/%Y')}"
+
+                    horarios_disponiveis.append({
+                        "numero": len(horarios_disponiveis) + 1,
+                        "texto": f"Previsão de chegada entre {horario_info['texto']} - {data_formatada}",
+                        "datetime_agendamento": horario_dt.isoformat(),
+                        "dia_semana": data_formatada,
+                        "hora_agendamento": f"{horario_info['hora']:02d}:00"
+                    })
+
+                    # Parar quando tiver 3 horários
+                    if len(horarios_disponiveis) >= 3:
+                        break
+
+            # Parar quando tiver 3 horários
+            if len(horarios_disponiveis) >= 3:
+                break
+
+        # Se não encontrou horários suficientes, usar fallback
+        if len(horarios_disponiveis) < 3:
+            logger.warning(f"⚠️ Apenas {len(horarios_disponiveis)} horários disponíveis para {technician_name}")
+            # Completar com horários fixos mais distantes
+            return gerar_horarios_fixos_consistentes(urgente)
+
+        logger.info(f"✅ {len(horarios_disponiveis)} horários disponíveis encontrados para {technician_name}")
+        return horarios_disponiveis
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao verificar disponibilidade do técnico: {e}")
+        # Fallback para horários fixos
+        return gerar_horarios_fixos_consistentes(urgente)
+
 def gerar_horarios_fixos_consistentes(urgente: bool = False) -> List[Dict]:
     """
-    Gera sempre os mesmos 3 horários para garantir consistência entre ETAPA 1 e 2
+    Gera sempre os mesmos 3 horários para garantir consistência entre ETAPA 1 e 2 (FALLBACK)
     """
     try:
         agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
@@ -327,6 +414,45 @@ async def gerar_horarios_disponiveis_v4(tecnico: str, grupo_logistico: str, urge
     except Exception as e:
         logger.error(f"Erro ao gerar horários disponíveis: {e}")
         return []
+
+async def verificar_horario_tecnico_disponivel(technician_id: str, date_str: str, hour: int) -> bool:
+    """
+    Verifica se um técnico específico está disponível em um horário específico
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Verificar agendamentos na tabela service_orders
+        response_os = supabase.table("service_orders").select("*").eq(
+            "technician_id", technician_id
+        ).eq(
+            "scheduled_date", date_str
+        ).like(
+            "scheduled_time", f"{hour:02d}:%"
+        ).execute()
+
+        if response_os.data and len(response_os.data) > 0:
+            logger.debug(f"❌ Técnico {technician_id} ocupado em {date_str} às {hour}:00 (service_orders)")
+            return False
+
+        # Verificar agendamentos na tabela agendamentos_ai
+        horario_dt = datetime.strptime(f"{date_str} {hour:02d}:00", "%Y-%m-%d %H:%M")
+        response_ai = supabase.table("agendamentos_ai").select("*").eq(
+            "technician_id", technician_id
+        ).eq(
+            "data_agendada", horario_dt.isoformat()
+        ).execute()
+
+        if response_ai.data and len(response_ai.data) > 0:
+            logger.debug(f"❌ Técnico {technician_id} ocupado em {date_str} às {hour}:00 (agendamentos_ai)")
+            return False
+
+        logger.debug(f"✅ Técnico {technician_id} disponível em {date_str} às {hour}:00")
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao verificar disponibilidade do técnico {technician_id}: {e}")
+        return False  # Em caso de erro, assumir ocupado por segurança
 
 async def verificar_horario_disponivel(horario_dt: datetime, tecnico: str) -> bool:
     """
@@ -1940,9 +2066,13 @@ async def consultar_disponibilidade_interna(data: dict):
         tecnico_info = await determinar_tecnico_otimizado(lista_equipamentos, grupo_logistico, urgente)
         tecnico = f"{tecnico_info['nome']} ({tecnico_info['email']})"
 
-        # 🕐 ETAPA 1: Gerar horários fixos e consistentes
-        logger.info(f"🕐 ETAPA 1: Gerando horários fixos para consistência")
-        horarios_disponiveis = gerar_horarios_fixos_consistentes(urgente)
+        # 🕐 ETAPA 1: Gerar horários considerando disponibilidade do técnico
+        logger.info(f"🕐 ETAPA 1: Gerando horários baseados na disponibilidade do técnico {tecnico_info['nome']}")
+        horarios_disponiveis = await gerar_horarios_com_disponibilidade_tecnico(
+            tecnico_info['tecnico_id'],
+            tecnico_info['nome'],
+            urgente
+        )
 
         if not horarios_disponiveis:
             return JSONResponse(
