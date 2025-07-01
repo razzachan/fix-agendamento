@@ -2707,32 +2707,25 @@ async def agendamento_inteligente_completo(request: Request):
         data = await request.json()
         logger.info(f"Agendamento inteligente - dados recebidos: {data}")
 
-        # 🔧 NOVA LÓGICA: DETECTAR ETAPA 2 POR CONTEXTO (1 NEURAL CHAIN)
+        # 🔧 NOVA LÓGICA: DETECTAR ETAPA POR PARÂMETRO opcao_escolhida
+        opcao_escolhida = data.get("opcao_escolhida", "").strip()
         horario_escolhido = data.get("horario_escolhido", "").strip()
 
-        # Verificar se existe pré-agendamento recente (últimos 5 minutos)
+        # 🎯 LÓGICA DE DETECÇÃO CORRIGIDA:
+        # ETAPA 1: opcao_escolhida vazio ou não numérico
+        # ETAPA 2: opcao_escolhida é "1", "2" ou "3"
+
         supabase = get_supabase_client()
-        cinco_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=5)
 
-        response_recente = supabase.table("agendamentos_ai").select("*").eq(
-            "nome", "{{nome}}"
-        ).eq("status", "pendente").gte(
-            "created_at", cinco_minutos_atras.isoformat()
-        ).order("created_at", desc=True).limit(1).execute()
-
-        tem_pre_agendamento = len(response_recente.data) > 0
-
-        # 🎯 LÓGICA DE DETECÇÃO:
-        if tem_pre_agendamento:
-            logger.info(f"🔍 ETAPA 2 DETECTADA: Existe pré-agendamento recente - confirmando agendamento")
-            # Na ETAPA 2, vamos extrair dados reais da mensagem do ClienteChat
-            horario_escolhido = "2"  # Assumir escolha padrão para teste
+        if opcao_escolhida and opcao_escolhida in ["1", "2", "3"]:
+            logger.info(f"🔍 ETAPA 2 DETECTADA: opcao_escolhida = '{opcao_escolhida}' - confirmando agendamento")
+            horario_escolhido = opcao_escolhida  # Usar escolha real do cliente
         else:
-            logger.info(f"🔍 ETAPA 1 DETECTADA: Sem pré-agendamento recente - consultando horários")
+            logger.info(f"🔍 ETAPA 1 DETECTADA: opcao_escolhida = '{opcao_escolhida}' - consultando horários")
             horario_escolhido = ""
 
-        # 🔧 LOGS PARA DEBUG (remover após funcionar)
-        logger.info(f"🔍 horario_escolhido recebido: '{data.get('horario_escolhido')}'")
+        # 🔧 LOGS PARA DEBUG
+        logger.info(f"🔍 opcao_escolhida recebido: '{data.get('opcao_escolhida', '')}'")
         logger.info(f"🔍 horario_escolhido processado: '{horario_escolhido}'")
 
         # 🔍 DEBUG: Mostrar dados principais
@@ -2741,7 +2734,7 @@ async def agendamento_inteligente_completo(request: Request):
         logger.info(f"🔍   telefone: '{data.get('telefone', '')}'")
         logger.info(f"🔍   endereco: '{data.get('endereco', '')}'")
         logger.info(f"🔍   equipamento: '{data.get('equipamento', '')}'")
-        logger.info(f"🔍   horario_escolhido: '{data.get('horario_escolhido', '')}'")
+        logger.info(f"🔍   opcao_escolhida: '{data.get('opcao_escolhida', '')}'")
         logger.info(f"🔍   ALL DATA KEYS: {list(data.keys())}")
 
         if not horario_escolhido:
