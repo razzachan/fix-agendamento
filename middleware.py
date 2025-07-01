@@ -3101,12 +3101,34 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
             # É uma escolha numérica - gerar horários para processar
             logger.info(f"🎯 Processando escolha numérica: {horario_escolhido}")
 
-            # 🕐 ETAPA 2: Gerar horários fixos e consistentes
-            logger.info(f"🎯 ETAPA 2: Gerando horários fixos para escolha {horario_escolhido}")
+            # 🕐 ETAPA 2: Usar horários salvos da ETAPA 1 para garantir consistência total
+            logger.info(f"🎯 ETAPA 2: Recuperando horários salvos da ETAPA 1 para escolha {horario_escolhido}")
 
-            # Gerar sempre os mesmos 3 horários para garantir consistência
-            horarios_disponiveis = gerar_horarios_fixos_consistentes(urgente)
-            logger.info(f"🔍 Horários fixos gerados: {len(horarios_disponiveis)}")
+            # 1. PRIORIDADE: Usar horários salvos da ETAPA 1
+            horarios_disponiveis = []
+            if 'horarios_oferecidos' in pre_agendamento and pre_agendamento['horarios_oferecidos']:
+                horarios_disponiveis = pre_agendamento['horarios_oferecidos']
+                logger.info(f"✅ ETAPA 2: Usando horários salvos da ETAPA 1: {len(horarios_disponiveis)}")
+            else:
+                # 2. FALLBACK: Gerar novos horários com logística inteligente
+                logger.warning("⚠️ ETAPA 2: Horários não encontrados na ETAPA 1, gerando novos...")
+                horarios_disponiveis = await gerar_horarios_logistica_inteligente(
+                    technician_id=pre_agendamento['technician_id'],
+                    technician_name=pre_agendamento.get('technician_name', 'Técnico'),
+                    grupo_logistico=determinar_grupo_logistico(pre_agendamento['endereco']),
+                    coordenadas=None,  # Será geocodificado internamente
+                    endereco=pre_agendamento['endereco'],
+                    urgente=urgente,
+                    agora=datetime.now(pytz.timezone('America/Sao_Paulo')),
+                    supabase=supabase
+                )
+                logger.info(f"🔍 Horários inteligentes gerados: {len(horarios_disponiveis)}")
+
+                # 3. ÚLTIMO RECURSO: Horários fixos
+                if not horarios_disponiveis or len(horarios_disponiveis) == 0:
+                    logger.warning("⚠️ ETAPA 2: Logística inteligente falhou, usando horários fixos")
+                    horarios_disponiveis = gerar_horarios_fixos_consistentes(urgente)
+                    logger.info(f"🔄 Horários fixos gerados: {len(horarios_disponiveis)}")
 
             if not horarios_disponiveis:
                 return JSONResponse(
@@ -3114,10 +3136,11 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
                     content={"success": False, "message": "Não há horários disponíveis no momento"}
                 )
 
-            # Debug: mostrar horários disponíveis
-            logger.info(f"🔍 Horários disponíveis gerados: {len(horarios_disponiveis)}")
+            # Debug: mostrar horários disponíveis com detalhes
+            logger.info(f"🔍 ETAPA 2: Horários disponíveis: {len(horarios_disponiveis)}")
             for i, h in enumerate(horarios_disponiveis[:3], 1):
-                logger.info(f"   {i}. {h.get('texto', 'N/A')} -> {h.get('datetime_agendamento', 'N/A')}")
+                escolhido = "👈 ESCOLHIDO" if str(i) == str(horario_escolhido) else ""
+                logger.info(f"   {i}. {h.get('texto', 'N/A')} -> {h.get('datetime_agendamento', 'N/A')} {escolhido}")
 
             # Processar escolha
             logger.info(f"🔍 Chamando processar_escolha_horario com: escolha='{horario_escolhido}', horarios={len(horarios_disponiveis)}")
