@@ -670,12 +670,12 @@ async def verificar_horario_tecnico_disponivel(technician_id: str, date_str: str
         supabase = get_supabase_client()
 
         # Verificar agendamentos na tabela service_orders
+        # Como scheduled_date contém data+hora, vamos verificar o horário específico
+        target_datetime = f"{date_str}T{hour:02d}:"
         response_os = supabase.table("service_orders").select("*").eq(
             "technician_id", technician_id
-        ).eq(
-            "scheduled_date", date_str
         ).like(
-            "scheduled_time", f"{hour:02d}:%"
+            "scheduled_date", f"{target_datetime}%"
         ).execute()
 
         if response_os.data and len(response_os.data) > 0:
