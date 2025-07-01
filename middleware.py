@@ -672,6 +672,8 @@ async def verificar_horario_tecnico_disponivel(technician_id: str, date_str: str
         # Verificar agendamentos na tabela service_orders
         # Como scheduled_date contém data+hora, vamos verificar o horário específico
         target_datetime = f"{date_str}T{hour:02d}:"
+        logger.debug(f"🔍 Verificando service_orders: technician_id={technician_id}, target={target_datetime}")
+
         response_os = supabase.table("service_orders").select("*").eq(
             "technician_id", technician_id
         ).like(
@@ -679,22 +681,29 @@ async def verificar_horario_tecnico_disponivel(technician_id: str, date_str: str
         ).execute()
 
         if response_os.data and len(response_os.data) > 0:
-            logger.debug(f"❌ Técnico {technician_id} ocupado em {date_str} às {hour}:00 (service_orders)")
+            logger.info(f"❌ Técnico {technician_id} ocupado em {date_str} às {hour}:00 (service_orders) - {len(response_os.data)} conflitos")
+            for os in response_os.data:
+                logger.debug(f"   📋 OS conflitante: {os.get('order_number', 'N/A')} - {os.get('scheduled_date', 'N/A')}")
             return False
 
         # Verificar agendamentos na tabela agendamentos_ai
         horario_dt = datetime.strptime(f"{date_str} {hour:02d}:00", "%Y-%m-%d %H:%M")
+        target_iso = horario_dt.isoformat()
+        logger.debug(f"🔍 Verificando agendamentos_ai: technician_id={technician_id}, target_iso={target_iso}")
+
         response_ai = supabase.table("agendamentos_ai").select("*").eq(
             "technician_id", technician_id
         ).eq(
-            "data_agendada", horario_dt.isoformat()
+            "data_agendada", target_iso
         ).execute()
 
         if response_ai.data and len(response_ai.data) > 0:
-            logger.debug(f"❌ Técnico {technician_id} ocupado em {date_str} às {hour}:00 (agendamentos_ai)")
+            logger.info(f"❌ Técnico {technician_id} ocupado em {date_str} às {hour}:00 (agendamentos_ai) - {len(response_ai.data)} conflitos")
+            for ag in response_ai.data:
+                logger.debug(f"   📅 Agendamento conflitante: {ag.get('nome', 'N/A')} - {ag.get('data_agendada', 'N/A')}")
             return False
 
-        logger.debug(f"✅ Técnico {technician_id} disponível em {date_str} às {hour}:00")
+        logger.info(f"✅ Técnico {technician_id} disponível em {date_str} às {hour}:00")
         return True
 
     except Exception as e:
@@ -2834,8 +2843,13 @@ async def consultar_disponibilidade_interna(data: dict):
             urgente = False  # Padrão quando placeholder filtrado
 
         # Determinar técnico otimizado para ETAPA 1
+        logger.info(f"🎯 ETAPA 1: Iniciando determinação de técnico para equipamentos: {lista_equipamentos}")
+        logger.info(f"🎯 ETAPA 1: Grupo logístico: {grupo_logistico}, Urgente: {urgente}")
+
         tecnico_info = await determinar_tecnico_otimizado(lista_equipamentos, grupo_logistico, urgente)
         tecnico = f"{tecnico_info['nome']} ({tecnico_info['email']})"
+
+        logger.info(f"🏆 ETAPA 1: Técnico selecionado: {tecnico_info['nome']} (ID: {tecnico_info['tecnico_id']}, Score: {tecnico_info['score']})")
 
         # 🕐 ETAPA 1: Gerar horários com logística inteligente
         logger.info(f"🕐 ETAPA 1: Gerando horários com logística inteligente para {tecnico_info['nome']} - Grupo {grupo_logistico}")
