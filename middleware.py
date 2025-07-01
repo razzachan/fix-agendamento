@@ -670,14 +670,17 @@ async def verificar_horario_tecnico_disponivel(technician_id: str, date_str: str
         supabase = get_supabase_client()
 
         # Verificar agendamentos na tabela service_orders
-        # Como scheduled_date contém data+hora, vamos verificar o horário específico
-        target_datetime = f"{date_str}T{hour:02d}:"
-        logger.debug(f"🔍 Verificando service_orders: technician_id={technician_id}, target={target_datetime}")
+        # Usar range de horário em vez de LIKE para timestamp
+        start_datetime = f"{date_str}T{hour:02d}:00:00"
+        end_datetime = f"{date_str}T{hour:02d}:59:59"
+        logger.debug(f"🔍 Verificando service_orders: technician_id={technician_id}, range={start_datetime} to {end_datetime}")
 
         response_os = supabase.table("service_orders").select("*").eq(
             "technician_id", technician_id
-        ).like(
-            "scheduled_date", f"{target_datetime}%"
+        ).gte(
+            "scheduled_date", start_datetime
+        ).lte(
+            "scheduled_date", end_datetime
         ).execute()
 
         if response_os.data and len(response_os.data) > 0:
@@ -687,14 +690,17 @@ async def verificar_horario_tecnico_disponivel(technician_id: str, date_str: str
             return False
 
         # Verificar agendamentos na tabela agendamentos_ai
-        horario_dt = datetime.strptime(f"{date_str} {hour:02d}:00", "%Y-%m-%d %H:%M")
-        target_iso = horario_dt.isoformat()
-        logger.debug(f"🔍 Verificando agendamentos_ai: technician_id={technician_id}, target_iso={target_iso}")
+        # Usar range de horário para maior flexibilidade
+        start_ai = f"{date_str}T{hour:02d}:00:00"
+        end_ai = f"{date_str}T{hour:02d}:59:59"
+        logger.debug(f"🔍 Verificando agendamentos_ai: technician_id={technician_id}, range={start_ai} to {end_ai}")
 
         response_ai = supabase.table("agendamentos_ai").select("*").eq(
             "technician_id", technician_id
-        ).eq(
-            "data_agendada", target_iso
+        ).gte(
+            "data_agendada", start_ai
+        ).lte(
+            "data_agendada", end_ai
         ).execute()
 
         if response_ai.data and len(response_ai.data) > 0:
