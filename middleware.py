@@ -14,6 +14,12 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import pytz
+from contextlib import asynccontextmanager
+
+# Cache global para otimização
+_supabase_client = None
+_technicians_cache = {}
+_cache_timestamp = None
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -587,16 +593,22 @@ def filtrar_placeholders(valor: str) -> str:
 
     return valor
 
-# Função para obter cliente Supabase
+# Função para obter cliente Supabase com cache
 def get_supabase_client() -> Client:
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_KEY")
-    
-    if not url or not key:
-        logger.error("Variáveis de ambiente SUPABASE_URL ou SUPABASE_KEY não definidas")
-        raise ValueError("Variáveis de ambiente SUPABASE_URL ou SUPABASE_KEY não definidas")
-    
-    return create_client(url, key)
+    global _supabase_client
+
+    if _supabase_client is None:
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_KEY")
+
+        if not url or not key:
+            logger.error("Variáveis de ambiente SUPABASE_URL ou SUPABASE_KEY não definidas")
+            raise ValueError("Variáveis de ambiente SUPABASE_URL ou SUPABASE_KEY não definidas")
+
+        _supabase_client = create_client(url, key)
+        logger.info("🔧 Cliente Supabase inicializado com cache")
+
+    return _supabase_client
 
 # Função para determinar técnico baseado no equipamento
 def determinar_tecnico(equipamento: str) -> str:
@@ -834,7 +846,9 @@ async def geocodificar_endereco(endereco: str) -> Optional[Tuple[float, float]]:
         encoded_address = endereco.replace(' ', '+') + ',+Brasil'
         url = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded_address}&limit=1&countrycodes=br"
 
-        async with httpx.AsyncClient() as client:
+        # Cliente HTTP otimizado com timeout
+        timeout = httpx.Timeout(10.0, connect=5.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(url, headers={
                 'User-Agent': 'FixFogoes/1.0 (contato@fixfogoes.com.br)'
             })
@@ -2536,14 +2550,34 @@ async def criar_os_completa(dados: dict):
 # Endpoint para verificar saúde da API
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "ok",
-        "version": "3.1.3-PYTHON311-FIXED",
-        "timestamp": "2025-07-04T16:00:00",
-        "middleware": "agendamento-inteligente",
-        "railway_deploy": "python311_fixed",
-        "build_status": "WORKING"
-    }
+    try:
+        # Teste rápido de conectividade com Supabase
+        supabase = get_supabase_client()
+        test_response = supabase.table("technicians").select("count", count="exact").limit(1).execute()
+        supabase_status = "connected" if test_response else "error"
+
+        return {
+            "status": "ok",
+            "version": "3.1.4-PERFORMANCE-OPTIMIZED",
+            "timestamp": datetime.now(pytz.timezone('America/Sao_Paulo')).isoformat(),
+            "middleware": "agendamento-inteligente",
+            "railway_deploy": "python311_optimized",
+            "build_status": "WORKING",
+            "supabase_status": supabase_status,
+            "cache_status": "enabled" if _supabase_client else "initializing",
+            "performance": {
+                "timeout_keep_alive": 300,
+                "timeout_graceful_shutdown": 30,
+                "cache_enabled": True
+            }
+        }
+    except Exception as e:
+        logger.error(f"❌ Health check error: {e}")
+        return {
+            "status": "degraded",
+            "version": "3.1.4-PERFORMANCE-OPTIMIZED",
+            "error": str(e)
+        }
 
 # Endpoint de DEBUG para ver dados do ClienteChat
 @app.post("/debug-clientechat")
