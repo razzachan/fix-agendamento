@@ -21,6 +21,144 @@ _supabase_client = None
 _technicians_cache = {}
 _cache_timestamp = None
 
+def calcular_data_inicio_otimizada(urgente: bool = False) -> datetime:
+    """
+    🎯 NOVA LÓGICA: Sempre calcular a data de início mais próxima possível
+
+    ANTES: Urgente = +1 dia, Normal = +2 dias
+    AGORA: Urgente = +1 dia, Normal = +1 dia (sempre o mais próximo)
+
+    Isso garante que sempre oferecemos as datas mais próximas disponíveis
+    """
+    agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
+
+    # 🎯 SEMPRE COMEÇAR NO PRÓXIMO DIA ÚTIL DISPONÍVEL
+    inicio = agora + timedelta(days=1)
+
+    # Pular para o próximo dia útil se necessário
+    while inicio.weekday() >= 5:  # 5=sábado, 6=domingo
+        inicio += timedelta(days=1)
+
+    logger.info(f"🎯 Data início otimizada: {inicio.strftime('%Y-%m-%d')} (Urgente: {urgente})")
+    return inicio
+
+async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente: bool = False) -> List[Dict]:
+    """
+    🎯 NOVA FUNÇÃO: Gera horários sempre priorizando as datas mais próximas disponíveis
+
+    Esta função substitui a lógica complexa por uma busca sequencial simples:
+    1. Começa no próximo dia útil
+    2. Verifica disponibilidade sequencialmente
+    3. Para assim que encontrar 3 horários
+    """
+    try:
+        logger.info(f"🎯 Gerando horários próximas datas - Técnico: {technician_id}, Urgente: {urgente}")
+
+        inicio = calcular_data_inicio_otimizada(urgente)
+        horarios_disponiveis = []
+
+        # Horários comerciais preferenciais
+        horarios_comerciais = [
+            {"hora": 9, "texto": "9h e 10h"},
+            {"hora": 10, "texto": "10h e 11h"},
+            {"hora": 14, "texto": "14h e 15h"},
+            {"hora": 15, "texto": "15h e 16h"},
+            {"hora": 16, "texto": "16h e 17h"}
+        ]
+
+        # Buscar sequencialmente até encontrar 3 horários
+        dia_offset = 0
+        while len(horarios_disponiveis) < 3 and dia_offset < 20:  # Máximo 20 dias
+            data_verificacao = inicio + timedelta(days=dia_offset)
+            dia_offset += 1
+
+            # Pular fins de semana
+            if data_verificacao.weekday() >= 5:
+                continue
+
+            # Verificar cada horário do dia
+            for horario_info in horarios_comerciais:
+                if len(horarios_disponiveis) >= 3:
+                    break
+
+                horario_dt = data_verificacao.replace(
+                    hour=horario_info["hora"],
+                    minute=0,
+                    second=0,
+                    microsecond=0
+                )
+
+                # Verificar disponibilidade
+                if await verificar_horario_disponivel_tecnico(technician_id, horario_dt):
+                    # Formatar data
+                    dias_semana = {
+                        'Monday': 'Segunda-feira', 'Tuesday': 'Terça-feira',
+                        'Wednesday': 'Quarta-feira', 'Thursday': 'Quinta-feira',
+                        'Friday': 'Sexta-feira', 'Saturday': 'Sábado', 'Sunday': 'Domingo'
+                    }
+
+                    dia_semana_pt = dias_semana.get(horario_dt.strftime('%A'), horario_dt.strftime('%A'))
+                    data_formatada = f"{dia_semana_pt}, {horario_dt.strftime('%d/%m/%Y')}"
+
+                    # Calcular score baseado na proximidade (mais próximo = maior score)
+                    score_proximidade = 50 - dia_offset  # Quanto mais próximo, maior o score
+                    score_horario = 15 if horario_info["hora"] <= 10 else 10  # Manhã preferencial
+                    score_total = score_proximidade + score_horario
+
+                    horarios_disponiveis.append({
+                        "numero": len(horarios_disponiveis) + 1,
+                        "texto": f"Previsão de chegada entre {horario_info['texto']} - {data_formatada}",
+                        "datetime_agendamento": horario_dt.isoformat(),
+                        "dia_semana": data_formatada,
+                        "hora_agendamento": f"{horario_info['hora']:02d}:00",
+                        "score_otimizacao": score_total,
+                        "grupo_logistico": "A"  # Será ajustado pela função principal
+                    })
+
+                    logger.info(f"✅ Horário próximo encontrado: {data_formatada} {horario_info['hora']}h (Score: {score_total})")
+
+        logger.info(f"🎯 Total de horários próximos encontrados: {len(horarios_disponiveis)}")
+        return horarios_disponiveis
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao gerar horários próximas datas: {e}")
+        return []
+
+async def verificar_horario_disponivel_tecnico(technician_id: str, horario_dt: datetime) -> bool:
+    """
+    Verifica se um técnico específico está disponível em um horário específico
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Verificar conflitos em service_orders
+        data_str = horario_dt.strftime('%Y-%m-%d')
+        hora_str = horario_dt.strftime('%H:%M')
+
+        response_os = supabase.table("service_orders").select("*").eq(
+            "technician_id", technician_id
+        ).eq("scheduled_date", data_str).eq("scheduled_time", hora_str).execute()
+
+        if response_os.data:
+            return False
+
+        # Verificar conflitos em agendamentos_ai
+        inicio_range = horario_dt.isoformat()
+        fim_range = (horario_dt + timedelta(hours=1)).isoformat()
+
+        response_ai = supabase.table("agendamentos_ai").select("*").eq(
+            "technician_id", technician_id
+        ).gte("data_agendada", inicio_range).lte("data_agendada", fim_range).execute()
+
+        if response_ai.data:
+            return False
+
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao verificar disponibilidade do técnico: {e}")
+        return False
+
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -204,15 +342,22 @@ async def processar_horarios_com_otimizacao(
     🎯 Processa horários com otimização inteligente
     """
     horarios_disponiveis = []
-    inicio = agora + timedelta(days=1 if urgente else 2)
+    inicio = calcular_data_inicio_otimizada(urgente)
 
-    # Verificar próximos 10 dias úteis
-    for dia_offset in range(10):
+    # 🎯 BUSCAR SEMPRE AS DATAS MAIS PRÓXIMAS DISPONÍVEIS
+    # Verificar próximos 15 dias úteis para garantir opções
+    dias_verificados = 0
+    dia_offset = 0
+
+    while len(horarios_disponiveis) < 3 and dias_verificados < 15:
         data_verificacao = inicio + timedelta(days=dia_offset)
+        dia_offset += 1
 
         # Pular fins de semana
         if data_verificacao.weekday() >= 5:
             continue
+
+        dias_verificados += 1
 
         data_str = data_verificacao.strftime('%Y-%m-%d')
 
@@ -286,7 +431,7 @@ async def gerar_horarios_com_disponibilidade_tecnico(technician_id: str, technic
         logger.info(f"🔍 Verificando disponibilidade real do técnico {technician_name} (ID: {technician_id})")
 
         agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
-        inicio = agora + timedelta(days=1 if urgente else 2)
+        inicio = calcular_data_inicio_otimizada(urgente)
 
         # Horários preferenciais para verificar - HORÁRIOS COMERCIAIS
         horarios_preferidos = [
@@ -301,13 +446,19 @@ async def gerar_horarios_com_disponibilidade_tecnico(technician_id: str, technic
         horarios_disponiveis = []
         supabase = get_supabase_client()
 
-        # Verificar disponibilidade nos próximos 7 dias
-        for dia_offset in range(7):
+        # 🎯 BUSCAR SEQUENCIALMENTE AS DATAS MAIS PRÓXIMAS
+        dias_verificados = 0
+        dia_offset = 0
+
+        while len(horarios_disponiveis) < 3 and dias_verificados < 10:
             data_verificacao = inicio + timedelta(days=dia_offset)
+            dia_offset += 1
 
             # Pular fins de semana
             if data_verificacao.weekday() >= 5:
                 continue
+
+            dias_verificados += 1
 
             data_str = data_verificacao.strftime('%Y-%m-%d')
 
@@ -375,8 +526,8 @@ def gerar_horarios_fixos_consistentes(urgente: bool = False) -> List[Dict]:
     try:
         agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
 
-        # Para urgente, começar amanhã. Para normal, começar em 2 dias
-        inicio = agora + timedelta(days=1 if urgente else 2)
+        # 🎯 NOVA LÓGICA: Sempre usar data mais próxima disponível
+        inicio = calcular_data_inicio_otimizada(urgente)
 
         # Sempre gerar os mesmos 3 horários: 09:00-10:00, 14:00-15:00, 16:00-17:00
         horarios_fixos = [
@@ -654,8 +805,8 @@ async def gerar_horarios_disponiveis_v4(tecnico: str, grupo_logistico: str, urge
             agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
             logger.info(f"🕐 Usando data atual: {agora}")
 
-        # Para urgente, começar amanhã. Para normal, começar em 2 dias
-        inicio = agora + timedelta(days=1 if urgente else 2)
+        # 🎯 NOVA LÓGICA: Sempre usar data mais próxima disponível
+        inicio = calcular_data_inicio_otimizada(urgente)
 
         # Gerar horários para os próximos 7 dias
         for i in range(7):
@@ -1644,7 +1795,7 @@ async def processar_horarios_rota_sequencial(
     logger.info(f"🎯 DEBUG: Horários prioritários: {len(horarios_prioritarios)}")
 
     horarios_disponiveis = []
-    inicio = agora + timedelta(days=1 if urgente else 2)
+    inicio = calcular_data_inicio_otimizada(urgente)
     logger.info(f"🎯 DEBUG: Data início busca: {inicio.strftime('%Y-%m-%d')}")
 
     # Agrupar agendamentos por data
@@ -2938,20 +3089,34 @@ async def consultar_disponibilidade_interna(data: dict):
 
         logger.info(f"🏆 ETAPA 1: Técnico selecionado: {tecnico_info['nome']} (ID: {tecnico_info['tecnico_id']}, Score: {tecnico_info['score']})")
 
-        # 🕐 ETAPA 1: Gerar horários com logística inteligente
-        logger.info(f"🕐 ETAPA 1: Gerando horários com logística inteligente para {tecnico_info['nome']} - Grupo {grupo_logistico}")
+        # 🎯 ETAPA 1: NOVA LÓGICA - Sempre priorizar datas mais próximas
+        logger.info(f"🎯 ETAPA 1: Gerando horários próximas datas para {tecnico_info['nome']} - Grupo {grupo_logistico}")
 
-        # Geocodificar endereço para otimização de rotas
-        coordenadas = await geocodificar_endereco(endereco)
-
-        horarios_disponiveis = await gerar_horarios_logistica_inteligente(
+        # Usar nova função que sempre busca as datas mais próximas
+        horarios_disponiveis = await gerar_horarios_proximas_datas_disponiveis(
             tecnico_info['tecnico_id'],
-            tecnico_info['nome'],
-            grupo_logistico,
-            coordenadas,
-            endereco,
             urgente
         )
+
+        # Ajustar grupo logístico nos horários
+        for horario in horarios_disponiveis:
+            horario['grupo_logistico'] = grupo_logistico
+
+        # Se não encontrou horários próximos, usar fallback da logística inteligente
+        if not horarios_disponiveis:
+            logger.warning("⚠️ Nenhum horário próximo encontrado, usando logística inteligente como fallback")
+
+            # Geocodificar endereço para otimização de rotas
+            coordenadas = await geocodificar_endereco(endereco)
+
+            horarios_disponiveis = await gerar_horarios_logistica_inteligente(
+                tecnico_info['tecnico_id'],
+                tecnico_info['nome'],
+                grupo_logistico,
+                coordenadas,
+                endereco,
+                urgente
+            )
 
         if not horarios_disponiveis:
             return JSONResponse(
