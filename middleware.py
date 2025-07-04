@@ -2365,68 +2365,88 @@ async def inserir_agendamento(agendamento: Dict[str, Any]) -> Dict[str, Any]:
 @app.post("/agendamento-inteligente")
 async def agendamento_inteligente(request: Request):
     """
-    🎯 ETAPA 1 APENAS: Consultar horários disponíveis
-
-    Este endpoint é chamado pela Neural Chain 1 (confirmacao_agendamento) do ClienteChat
-    e SEMPRE executa apenas a consulta de disponibilidade, retornando 3 opções de horários.
-
-    A Neural Chain 2 (confirmacao_agendamento_2) chama automaticamente o endpoint da ETAPA 2.
+    🎯 ENDPOINT INTELIGENTE: Detecta automaticamente ETAPA 1 ou ETAPA 2
     """
     try:
-        # Tentar obter JSON diretamente do FastAPI
-        try:
-            data = await request.json()
-            logger.info(f"🚀 NEURAL CHAIN 1: Executando consulta de disponibilidade")
-            logger.info(f"Agendamento inteligente - dados recebidos: {data}")
-        except Exception as json_error:
-            logger.error(f"❌ Erro ao parsear JSON: {json_error}")
+        data = await request.json()
+        logger.info(f"🚀 NEURAL CHAIN 1: Executando consulta de disponibilidade")
+        logger.info(f"Agendamento inteligente - dados recebidos: {data}")
 
-            # Fallback: tentar decodificar manualmente
-            raw_body = await request.body()
-            logger.info(f"🔍 Raw body recebido: {raw_body}")
+        # 🧠 DETECÇÃO INTELIGENTE DE ETAPA
+        logger.info("🔍 DEBUG: Iniciando detecção inteligente de etapa")
+        horario_escolhido = data.get("horario_escolhido", "1").strip()
+        telefone = data.get("telefone", "").strip()
+        logger.info(f"🔍 DEBUG: horario_escolhido='{horario_escolhido}', telefone='{telefone}'")
 
-            # Tentar decodificar UTF-8, depois Latin-1 como fallback
-            try:
-                body_str = raw_body.decode('utf-8')
-                logger.info(f"🔍 Body decodificado UTF-8: {body_str}")
-            except UnicodeDecodeError:
-                try:
-                    body_str = raw_body.decode('latin-1')
-                    logger.info(f"🔍 Body decodificado Latin-1: {body_str}")
-                except UnicodeDecodeError as e:
-                    logger.error(f"❌ Erro ao decodificar UTF-8 e Latin-1: {e}")
-                    return JSONResponse(
-                        status_code=400,
-                        content={"success": False, "message": "Erro de codificação de caracteres. Verifique os dados enviados."}
-                    )
+        # Verificar se há pré-agendamento recente
+        supabase = get_supabase_client()
+        tres_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=3)
+        response_busca = supabase.table("agendamentos_ai").select("*").eq(
+            "telefone", telefone
+        ).eq("status", "pendente").gte("created_at", tres_minutos_atras.isoformat()).order("created_at", desc=True).limit(1).execute()
 
-            # Tentar parsear JSON manualmente
-            import json
-            try:
-                data = json.loads(body_str)
-                logger.info(f"🔍 JSON parseado manualmente: {data}")
-            except json.JSONDecodeError as e:
-                logger.error(f"❌ Erro ao parsear JSON manualmente: {e}")
-                return JSONResponse(
-                    status_code=400,
-                    content={"success": False, "message": "Erro ao processar dados JSON."}
-                )
+        tem_pre_agendamento = bool(response_busca.data)
+        logger.info(f"🔍 DEBUG: Pré-agendamentos encontrados: {len(response_busca.data) if response_busca.data else 0}")
 
-        # 🎯 SEMPRE EXECUTAR ETAPA 1 - CONSULTA DE DISPONIBILIDADE
-        return await consultar_disponibilidade_interna(data)
+        if tem_pre_agendamento:
+            # ETAPA 2: CONFIRMAÇÃO
+            logger.info(f"🎯 ETAPA 2 DETECTADA: Cliente escolheu opção '{horario_escolhido}' - confirmando agendamento")
+            return await processar_etapa_2_confirmacao(horario_escolhido, telefone)
+        else:
+            # ETAPA 1: CONSULTA
+            logger.info(f"🎯 ETAPA 1 DETECTADA: Primeira consulta - gerando opções de horário")
+            resultado_consulta = await consultar_disponibilidade_interna(data)
 
-    except UnicodeDecodeError as e:
-        logger.error(f"Erro de encoding UTF-8: {e}")
-        return JSONResponse(
-            status_code=400,
-            content={"success": False, "message": "Erro de codificação de caracteres. Verifique os dados enviados."}
-        )
+            # Criar pré-agendamento
+            if hasattr(resultado_consulta, 'status_code') and resultado_consulta.status_code == 200:
+                logger.info("💾 ETAPA 1: Criando pré-agendamento após consulta bem-sucedida")
+                await criar_pre_agendamento_etapa1(data, telefone)
+
+            return resultado_consulta
+
     except Exception as e:
-        logger.error(f"Erro ao processar consulta de disponibilidade: {e}")
+        logger.error(f"❌ Erro no agendamento inteligente: {e}")
         return JSONResponse(
             status_code=500,
-            content={"success": False, "message": f"Erro ao processar consulta: {str(e)}"}
+            content={"success": False, "message": "Erro interno do servidor"}
         )
+
+async def criar_pre_agendamento_etapa1(data: dict, telefone: str):
+    """
+    Cria pré-agendamento após ETAPA 1 bem-sucedida
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Extrair dados básicos
+        nome = data.get("nome", "").strip()
+        endereco = data.get("endereco", "").strip()
+        equipamentos = []
+
+        # Coletar equipamentos
+        for i in range(1, 4):
+            equip = data.get(f"equipamento_{i}" if i > 1 else "equipamento", "").strip()
+            if equip:
+                equipamentos.append(equip)
+
+        # Dados do pré-agendamento
+        pre_agendamento_data = {
+            "nome": nome,
+            "endereco": endereco,
+            "telefone": telefone,
+            "cpf": data.get("cpf", ""),
+            "email": data.get("email", ""),
+            "equipamentos": equipamentos,
+            "status": "pendente",
+            "urgente": data.get("urgente", "não").lower() == "sim"
+        }
+
+        # Inserir no banco
+        response = supabase.table("agendamentos_ai").insert(pre_agendamento_data).execute()
+        logger.info(f"💾 ETAPA 1: Pré-agendamento criado com ID: {response.data[0]['id']}")
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar pré-agendamento: {e}")
 
 # Endpoint para confirmação de agendamento (ETAPA 2) - Neural Chain 2
 @app.post("/agendamento-inteligente-confirmacao")
