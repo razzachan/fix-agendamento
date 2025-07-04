@@ -89,7 +89,10 @@ async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente:
                 )
 
                 # Verificar disponibilidade
-                if await verificar_horario_disponivel_tecnico(technician_id, horario_dt):
+                disponivel = await verificar_horario_disponivel_tecnico(technician_id, horario_dt)
+                logger.info(f"🔍 DEBUG: {data_verificacao.strftime('%d/%m/%Y')} {horario_info['hora']}h - Disponível: {disponivel}")
+
+                if disponivel:
                     # Formatar data
                     dias_semana = {
                         'Monday': 'Segunda-feira', 'Tuesday': 'Terça-feira',
@@ -135,11 +138,14 @@ async def verificar_horario_disponivel_tecnico(technician_id: str, horario_dt: d
         data_str = horario_dt.strftime('%Y-%m-%d')
         hora_str = horario_dt.strftime('%H:%M')
 
+        logger.info(f"🔍 DEBUG: Verificando {technician_id} em {data_str} {hora_str}")
+
         response_os = supabase.table("service_orders").select("*").eq(
             "technician_id", technician_id
         ).eq("scheduled_date", data_str).eq("scheduled_time", hora_str).execute()
 
         if response_os.data:
+            logger.info(f"❌ DEBUG: Conflito em service_orders: {len(response_os.data)} registros")
             return False
 
         # Verificar conflitos em agendamentos_ai
@@ -151,8 +157,10 @@ async def verificar_horario_disponivel_tecnico(technician_id: str, horario_dt: d
         ).gte("data_agendada", inicio_range).lte("data_agendada", fim_range).execute()
 
         if response_ai.data:
+            logger.info(f"❌ DEBUG: Conflito em agendamentos_ai: {len(response_ai.data)} registros")
             return False
 
+        logger.info(f"✅ DEBUG: Horário disponível!")
         return True
 
     except Exception as e:
