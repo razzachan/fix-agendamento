@@ -568,6 +568,17 @@ def filtrar_placeholders(valor: str) -> str:
     if not valor or not isinstance(valor, str):
         return ""
 
+    # Garantir encoding UTF-8 correto
+    try:
+        if isinstance(valor, bytes):
+            valor = valor.decode('utf-8')
+        elif isinstance(valor, str):
+            # Recodificar para garantir UTF-8 correto
+            valor = valor.encode('utf-8').decode('utf-8')
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        logger.warning(f"Erro de encoding ao processar valor: {repr(valor)}")
+        return ""
+
     valor = valor.strip()
 
     # Se é um placeholder, retornar string vazia
