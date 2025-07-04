@@ -2538,10 +2538,11 @@ async def criar_os_completa(dados: dict):
 async def health_check():
     return {
         "status": "ok",
-        "version": "3.1.2-FORCE-REBUILD",
-        "timestamp": "2025-07-04T15:30:00",
+        "version": "3.1.3-PYTHON311-FIXED",
+        "timestamp": "2025-07-04T16:00:00",
         "middleware": "agendamento-inteligente",
-        "railway_deploy": "forced"
+        "railway_deploy": "python311_fixed",
+        "build_status": "WORKING"
     }
 
 # Endpoint de DEBUG para ver dados do ClienteChat
