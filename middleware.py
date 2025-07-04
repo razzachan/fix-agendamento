@@ -2954,20 +2954,42 @@ async def consultar_disponibilidade_interna(data: dict):
         except Exception as e:
             logger.warning(f"⚠️ Erro ao preparar cache do técnico: {e}")
 
-        # Formatar resposta para o cliente - FORMATO MELHORADO E COMPLETO
+        # Formatar resposta para o cliente - FORMATO COMPATÍVEL COM CLIENTECHAT
         mensagem = f"✅ *Horários disponíveis para {primeiro_equipamento}:*\n\n"
+
+        # Lista simples de opções para o ClienteChat
+        opcoes_simples = []
 
         for i, horario in enumerate(horarios_disponiveis[:3], 1):
             # Extrair informações do horário
             dia_semana = horario.get('dia_semana', '')
-            hora_texto = horario.get('texto', '')
+            hora_agendamento = horario.get('hora_agendamento', '')
+            datetime_agendamento = horario.get('datetime_agendamento', '')
 
-            # Formato mais claro e completo
-            if 'Previsão de chegada entre' in hora_texto:
-                mensagem += f"*{i}.* {hora_texto}\n"
+            # Formato compatível com ClienteChat
+            if datetime_agendamento:
+                # Extrair data no formato DD/MM/YYYY
+                try:
+                    dt = datetime.fromisoformat(datetime_agendamento.replace('Z', '+00:00'))
+                    data_formatada = dt.strftime('%d/%m/%Y')
+                    hora_formatada = dt.strftime('%H:%M')
+                except:
+                    data_formatada = dia_semana.split(', ')[-1] if ', ' in dia_semana else 'Data não disponível'
+                    hora_formatada = hora_agendamento or '09:00'
             else:
-                # Fallback para formato mais simples
-                mensagem += f"*{i}.* {dia_semana} - {hora_texto}\n"
+                data_formatada = dia_semana.split(', ')[-1] if ', ' in dia_semana else 'Data não disponível'
+                hora_formatada = hora_agendamento or '09:00'
+
+            # Adicionar à mensagem principal
+            mensagem += f"*{i}.* Data: {data_formatada} - Horário: {hora_formatada}\n"
+
+            # Adicionar à lista de opções simples
+            opcoes_simples.append({
+                "numero": i,
+                "data": data_formatada,
+                "horario": hora_formatada,
+                "datetime_completo": datetime_agendamento
+            })
 
         mensagem += "\n📝 *Como responder:*\n"
         mensagem += "• Digite *1*, *2* ou *3* para escolher\n"
@@ -2980,6 +3002,7 @@ async def consultar_disponibilidade_interna(data: dict):
                 "success": True,
                 "message": mensagem,
                 "horarios_disponiveis": horarios_disponiveis[:3],
+                "opcoes_simples": opcoes_simples,  # Formato simples para ClienteChat
                 "tecnico": tecnico,
                 "urgente": urgente,
                 "action": "select_time",
