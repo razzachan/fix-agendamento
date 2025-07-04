@@ -2196,6 +2196,12 @@ async def agendamento_inteligente(request: Request):
         # 🎯 SEMPRE EXECUTAR ETAPA 1 - CONSULTA DE DISPONIBILIDADE
         return await consultar_disponibilidade_interna(data)
 
+    except UnicodeDecodeError as e:
+        logger.error(f"Erro de encoding UTF-8: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Erro de codificação de caracteres. Verifique os dados enviados."}
+        )
     except Exception as e:
         logger.error(f"Erro ao processar consulta de disponibilidade: {e}")
         return JSONResponse(
