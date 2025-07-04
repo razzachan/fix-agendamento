@@ -8,7 +8,7 @@ cmds = ["pip install --no-cache-dir -r requirements.txt"]
 cmds = ["echo 'Build completed'", "rm -f main_backup.py || true", "python -m compileall middleware.py"]
 
 [start]
-cmd = "uvicorn middleware:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 300 --timeout-graceful-shutdown 30"
+cmd = "python main.py"
 
 [variables]
 PYTHONUNBUFFERED = "1"
