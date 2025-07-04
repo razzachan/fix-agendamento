@@ -2204,16 +2204,20 @@ async def agendamento_inteligente(request: Request):
         raw_body = await request.body()
         logger.info(f"🔍 Raw body recebido: {raw_body}")
 
-        # Tentar decodificar UTF-8
+        # Tentar decodificar UTF-8, depois Latin-1 como fallback
         try:
             body_str = raw_body.decode('utf-8')
             logger.info(f"🔍 Body decodificado UTF-8: {body_str}")
-        except UnicodeDecodeError as e:
-            logger.error(f"❌ Erro ao decodificar UTF-8: {e}")
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Erro de codificação de caracteres. Verifique os dados enviados."}
-            )
+        except UnicodeDecodeError:
+            try:
+                body_str = raw_body.decode('latin-1')
+                logger.info(f"🔍 Body decodificado Latin-1: {body_str}")
+            except UnicodeDecodeError as e:
+                logger.error(f"❌ Erro ao decodificar UTF-8 e Latin-1: {e}")
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "message": "Erro de codificação de caracteres. Verifique os dados enviados."}
+                )
 
         # Parsear JSON
         data = await request.json()
