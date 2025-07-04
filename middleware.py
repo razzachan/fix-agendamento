@@ -3302,8 +3302,30 @@ async def processar_etapa_2_confirmacao(opcao_escolhida: str, telefone_contato: 
         # Buscar dados do cache (horários e técnico) em vez de pré-agendamento
         logger.info(f"🔍 ETAPA 2: Buscando dados do cache por telefone {telefone_contato}")
 
-        # Criar dados temporários para buscar no cache (usando telefone)
-        dados_busca = {"telefone": telefone_contato}
+        # Buscar pré-agendamento para obter dados completos
+        supabase = get_supabase_client()
+        tres_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=3)
+        response_busca = supabase.table("agendamentos_ai").select("*").eq(
+            "telefone", telefone_contato
+        ).eq("status", "pendente").gte("created_at", tres_minutos_atras.isoformat()).order("created_at", desc=True).limit(1).execute()
+
+        if not response_busca.data:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "success": False,
+                    "message": "❌ Dados de agendamento não encontrados. Por favor, inicie o processo novamente."
+                }
+            )
+
+        pre_agendamento = response_busca.data[0]
+
+        # Criar dados para buscar no cache usando a mesma estrutura da ETAPA 1
+        dados_busca = {
+            "nome": pre_agendamento.get("nome", ""),
+            "endereco": pre_agendamento.get("endereco", ""),
+            "equipamento": pre_agendamento.get("equipamento", "")
+        }
         horarios_oferecidos = recuperar_horarios_cache(dados_busca)
 
         if not horarios_oferecidos:
