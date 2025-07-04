@@ -2536,7 +2536,13 @@ async def criar_os_completa(dados: dict):
 # Endpoint para verificar saúde da API
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "version": "3.1.1", "timestamp": "2025-07-04"}
+    return {
+        "status": "ok",
+        "version": "3.1.2-FORCE-REBUILD",
+        "timestamp": "2025-07-04T15:30:00",
+        "middleware": "agendamento-inteligente",
+        "railway_deploy": "forced"
+    }
 
 # Endpoint de DEBUG para ver dados do ClienteChat
 @app.post("/debug-clientechat")
