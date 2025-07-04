@@ -2438,6 +2438,7 @@ async def criar_pre_agendamento_etapa1(data: dict, telefone: str):
             "email": data.get("email", ""),
             "equipamento": equipamentos[0] if equipamentos else "",  # Primeiro equipamento como string
             "equipamentos": equipamentos,  # Array completo
+            "problema": data.get("problema", ""),  # Campo problema obrigatório
             "status": "pendente",
             "urgente": data.get("urgente", "não").lower() == "sim"
         }
