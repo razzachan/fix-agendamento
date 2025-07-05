@@ -186,8 +186,8 @@ async def gerar_proximo_numero_os():
         supabase = get_supabase_client()
 
         # Buscar o maior número existente
-        response = supabase.table("service_orders").select("order_number").not_(
-            "order_number", "is", None
+        response = supabase.table("service_orders").select("order_number").is_(
+            "order_number", "not.null"
         ).order("order_number", desc=True).limit(1).execute()
 
         next_number = 1
@@ -3682,7 +3682,7 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         logger.info(f"   - client_name: {os_data.get('client_name')}")
         logger.info(f"   - equipment_type: {os_data.get('equipment_type')}")
 
-        response_os = supabase.table("service_orders").insert(os_data).select().execute()
+        response_os = supabase.table("service_orders").insert(os_data).execute()
 
         if not response_os.data:
             raise Exception("Erro ao criar ordem de serviço")
