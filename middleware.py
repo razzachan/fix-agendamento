@@ -186,8 +186,8 @@ async def gerar_proximo_numero_os():
         supabase = get_supabase_client()
 
         # Buscar o maior número existente
-        response = supabase.table("service_orders").select("order_number").is_(
-            "order_number", "not.null"
+        response = supabase.table("service_orders").select("order_number").not_(
+            "order_number", "is", None
         ).order("order_number", desc=True).limit(1).execute()
 
         next_number = 1
@@ -3673,7 +3673,6 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
             "logistics_group": grupo_logistico,
             "service_type": service_type,
             "priority": service_order_data["priority"],
-            "estimated_cost": final_cost,
             "notes": service_order_data["notes"]
         }
 
