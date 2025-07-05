@@ -210,6 +210,9 @@ async def gerar_proximo_numero_os():
 
     except Exception as e:
         logger.error(f"Erro ao gerar número OS: {e}")
+        logger.error(f"Tipo do erro: {type(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         # Fallback para timestamp se falhar
         timestamp = int(datetime.now().timestamp()) % 10000
         return f"OS #{timestamp:04d}"
@@ -3768,6 +3771,9 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         # Tratar encoding de caracteres especiais
         error_msg = str(e).encode('utf-8', errors='replace').decode('utf-8')
         logger.error(f"Erro ao confirmar agendamento: {error_msg}")
+        logger.error(f"Tipo do erro: {type(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": f"Erro ao confirmar agendamento: {error_msg}"}
