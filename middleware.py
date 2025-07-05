@@ -3376,8 +3376,12 @@ async def processar_etapa_2_confirmacao(opcao_escolhida: str, telefone_contato: 
         # ETAPA 2: Criar agendamento final e OS
         logger.info(f"🚀 ETAPA 2: Criando agendamento final para horário: {horario_escolhido}")
 
-        # ✅ CORREÇÃO: Chamar confirmar_agendamento_final em vez de recursão
-        data_confirmacao = {"telefone": telefone_contato}
+        # ✅ CORREÇÃO: Passar dados do pré-agendamento diretamente
+        data_confirmacao = {
+            "telefone": telefone_contato,
+            "pre_agendamento": pre_agendamento,  # Passar dados do pré-agendamento
+            "horarios_oferecidos": horarios_oferecidos  # Passar horários do cache
+        }
         resultado = await confirmar_agendamento_final(data_confirmacao, horario_escolhido)
 
         return resultado
@@ -3404,19 +3408,21 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         supabase = get_supabase_client()
         logger.info(f"✅ ETAPA 2: Supabase client criado com sucesso")
 
-        # 🔍 BUSCAR DADOS DO CACHE EM VEZ DE PRÉ-AGENDAMENTO
-        logger.info(f"🔍 ETAPA 2: Buscando dados do cache por telefone {telefone_contato}...")
+        # 🔍 USAR DADOS PASSADOS DIRETAMENTE EM VEZ DE BUSCAR NO CACHE
+        logger.info(f"🔍 ETAPA 2: Usando dados passados diretamente")
 
-        # Criar dados temporários para buscar no cache
-        dados_busca = {"telefone": telefone_contato}
-        horarios_cache = recuperar_horarios_cache(dados_busca)
+        # Verificar se os dados foram passados
+        pre_agendamento = data.get("pre_agendamento")
+        horarios_oferecidos = data.get("horarios_oferecidos")
 
-        if not horarios_cache:
-            logger.error(f"❌ ETAPA 2: Nenhum dado encontrado no cache para telefone {telefone_contato}")
+        if not pre_agendamento or not horarios_oferecidos:
+            logger.error(f"❌ ETAPA 2: Dados não foram passados corretamente")
             return JSONResponse(
                 status_code=400,
                 content={"success": False, "message": "Dados de agendamento não encontrados. Inicie o processo novamente."}
             )
+
+        horarios_cache = horarios_oferecidos
 
         logger.info(f"✅ ETAPA 2: Dados encontrados no cache: {len(horarios_cache)} horários")
 
