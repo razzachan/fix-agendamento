@@ -42,7 +42,7 @@ export function mapServiceOrder(order: any): ServiceOrder {
     status: order.status as any,
     createdAt: order.created_at || '',
     scheduledDate: order.scheduled_date,
-    scheduledTime: order.scheduled_date ? new Date(order.scheduled_date).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : '',
+    scheduledTime: order.scheduled_time || (order.scheduled_date ? new Date(order.scheduled_date).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : ''),
     completedDate: order.completed_date,
     description: order.description,
     equipmentType: order.equipment_type,
