@@ -3628,6 +3628,36 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         client_id = None
         if client_data["name"]:
             try:
+                # 🔍 VERIFICAR SE CLIENTE JÁ EXISTE (evitar duplicatas)
+                normalized_email = client_data["email"].lower().strip() if client_data["email"] else ""
+                normalized_phone = ''.join(filter(str.isdigit, client_data["phone"])) if client_data["phone"] else ""
+
+                # 1. Verificar por email primeiro (mais confiável)
+                if normalized_email:
+                    logger.info(f"🔍 Verificando cliente existente por email: {normalized_email}")
+                    response_email = supabase.table("clients").select("id").ilike("email", normalized_email).limit(1).execute()
+                    if response_email.data and len(response_email.data) > 0:
+                        client_id = response_email.data[0]["id"]
+                        logger.info(f"✅ Cliente encontrado por email: {client_id}")
+                        return client_id
+
+                # 2. Verificar por telefone (últimos 8 dígitos)
+                if normalized_phone and len(normalized_phone) >= 8:
+                    logger.info(f"🔍 Verificando cliente existente por telefone: {normalized_phone}")
+                    response_all_phones = supabase.table("clients").select("id, phone").not_("phone", "is", None).execute()
+                    if response_all_phones.data:
+                        for client in response_all_phones.data:
+                            if client["phone"]:
+                                client_normalized_phone = ''.join(filter(str.isdigit, client["phone"]))
+                                if len(client_normalized_phone) >= 8 and len(normalized_phone) >= 8:
+                                    if (normalized_phone.endswith(client_normalized_phone[-8:]) or
+                                        client_normalized_phone.endswith(normalized_phone[-8:])):
+                                        client_id = client["id"]
+                                        logger.info(f"✅ Cliente encontrado por telefone: {client_id}")
+                                        return client_id
+
+                # 3. Se não encontrou, criar novo cliente
+                logger.info(f"🆕 Criando novo cliente: {client_data['name']}")
                 response_client = supabase.rpc('create_client', {
                     'client_name': client_data["name"],
                     'client_email': client_data["email"],
