@@ -1,7 +1,7 @@
 /**
  * Utilitários para geração e formatação de números sequenciais
  * Sistema de numeração amigável:
- * - Ordens de Serviço: OS #001, OS #002, etc.
+ * - Ordens de Serviço: #001, #002, etc.
  * - Pré-agendamentos: AG #001, AG #002, etc.
  */
 
@@ -21,7 +21,7 @@ export interface NumberConfig {
  */
 const NUMBER_CONFIGS: Record<NumberType, NumberConfig> = {
   service_order: {
-    prefix: 'OS',
+    prefix: '',
     tableName: 'service_orders',
     columnName: 'order_number',
     sequenceName: 'service_order_number_seq'
@@ -58,9 +58,11 @@ export async function generateNextNumber(type: NumberType): Promise<string> {
     let nextNumber = 1;
 
     if (records && records.length > 0 && records[0][config.columnName]) {
-      // Extrair número do formato "OS #001" ou "AG #001"
+      // Extrair número do formato "#001" ou "AG #001"
       const lastNumber = records[0][config.columnName];
-      const numberMatch = lastNumber.match(new RegExp(`${config.prefix} #(\\d+)`));
+      const numberMatch = config.prefix
+        ? lastNumber.match(new RegExp(`${config.prefix} #(\\d+)`))
+        : lastNumber.match(new RegExp(`#(\\d+)`));
 
       if (numberMatch) {
         const lastNum = parseInt(numberMatch[1], 10);
@@ -68,8 +70,10 @@ export async function generateNextNumber(type: NumberType): Promise<string> {
       }
     }
 
-    // 2. Formatar como "OS #001" ou "AG #001"
-    const formattedNumber = `${config.prefix} #${nextNumber.toString().padStart(3, '0')}`;
+    // 2. Formatar como "#001" ou "AG #001"
+    const formattedNumber = config.prefix
+      ? `${config.prefix} #${nextNumber.toString().padStart(3, '0')}`
+      : `#${nextNumber.toString().padStart(3, '0')}`;
 
     console.log(`🔢 Próximo número de ${type} gerado: ${formattedNumber}`);
     return formattedNumber;
@@ -106,7 +110,9 @@ export async function generateNextScheduleNumber(): Promise<string> {
  */
 export function formatNumber(number: number, type: NumberType): string {
   const config = NUMBER_CONFIGS[type];
-  return `${config.prefix} #${number.toString().padStart(3, '0')}`;
+  return config.prefix
+    ? `${config.prefix} #${number.toString().padStart(3, '0')}`
+    : `#${number.toString().padStart(3, '0')}`;
 }
 
 /**
@@ -127,13 +133,17 @@ export function formatOrderNumber(number: number): string {
 export function extractNumber(formattedNumber: string, type?: NumberType): number | null {
   if (type) {
     const config = NUMBER_CONFIGS[type];
-    const match = formattedNumber.match(new RegExp(`${config.prefix} #(\\d+)`));
+    const match = config.prefix
+      ? formattedNumber.match(new RegExp(`${config.prefix} #(\\d+)`))
+      : formattedNumber.match(new RegExp(`#(\\d+)`));
     return match ? parseInt(match[1], 10) : null;
   }
 
   // Detectar automaticamente o tipo
   for (const [numberType, config] of Object.entries(NUMBER_CONFIGS)) {
-    const match = formattedNumber.match(new RegExp(`${config.prefix} #(\\d+)`));
+    const match = config.prefix
+      ? formattedNumber.match(new RegExp(`${config.prefix} #(\\d+)`))
+      : formattedNumber.match(new RegExp(`#(\\d+)`));
     if (match) {
       return parseInt(match[1], 10);
     }
@@ -160,13 +170,19 @@ export function extractOrderNumber(orderNumber: string): number | null {
 export function isValidNumber(formattedNumber: string, type?: NumberType): boolean {
   if (type) {
     const config = NUMBER_CONFIGS[type];
-    return new RegExp(`^${config.prefix} #\\d{3,}$`).test(formattedNumber);
+    const pattern = config.prefix
+      ? `^${config.prefix} #\\d{3,}$`
+      : `^#\\d{3,}$`;
+    return new RegExp(pattern).test(formattedNumber);
   }
 
   // Validar qualquer tipo
-  return Object.values(NUMBER_CONFIGS).some(config =>
-    new RegExp(`^${config.prefix} #\\d{3,}$`).test(formattedNumber)
-  );
+  return Object.values(NUMBER_CONFIGS).some(config => {
+    const pattern = config.prefix
+      ? `^${config.prefix} #\\d{3,}$`
+      : `^#\\d{3,}$`;
+    return new RegExp(pattern).test(formattedNumber);
+  });
 }
 
 /**

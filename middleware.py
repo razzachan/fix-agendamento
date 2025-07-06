@@ -265,17 +265,17 @@ async def gerar_proximo_numero_os():
         next_number = 1
 
         if response.data and len(response.data) > 0 and response.data[0]["order_number"]:
-            # Extrair número do formato "OS #001"
+            # Extrair número do formato "#001"
             last_number = response.data[0]["order_number"]
             import re
-            number_match = re.search(r'OS #(\d+)', last_number)
+            number_match = re.search(r'#(\d+)', last_number)
 
             if number_match:
                 last_num = int(number_match.group(1))
                 next_number = last_num + 1
 
-        # Formatar como "OS #001"
-        formatted_number = f"OS #{next_number:03d}"
+        # Formatar como "#001"
+        formatted_number = f"#{next_number:03d}"
 
         logger.info(f"🔢 Próximo número OS gerado: {formatted_number}")
         return formatted_number
