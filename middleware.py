@@ -2383,7 +2383,7 @@ async def agendamento_inteligente(request: Request):
 
         # Verificar se há pré-agendamento recente
         supabase = get_supabase_client()
-        tres_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=3)
+        tres_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=10)
         response_busca = supabase.table("agendamentos_ai").select("*").eq(
             "telefone", telefone
         ).eq("status", "pendente").gte("created_at", tres_minutos_atras.isoformat()).order("created_at", desc=True).limit(1).execute()
