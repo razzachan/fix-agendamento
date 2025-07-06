@@ -2769,7 +2769,7 @@ async def criar_os_completa(dados: dict):
             "status": "scheduled",
             "technician_id": tecnico_id,  # ✅ ID DO TÉCNICO (obrigatório para dashboard)
             "technician_name": tecnico_nome_real,  # ✅ NOME DO TÉCNICO
-            "scheduled_date": converter_horario_para_iso(dados.get("horario_agendado")),  # ✅ CONVERTER PARA ISO
+            "scheduled_date": dados.get("horario_agendado"),  # ✅ JÁ ESTÁ EM FORMATO ISO
             "final_cost": dados.get("valor_os", 150.00),
             "order_number": os_numero,
             "pickup_address": dados["endereco"]
