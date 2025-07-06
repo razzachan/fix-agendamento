@@ -365,10 +365,10 @@ export const useMainCalendar = ({
       // Filtrar eventos relevantes para o calendário principal (excluir sugeridos e cancelados)
       // IMPORTANTE: Eventos cancelados NÃO devem aparecer no calendário
       const relevantEvents = calendarEvents.filter(event =>
-        event.status === 'confirmed' ||
-        event.status === 'completed' ||
-        event.status === 'in_progress'
-        // ❌ Excluir cancelados do calendário
+        event.status === 'confirmed' ||    // ✅ INCLUIR AGENDADOS (scheduled)
+        event.status === 'completed' ||    // ✅ INCLUIR CONCLUÍDOS
+        event.status === 'in_progress'     // ✅ INCLUIR EM PROGRESSO
+        // ❌ Excluir apenas cancelados e sugeridos do calendário
       );
 
       console.log(`✅ [useMainCalendar] ${relevantEvents.length} eventos relevantes carregados (excluindo cancelados)`);
