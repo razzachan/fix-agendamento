@@ -360,7 +360,15 @@ export const useMainCalendar = ({
       // Converter para CalendarEvent
       const calendarEvents: CalendarEvent[] = scheduledServices.map(service => {
         const relatedOrder = serviceOrders.find(order => order.id === service.serviceOrderId);
-        return convertToCalendarEvent(service, relatedOrder);
+        const event = convertToCalendarEvent(service, relatedOrder);
+        console.log(`🔍 [useMainCalendar] Evento convertido:`, {
+          id: event.id,
+          clientName: event.clientName,
+          status: event.status,
+          serviceStatus: service.status,
+          orderStatus: relatedOrder?.status
+        });
+        return event;
       });
 
       // Filtrar eventos relevantes para o calendário principal (excluir sugeridos e cancelados)
