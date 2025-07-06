@@ -3805,17 +3805,20 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         if os_criada["success"]:
             logger.info(f"✅ ETAPA 2: OS criada com sucesso - {os_criada['os_numero']}")
 
-            # Marcar agendamento como processado
-            try:
-                supabase.table("agendamentos_ai").update({
-                    "status": "confirmado",
-                    "os_numero": os_criada["os_numero"],
-                    "horario_confirmado": horario_escolhido,
-                    "dados_finais": dados_reais
-                }).eq("id", agendamento_id).execute()
-                logger.info(f"✅ Agendamento {agendamento_id} marcado como processado")
-            except Exception as update_error:
-                logger.warning(f"⚠️ Erro ao marcar agendamento como convertido: {update_error}")
+            # Marcar agendamento como processado (apenas se for UUID válido)
+            if agendamento_id != "etapa2-direto":
+                try:
+                    supabase.table("agendamentos_ai").update({
+                        "status": "confirmado",
+                        "os_numero": os_criada["os_numero"],
+                        "horario_confirmado": horario_escolhido,
+                        "dados_finais": dados_reais
+                    }).eq("id", agendamento_id).execute()
+                    logger.info(f"✅ Agendamento {agendamento_id} marcado como processado")
+                except Exception as update_error:
+                    logger.warning(f"⚠️ Erro ao marcar agendamento como convertido: {update_error}")
+            else:
+                logger.info(f"🚫 Pulando atualização de agendamento (ETAPA 2 direta)")
 
             return JSONResponse(
                 status_code=200,
