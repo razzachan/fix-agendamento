@@ -3331,10 +3331,25 @@ async def processar_etapa_2_confirmacao(opcao_escolhida: str, telefone_contato: 
 
         # Buscar pré-agendamento para obter dados completos
         supabase = get_supabase_client()
-        tres_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=3)
+        dez_minutos_atras = datetime.now(pytz.UTC) - timedelta(minutes=10)  # ✅ AUMENTAR JANELA
+
+        logger.info(f"🔍 ETAPA 2: Buscando pré-agendamento desde {dez_minutos_atras.isoformat()}")
+
+        # Buscar sem filtro de status primeiro para debug
+        response_debug = supabase.table("agendamentos_ai").select("*").eq(
+            "telefone", telefone_contato
+        ).gte("created_at", dez_minutos_atras.isoformat()).order("created_at", desc=True).execute()
+
+        logger.info(f"🔍 ETAPA 2: Total de agendamentos encontrados (qualquer status): {len(response_debug.data) if response_debug.data else 0}")
+
+        if response_debug.data:
+            for agend in response_debug.data:
+                logger.info(f"🔍 ETAPA 2: Agendamento ID={agend.get('id', 'N/A')[:8]}, Status={agend.get('status', 'N/A')}, Criado={agend.get('created_at', 'N/A')}")
+
+        # Agora buscar com status pendente
         response_busca = supabase.table("agendamentos_ai").select("*").eq(
             "telefone", telefone_contato
-        ).eq("status", "pendente").gte("created_at", tres_minutos_atras.isoformat()).order("created_at", desc=True).limit(1).execute()
+        ).eq("status", "pendente").gte("created_at", dez_minutos_atras.isoformat()).order("created_at", desc=True).limit(1).execute()
 
         if not response_busca.data:
             return JSONResponse(
