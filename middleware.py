@@ -2732,10 +2732,8 @@ async def criar_os_completa(dados: dict):
         logger.info("🔄 Criando OS completa...")
         supabase = get_supabase_client()
 
-        # Gerar número sequencial da OS
-        response_count = supabase.table("service_orders").select("id", count="exact").execute()
-        proximo_numero = len(response_count.data) + 1
-        os_numero = f"OS{proximo_numero:03d}"
+        # Gerar número sequencial da OS usando função correta
+        os_numero = await gerar_proximo_numero_os()
 
         logger.info(f"📋 Número da OS gerado: {os_numero}")
 

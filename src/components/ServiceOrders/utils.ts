@@ -1,11 +1,9 @@
+import { formatUTCStringAsLocal } from '@/utils/timezoneUtils';
+
 export const formatDate = (dateString: string) => {
   if (!dateString) return '-';
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date);
+  // Usar timezone utils para preservar o horário visual correto
+  return formatUTCStringAsLocal(dateString, 'dd/MM/yyyy HH:mm');
 };
 
 // Note: The searchAddresses function has been replaced by searchAddressesWithMapbox
