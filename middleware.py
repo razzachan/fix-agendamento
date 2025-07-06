@@ -2784,7 +2784,18 @@ async def criar_os_completa(dados: dict):
                 tecnico_id = None
                 tecnico_nome_real = tecnico_nome
 
-        # Criar OS
+        # Extrair horário para scheduled_time
+        horario_agendado_iso = converter_horario_para_iso_direto(dados.get("horario_agendado"))
+
+        # Extrair apenas o horário (HH:MM) do ISO datetime
+        try:
+            from datetime import datetime
+            dt_parsed = datetime.fromisoformat(horario_agendado_iso.replace('Z', '+00:00'))
+            scheduled_time = dt_parsed.strftime('%H:%M')
+        except:
+            scheduled_time = "10:00"  # Fallback
+
+        # Criar OS com TODOS os campos que o frontend usa
         os_data = {
             "client_id": cliente_id,
             "client_name": dados["nome"],
@@ -2797,7 +2808,12 @@ async def criar_os_completa(dados: dict):
             "status": "scheduled",
             "technician_id": tecnico_id,  # ✅ ID DO TÉCNICO (obrigatório para dashboard)
             "technician_name": tecnico_nome_real,  # ✅ NOME DO TÉCNICO
-            "scheduled_date": converter_horario_para_iso_direto(dados.get("horario_agendado")),  # ✅ CONVERTER TIMEZONE CORRETO
+            "scheduled_date": horario_agendado_iso,  # ✅ DATA E HORA COMPLETA
+            "scheduled_time": scheduled_time,  # ✅ APENAS HORÁRIO (HH:MM)
+            "created_at": datetime.now().isoformat(),  # ✅ DATA DE CRIAÇÃO
+            "completed_date": None,  # ✅ AINDA NÃO COMPLETADO
+            "needs_pickup": dados.get("tipo_atendimento") in ["coleta_conserto", "coleta_diagnostico"],  # ✅ BASEADO NO TIPO
+            "current_location": "client" if dados.get("tipo_atendimento") in ["coleta_conserto", "coleta_diagnostico"] else "workshop",  # ✅ LOCALIZAÇÃO
             "final_cost": dados.get("valor_os", 150.00),
             "order_number": os_numero,
             "pickup_address": dados["endereco"]
