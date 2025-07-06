@@ -3586,8 +3586,8 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         # Simular agendamento_id para compatibilidade
         agendamento_id = "etapa2-direto"
 
-        # 2. Usar função do modal para criar ordem de serviço
-        logger.info(f"🔧 ETAPA 2: Usando função do modal para criar OS com técnico {tecnico_info['tecnico_id']}")
+        # 2. Usar lógica do endpoint de confirmação (mais completa)
+        logger.info(f"🔧 ETAPA 2: Usando lógica completa do endpoint de confirmação")
 
         # Determinar tipo de serviço e valor baseado nos equipamentos
         service_type = "em_domicilio"
@@ -3597,200 +3597,58 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         descricao_completa = " | ".join(problemas) if problemas else "Não especificado"
         tipos_equipamentos = ", ".join(equipamentos)
 
-        # 2.1. Chamar função do modal para criar OS com técnico atribuído
-        logger.info(f"🚀 ETAPA 2: Chamando função do modal createServiceOrderFromAgendamento")
-        logger.info(f"   - agendamento_id: {agendamento_id}")
-        logger.info(f"   - technician_id: {tecnico_info['tecnico_id']}")
-        logger.info(f"   - equipamentos: {tipos_equipamentos}")
-
-        # Fazer chamada HTTP para o frontend criar a OS usando a função do modal
-        # Como estamos no backend Python, vamos simular os dados que o modal enviaria
-
-        service_order_data = {
-            "equipment": tipos_equipamentos,
-            "problem_description": descricao_completa,
-            "notes": f"Agendamento inteligente - Score técnico: {tecnico_info['score']}",
-            "estimated_cost": final_cost,
-            "service_attendance_type": service_type
+        # Dados completos para criação da OS (igual ao endpoint de confirmação)
+        dados_reais = {
+            "nome": nome,
+            "telefone": telefone,
+            "endereco": endereco,
+            "equipamento": tipos_equipamentos,
+            "problema": descricao_completa,
+            "cpf": cpf,
+            "email": email,
+            "tecnico": tecnico_info.get('nome', 'Paulo Cesar Betoni'),
+            "urgente": urgente,
+            "horario_agendado": horario_escolhido,
+            "tipo_atendimento": service_type,
+            "valor_os": final_cost
         }
 
-        # Como não podemos chamar diretamente a função TypeScript do Python,
-        # vamos criar a OS manualmente mas seguindo exatamente o padrão do modal
+        # Criar OS usando a função completa do endpoint de confirmação
+        logger.info("🔄 ETAPA 2: Criando Ordem de Serviço completa...")
+        os_criada = await criar_os_completa(dados_reais)
 
-        # Primeiro, criar cliente se necessário (mesmo padrão do modal)
-        client_data = {
-            "name": nome,
-            "email": email if email else None,
-            "phone": telefone,
-            "address": endereco
-        }
+        if os_criada["success"]:
+            logger.info(f"✅ ETAPA 2: OS criada com sucesso - {os_criada['os_numero']}")
 
-        client_id = None
-        if client_data["name"]:
+            # Marcar agendamento como processado
             try:
-                # 🔍 VERIFICAR SE CLIENTE JÁ EXISTE (evitar duplicatas)
-                normalized_email = client_data["email"].lower().strip() if client_data["email"] else ""
-                normalized_phone = ''.join(filter(str.isdigit, client_data["phone"])) if client_data["phone"] else ""
+                supabase.table("agendamentos_ai").update({
+                    "status": "confirmado",
+                    "os_numero": os_criada["os_numero"],
+                    "horario_confirmado": horario_escolhido,
+                    "dados_finais": dados_reais
+                }).eq("id", agendamento_id).execute()
+                logger.info(f"✅ Agendamento {agendamento_id} marcado como processado")
+            except Exception as update_error:
+                logger.warning(f"⚠️ Erro ao marcar agendamento como convertido: {update_error}")
 
-                # 1. Verificar por email primeiro (mais confiável)
-                if normalized_email:
-                    logger.info(f"🔍 Verificando cliente existente por email: {normalized_email}")
-                    response_email = supabase.table("clients").select("id").ilike("email", normalized_email).limit(1).execute()
-                    if response_email.data and len(response_email.data) > 0:
-                        client_id = response_email.data[0]["id"]
-                        logger.info(f"✅ Cliente encontrado por email: {client_id}")
-                        return client_id
-
-                # 2. Verificar por telefone (últimos 8 dígitos)
-                if normalized_phone and len(normalized_phone) >= 8:
-                    logger.info(f"🔍 Verificando cliente existente por telefone: {normalized_phone}")
-                    response_all_phones = supabase.table("clients").select("id, phone").not_("phone", "is", None).execute()
-                    if response_all_phones.data:
-                        for client in response_all_phones.data:
-                            if client["phone"]:
-                                client_normalized_phone = ''.join(filter(str.isdigit, client["phone"]))
-                                if len(client_normalized_phone) >= 8 and len(normalized_phone) >= 8:
-                                    if (normalized_phone.endswith(client_normalized_phone[-8:]) or
-                                        client_normalized_phone.endswith(normalized_phone[-8:])):
-                                        client_id = client["id"]
-                                        logger.info(f"✅ Cliente encontrado por telefone: {client_id}")
-                                        return client_id
-
-                # 3. Se não encontrou, criar novo cliente
-                logger.info(f"🆕 Criando novo cliente: {client_data['name']}")
-                response_client = supabase.rpc('create_client', {
-                    'client_name': client_data["name"],
-                    'client_email': client_data["email"],
-                    'client_phone': client_data["phone"],
-                    'client_address': client_data["address"],
-                    'client_city': None,
-                    'client_state': None,
-                    'client_zip_code': None
-                }).execute()
-
-                if response_client.data:
-                    if isinstance(response_client.data, list) and len(response_client.data) > 0:
-                        client_id = response_client.data[0]["id"]
-                    elif isinstance(response_client.data, dict):
-                        client_id = response_client.data["id"]
-                    logger.info(f"✅ Cliente criado: {client_id}")
-            except Exception as client_error:
-                logger.warning(f"⚠️ Erro ao criar cliente: {client_error}")
-
-        # Gerar número da OS
-        order_number = await gerar_proximo_numero_os()
-        logger.info(f"🔢 Número OS gerado: {order_number}")
-
-        # Criar OS seguindo exatamente o padrão do OrderLifecycleService
-        now = datetime.now().isoformat()
-        os_data = {
-            "order_number": order_number,
-            "client_name": nome,
-            "client_phone": telefone,
-            "client_email": email,
-            "pickup_address": endereco,
-            "equipment_type": service_order_data["equipment"],
-            "description": service_order_data["problem_description"],
-            "status": "scheduled",
-            "scheduled_date": data_agendada,
-            "scheduled_time": hora_agendada,
-            "technician_id": tecnico_info["tecnico_id"],  # ✅ TÉCNICO ATRIBUÍDO
-            "created_at": now,
-            "updated_at": now,
-            "client_id": client_id,
-            "service_attendance_type": service_type,
-            "notes": service_order_data["notes"]
-        }
-
-        logger.info(f"🔍 DADOS DA OS (padrão modal):")
-        logger.info(f"   - technician_id: {os_data.get('technician_id')}")
-        logger.info(f"   - client_name: {os_data.get('client_name')}")
-        logger.info(f"   - equipment_type: {os_data.get('equipment_type')}")
-
-        response_os = supabase.table("service_orders").insert(os_data).execute()
-
-        if not response_os.data:
-            raise Exception("Erro ao criar ordem de serviço")
-
-        service_order = response_os.data[0]
-        os_id = service_order["id"]
-
-        logger.info(f"✅ OS criada (padrão modal): {os_id}")
-        logger.info(f"🔍 TÉCNICO ATRIBUÍDO: {service_order.get('technician_id')}")
-
-        # Marcar agendamento como convertido (mesmo padrão do modal)
-        try:
-            supabase.table("agendamentos_ai").update({
-                "processado": True,
-                "ordem_servico_id": os_id,
-                "ordem_servico_numero": order_number,
-                "status": "convertido"
-            }).eq("id", agendamento_id).execute()
-            logger.info(f"✅ Agendamento marcado como convertido: {agendamento_id} -> {order_number}")
-        except Exception as e:
-            logger.warning(f"⚠️ Erro ao marcar agendamento como convertido: {e}")
-
-        # 4. Preparar resposta de confirmação
-        data_formatada = horario_dt.strftime('%A, %d/%m/%Y')
-        hora_formatada = horario_dt.strftime('%H:%M')
-
-        # Traduzir dia da semana
-        dias_semana = {
-            'Monday': 'Segunda-feira',
-            'Tuesday': 'Terça-feira',
-            'Wednesday': 'Quarta-feira',
-            'Thursday': 'Quinta-feira',
-            'Friday': 'Sexta-feira',
-            'Saturday': 'Sábado',
-            'Sunday': 'Domingo'
-        }
-
-        for en, pt in dias_semana.items():
-            data_formatada = data_formatada.replace(en, pt)
-
-        mensagem_confirmacao = f"✅ *Agendamento Confirmado!*\n\n"
-        mensagem_confirmacao += f"📋 *Ordem de Serviço:* {order_number}\n"
-        mensagem_confirmacao += f"👤 *Cliente:* {nome}\n"
-        mensagem_confirmacao += f"⚙️ *Equipamento(s):* {tipos_equipamentos}\n"
-        mensagem_confirmacao += f"📅 *Data/Hora:* {data_formatada} às {hora_formatada}\n"
-        mensagem_confirmacao += f"👨‍🔧 *Técnico:* {tecnico_info['nome']}\n"
-        mensagem_confirmacao += f"📞 *Contato:* {tecnico_info['telefone']}\n"
-        mensagem_confirmacao += f"💰 *Valor Estimado:* R$ {final_cost:.2f}\n\n"
-        mensagem_confirmacao += f"📱 *Central:* (48) 98833-2664\n"
-        mensagem_confirmacao += f"Confirmação automática 1 dia antes do agendamento.\n\n"
-        mensagem_confirmacao += f"Obrigado por escolher a Fix Fogões! 🔧"
-
-        return JSONResponse(
-            status_code=200,
-            content={
-                "success": True,
-                "message": mensagem_confirmacao,
-                "agendamento_confirmado": True,
-                # ✅ PARÂMETROS NO NÍVEL RAIZ PARA CLIENTECHAT
-                "ordem_servico_numero": order_number,
-                "cliente": nome,
-                "data_agendada": data_formatada,  # Data formatada para exibição
-                "hora_agendada": hora_formatada,  # Hora formatada para exibição
-                "equipamento": tipos_equipamentos,
-                "endereco": endereco,
-                "telefone_contato": telefone,
-                "tecnico_nome": tecnico_info["nome"],
-                "tecnico_telefone": tecnico_info["telefone"],
-                "valor_estimado": f"R$ {final_cost:.2f}",
-                # ✅ MANTER DADOS ANINHADOS PARA COMPATIBILIDADE
-                "dados_agendamento": {
-                    "agendamento_id": agendamento_id,
-                    "ordem_servico_id": os_id,
-                    "ordem_servico_numero": order_number,
-                    "cliente": nome,
-                    "data_agendada": data_agendada,
-                    "hora_agendada": hora_agendada,
-                    "tecnico": tecnico_info,
-                    "valor_estimado": final_cost,
-                    "grupo_logistico": grupo_logistico
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": f"✅ Agendamento confirmado com sucesso!\n\n📋 OS: {os_criada['os_numero']}\n👤 Cliente: {nome}\n⏰ Horário: {horario_escolhido}\n👨‍🔧 Técnico: {dados_reais['tecnico']}\n💰 Valor: R$ {dados_reais['valor_os']:.2f}",
+                    "os_numero": os_criada['os_numero'],
+                    "os_id": os_criada['os_id'],
+                    "client_id": os_criada['cliente_id'],
+                    "dados_agendamento": dados_reais
                 }
-            }
-        )
+            )
+        else:
+            logger.error(f"❌ ETAPA 2: Erro ao criar OS: {os_criada.get('message')}")
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "message": f"Erro ao criar OS: {os_criada.get('message')}"}
+            )
 
     except Exception as e:
         # Tratar encoding de caracteres especiais
