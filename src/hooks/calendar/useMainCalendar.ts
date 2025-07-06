@@ -88,6 +88,7 @@ export const useMainCalendar = ({
       problem: relatedOrder?.problem || service.description,
       address: service.address,
       status: service.status === 'scheduled' ? 'confirmed' :
+              service.status === 'confirmed' ? 'confirmed' :  // ✅ ADICIONAR MAPEAMENTO PARA 'confirmed'
               service.status === 'completed' ? 'completed' :
               service.status === 'cancelled' ? 'cancelled' :
               service.status === 'in_progress' ? 'in_progress' : 'suggested',
