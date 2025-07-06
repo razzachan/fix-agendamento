@@ -811,6 +811,34 @@ def converter_horario_para_iso(horario_str):
 
     return datetime.now().isoformat()
 
+def converter_horario_para_iso_direto(horario_iso_str):
+    """Converter horário ISO com timezone Brasil para UTC correto"""
+    if not horario_iso_str:
+        return datetime.now().isoformat()
+
+    try:
+        # Se já está em formato ISO (ex: '2025-07-07T10:00:00-03:00')
+        if 'T' in horario_iso_str and ('-03:00' in horario_iso_str or '+' in horario_iso_str):
+            # Parse do datetime com timezone
+            dt_with_tz = datetime.fromisoformat(horario_iso_str.replace('Z', '+00:00'))
+
+            # Se não tem timezone info, assumir Brasil
+            if dt_with_tz.tzinfo is None:
+                dt_with_tz = pytz.timezone('America/Sao_Paulo').localize(dt_with_tz)
+
+            # Converter para UTC
+            dt_utc = dt_with_tz.astimezone(pytz.UTC)
+
+            logger.info(f"🔄 Horário ISO convertido: '{horario_iso_str}' -> '{dt_utc.isoformat()}'")
+            return dt_utc.isoformat()
+
+        # Se não está em formato ISO, usar função original
+        return converter_horario_para_iso(horario_iso_str)
+
+    except Exception as e:
+        logger.warning(f"⚠️ Erro ao converter horário ISO '{horario_iso_str}': {e}")
+        return datetime.now().isoformat()
+
 # Função para determinar técnico baseado no equipamento
 def determinar_tecnico(equipamento: str) -> str:
     """Determina o técnico baseado no tipo de equipamento"""
@@ -2769,7 +2797,7 @@ async def criar_os_completa(dados: dict):
             "status": "scheduled",
             "technician_id": tecnico_id,  # ✅ ID DO TÉCNICO (obrigatório para dashboard)
             "technician_name": tecnico_nome_real,  # ✅ NOME DO TÉCNICO
-            "scheduled_date": dados.get("horario_agendado"),  # ✅ JÁ ESTÁ EM FORMATO ISO
+            "scheduled_date": converter_horario_para_iso_direto(dados.get("horario_agendado")),  # ✅ CONVERTER TIMEZONE CORRETO
             "final_cost": dados.get("valor_os", 150.00),
             "order_number": os_numero,
             "pickup_address": dados["endereco"]
