@@ -177,6 +177,78 @@ load_dotenv()
 # Cache para horários disponíveis (para manter consistência entre ETAPA 1 e 2)
 cache_horarios = {}
 
+async def criar_cliente_com_auth_supabase(dados: Dict) -> str:
+    """
+    Cria cliente usando o sistema de autenticação do Supabase
+    Retorna o ID do cliente criado ou existente
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Verificar se cliente já existe pelo telefone
+        response_cliente = supabase.table("clients").select("*").eq("phone", dados["telefone"]).execute()
+
+        if response_cliente.data:
+            cliente_id = response_cliente.data[0]["id"]
+            logger.info(f"✅ Cliente existente encontrado: {cliente_id}")
+            return cliente_id
+
+        # Gerar email se não fornecido (necessário para auth)
+        email = dados.get("email", "")
+        if not email:
+            # Usar telefone como base para email único
+            telefone_limpo = ''.join(filter(str.isdigit, dados["telefone"]))
+            email = f"cliente{telefone_limpo}@fixfogoes.temp"
+
+        # Criar usuário na autenticação do Supabase
+        auth_response = supabase.auth.admin.create_user({
+            "email": email,
+            "password": "123456",
+            "email_confirm": True,  # Confirmar email automaticamente
+            "user_metadata": {
+                "name": dados["nome"],
+                "phone": dados["telefone"]
+            }
+        })
+
+        if auth_response.user:
+            user_id = auth_response.user.id
+            logger.info(f"✅ Usuário auth criado: {user_id}")
+
+            # Criar registro na tabela clients vinculado ao usuário auth
+            cliente_data = {
+                "user_id": user_id,
+                "name": dados["nome"],
+                "phone": dados["telefone"],
+                "address": dados["endereco"],
+                "cpf_cnpj": dados.get("cpf", ""),
+                "email": email
+            }
+
+            response_novo_cliente = supabase.table("clients").insert(cliente_data).execute()
+            cliente_id = response_novo_cliente.data[0]["id"]
+            logger.info(f"✅ Cliente criado com auth: {cliente_id}")
+            return cliente_id
+        else:
+            logger.error("❌ Falha ao criar usuário na autenticação")
+            raise Exception("Falha na criação do usuário")
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar cliente com auth: {e}")
+        # Fallback: criar cliente sem auth (temporário)
+        cliente_data = {
+            "name": dados["nome"],
+            "phone": dados["telefone"],
+            "address": dados["endereco"],
+            "cpf_cnpj": dados.get("cpf", ""),
+            "email": dados.get("email", "")
+        }
+
+        response_fallback = supabase.table("clients").insert(cliente_data).execute()
+        cliente_id = response_fallback.data[0]["id"]
+        logger.warning(f"⚠️ Cliente criado sem auth (fallback): {cliente_id}")
+        return cliente_id
+
 async def gerar_proximo_numero_os():
     """
     Gera próximo número sequencial de OS usando o mesmo sistema do frontend
@@ -2737,27 +2809,9 @@ async def criar_os_completa(dados: dict):
 
         logger.info(f"📋 Número da OS gerado: {os_numero}")
 
-        # Criar cliente primeiro (se não existir)
-        cliente_data = {
-            "name": dados["nome"],
-            "phone": dados["telefone"],
-            "address": dados["endereco"],
-            "cpf_cnpj": dados.get("cpf", ""),
-            "email": dados.get("email", ""),
-            "password": "123456"  # Senha padrão
-        }
-
-        # Verificar se cliente já existe
-        response_cliente = supabase.table("clients").select("*").eq("phone", dados["telefone"]).execute()
-
-        if response_cliente.data:
-            cliente_id = response_cliente.data[0]["id"]
-            logger.info(f"✅ Cliente existente encontrado: {cliente_id}")
-        else:
-            # Criar novo cliente
-            response_novo_cliente = supabase.table("clients").insert(cliente_data).execute()
-            cliente_id = response_novo_cliente.data[0]["id"]
-            logger.info(f"✅ Novo cliente criado: {cliente_id}")
+        # Criar cliente usando autenticação Supabase
+        cliente_id = await criar_cliente_com_auth_supabase(dados)
+        logger.info(f"✅ Cliente processado: {cliente_id}")
 
         # Buscar ID do técnico pelo nome
         tecnico_nome = dados.get("tecnico", "Paulo Cesar Betoni")
