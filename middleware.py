@@ -2813,7 +2813,7 @@ async def criar_os_completa(dados: dict):
             "created_at": datetime.now().isoformat(),  # ✅ DATA DE CRIAÇÃO
             "completed_date": None,  # ✅ AINDA NÃO COMPLETADO
             "needs_pickup": dados.get("tipo_atendimento") in ["coleta_conserto", "coleta_diagnostico"],  # ✅ BASEADO NO TIPO
-            "current_location": "client" if dados.get("tipo_atendimento") in ["coleta_conserto", "coleta_diagnostico"] else "workshop",  # ✅ LOCALIZAÇÃO
+            "current_location": "client",  # ✅ SEMPRE INICIA NO CLIENTE (independente do tipo)
             "final_cost": dados.get("valor_os", 150.00),
             "order_number": os_numero,
             "pickup_address": dados["endereco"]
