@@ -3668,6 +3668,7 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
             "created_at": now,
             "updated_at": now,
             "client_id": client_id,
+            "service_attendance_type": service_type,
             "notes": service_order_data["notes"]
         }
 
