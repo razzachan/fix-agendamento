@@ -3609,7 +3609,6 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         service_order_data = {
             "equipment": tipos_equipamentos,
             "problem_description": descricao_completa,
-            "priority": "high" if urgente else "medium",
             "notes": f"Agendamento inteligente - Score técnico: {tecnico_info['score']}",
             "estimated_cost": final_cost,
             "service_attendance_type": service_type
