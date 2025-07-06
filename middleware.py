@@ -3771,15 +3771,16 @@ def interpretar_opcao_flexivel(opcao_escolhida: str) -> Optional[str]:
     if any(palavra in opcao_lower for palavra in ["terceira", "terceiro", "três", "tres"]):
         return "3"
 
-    # 4. HORÁRIOS ESPECÍFICOS
-    if any(h in opcao_lower for h in ["9", "nove", "08", "8"]):
-        return "1"  # Manhã cedo
-    if any(h in opcao_lower for h in ["10", "dez", "11", "onze"]):
-        return "1"  # Manhã
-    if any(h in opcao_lower for h in ["14", "2", "duas", "13", "15"]):
-        return "2"  # Tarde
-    if any(h in opcao_lower for h in ["16", "4", "quatro", "17", "5"]):
-        return "3"  # Final da tarde
+    # 4. HORÁRIOS ESPECÍFICOS BASEADOS NAS OPÇÕES REAIS
+    # Opção 1: 9h-10h
+    if any(h in opcao_lower for h in ["9h", "09h", "nove"]):
+        return "1"
+    # Opção 2: 10h-11h
+    if any(h in opcao_lower for h in ["10h", "10:00", "dez"]):
+        return "2"
+    # Opção 3: 14h-15h
+    if any(h in opcao_lower for h in ["14h", "14:00", "2h", "duas"]):
+        return "3"
 
     # 5. PERÍODOS DO DIA
     if any(periodo in opcao_lower for periodo in ["manhã", "manha", "matinal", "cedo"]):
