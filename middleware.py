@@ -772,6 +772,45 @@ def get_supabase_client() -> Client:
 
     return _supabase_client
 
+def converter_horario_para_iso(horario_str):
+    """Converter horário do formato '07/07/2025 - 10:00' para ISO"""
+    if not horario_str:
+        return datetime.now().isoformat()
+
+    try:
+        # Formato: '07/07/2025 - 10:00' ou '07/07/2025 - Horário: 10:00'
+        if ' - ' in horario_str:
+            data_parte, hora_parte = horario_str.split(' - ')
+
+            # Remover 'Horário: ' se existir
+            if 'Horário: ' in hora_parte:
+                hora_parte = hora_parte.replace('Horário: ', '')
+
+            # Converter data (dd/mm/yyyy)
+            dia, mes, ano = data_parte.split('/')
+
+            # Converter hora (HH:MM)
+            if ':' in hora_parte:
+                hora, minuto = hora_parte.split(':')
+            else:
+                hora = hora_parte
+                minuto = '00'
+
+            # Criar datetime
+            dt = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto))
+
+            # Converter para UTC
+            dt_utc = pytz.timezone('America/Sao_Paulo').localize(dt).astimezone(pytz.UTC)
+
+            logger.info(f"🔄 Horário convertido: '{horario_str}' -> '{dt_utc.isoformat()}'")
+            return dt_utc.isoformat()
+
+    except Exception as e:
+        logger.warning(f"⚠️ Erro ao converter horário '{horario_str}': {e}")
+        return datetime.now().isoformat()
+
+    return datetime.now().isoformat()
+
 # Função para determinar técnico baseado no equipamento
 def determinar_tecnico(equipamento: str) -> str:
     """Determina o técnico baseado no tipo de equipamento"""
@@ -2730,7 +2769,7 @@ async def criar_os_completa(dados: dict):
             "status": "scheduled",
             "technician_id": tecnico_id,  # ✅ ID DO TÉCNICO (obrigatório para dashboard)
             "technician_name": tecnico_nome_real,  # ✅ NOME DO TÉCNICO
-            "scheduled_date": dados.get("horario_agendado", datetime.now().isoformat()),  # ✅ HORÁRIO ESCOLHIDO PELO CLIENTE
+            "scheduled_date": converter_horario_para_iso(dados.get("horario_agendado")),  # ✅ CONVERTER PARA ISO
             "final_cost": dados.get("valor_os", 150.00),
             "order_number": os_numero,
             "pickup_address": dados["endereco"]
