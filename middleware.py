@@ -3378,8 +3378,19 @@ async def consultar_disponibilidade_interna(data: dict):
                 data_formatada = dia_semana.split(', ')[-1] if ', ' in dia_semana else 'Data não disponível'
                 hora_formatada = hora_agendamento or '09:00'
 
+            # Criar janela de tempo (ex: "Previsão de chegada entre 9 e 10hs")
+            if hora_formatada and ':' in hora_formatada:
+                try:
+                    hora_inicio = int(hora_formatada.split(':')[0])
+                    hora_fim = hora_inicio + 1
+                    janela_tempo = f"Previsão de chegada entre {hora_inicio} e {hora_fim}hs"
+                except:
+                    janela_tempo = f"Previsão de chegada às {hora_formatada}"
+            else:
+                janela_tempo = "Horário a definir"
+
             # Adicionar à mensagem principal
-            mensagem += f"*{i}.* Data: {data_formatada} - Horário: {hora_formatada}\n"
+            mensagem += f"*{i}.* Data: {data_formatada} - {janela_tempo}\n"
 
             # Adicionar à lista de opções simples
             opcoes_simples.append({
