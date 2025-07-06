@@ -2694,6 +2694,29 @@ async def criar_os_completa(dados: dict):
             cliente_id = response_novo_cliente.data[0]["id"]
             logger.info(f"✅ Novo cliente criado: {cliente_id}")
 
+        # Buscar ID do técnico pelo nome
+        tecnico_nome = dados.get("tecnico", "Paulo Cesar Betoni")
+        logger.info(f"🔍 Buscando ID do técnico: {tecnico_nome}")
+
+        response_tecnico = supabase.table("technicians").select("id, name").ilike("name", f"%{tecnico_nome}%").limit(1).execute()
+
+        if response_tecnico.data and len(response_tecnico.data) > 0:
+            tecnico_id = response_tecnico.data[0]["id"]
+            tecnico_nome_real = response_tecnico.data[0]["name"]
+            logger.info(f"✅ Técnico encontrado: {tecnico_nome_real} (ID: {tecnico_id})")
+        else:
+            # Fallback para Paulo Cesar Betoni se não encontrar
+            logger.warning(f"⚠️ Técnico '{tecnico_nome}' não encontrado, usando Paulo Cesar Betoni")
+            response_paulo = supabase.table("technicians").select("id, name").ilike("name", "%Paulo%").limit(1).execute()
+            if response_paulo.data and len(response_paulo.data) > 0:
+                tecnico_id = response_paulo.data[0]["id"]
+                tecnico_nome_real = response_paulo.data[0]["name"]
+                logger.info(f"✅ Técnico fallback: {tecnico_nome_real} (ID: {tecnico_id})")
+            else:
+                logger.error("❌ Nenhum técnico encontrado na base de dados!")
+                tecnico_id = None
+                tecnico_nome_real = tecnico_nome
+
         # Criar OS
         os_data = {
             "client_id": cliente_id,
@@ -2705,7 +2728,8 @@ async def criar_os_completa(dados: dict):
             "description": dados["problema"],
             "service_attendance_type": dados.get("tipo_atendimento", "em_domicilio"),
             "status": "scheduled",
-            "technician_name": dados.get("tecnico", "Simão"),
+            "technician_id": tecnico_id,  # ✅ ID DO TÉCNICO (obrigatório para dashboard)
+            "technician_name": tecnico_nome_real,  # ✅ NOME DO TÉCNICO
             "scheduled_date": datetime.now().isoformat(),
             "final_cost": dados.get("valor_os", 150.00),
             "order_number": os_numero,
