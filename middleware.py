@@ -2820,7 +2820,7 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
             }
 
             # Adicionar dados de acesso se conta foi criada
-            if os_criada.get("conta_criada") and os_criada.get("dados_acesso"):
+            if os_criada.get("conta_criada") and os_criada.get("dados_acesso") and os_criada["dados_acesso"] is not None:
                 dados_acesso = os_criada["dados_acesso"]
                 resposta_dados.update({
                     "email_acesso": dados_acesso['email'],
