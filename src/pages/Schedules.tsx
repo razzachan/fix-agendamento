@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { MapPin, List, Route } from 'lucide-react';
 
 const Schedules: React.FC = () => {
-  const { agendamentos, isLoading } = useAppData();
+  const { agendamentos, isLoading, refreshAgendamentos } = useAppData();
   const [viewMode, setViewMode] = useState<'list' | 'map' | 'routing'>('list');
 
   const {
@@ -109,7 +109,10 @@ const Schedules: React.FC = () => {
           {viewMode === 'list' ? (
             <div className="mt-6">
               <PreAgendamentosStats agendamentos={filteredAgendamentos} />
-              <PreAgendamentosView agendamentos={filteredAgendamentos} />
+              <PreAgendamentosView
+                agendamentos={filteredAgendamentos}
+                onAgendamentoDeleted={refreshAgendamentos}
+              />
             </div>
           ) : viewMode === 'map' ? (
             <div className="mt-6">

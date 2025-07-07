@@ -18,15 +18,19 @@ import {
   Package,
   MessageSquare,
   Plus,
-  FileText
+  FileText,
+  Trash2
 } from 'lucide-react';
 import CreateOrderModal from './CreateOrderModal';
+import { agendamentosService } from '@/services/agendamentos';
+import { toast } from 'sonner';
 
 interface PreAgendamentosViewProps {
   agendamentos: AgendamentoAI[];
+  onAgendamentoDeleted?: () => void;
 }
 
-const PreAgendamentosView: React.FC<PreAgendamentosViewProps> = ({ agendamentos }) => {
+const PreAgendamentosView: React.FC<PreAgendamentosViewProps> = ({ agendamentos, onAgendamentoDeleted }) => {
   // Estado para controlar o modal de criação de OS
   const [createOrderModal, setCreateOrderModal] = useState<{
     isOpen: boolean;
@@ -50,6 +54,30 @@ const PreAgendamentosView: React.FC<PreAgendamentosViewProps> = ({ agendamentos 
       isOpen: false,
       agendamento: null
     });
+  };
+
+  // Função para excluir pré-agendamento
+  const handleDeleteAgendamento = async (agendamento: AgendamentoAI) => {
+    if (!confirm(`Tem certeza que deseja excluir o pré-agendamento de ${agendamento.nome}?`)) {
+      return;
+    }
+
+    try {
+      const success = await agendamentosService.delete(agendamento.id);
+
+      if (success) {
+        toast.success('Pré-agendamento excluído com sucesso!');
+        // Chamar callback para recarregar a lista
+        if (onAgendamentoDeleted) {
+          onAgendamentoDeleted();
+        }
+      } else {
+        toast.error('Erro ao excluir pré-agendamento');
+      }
+    } catch (error) {
+      console.error('Erro ao excluir pré-agendamento:', error);
+      toast.error('Erro ao excluir pré-agendamento');
+    }
   };
 
 
@@ -311,21 +339,30 @@ const PreAgendamentosView: React.FC<PreAgendamentosViewProps> = ({ agendamentos 
                 </>
               )}
 
-              {/* Botão Criar OS */}
-              {agendamento.status !== 'convertido' && (
-                <>
-                  <Separator className="my-4" />
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={() => handleCreateOrder(agendamento)}
-                      className="bg-[#e5b034] hover:bg-[#d4a02a] text-white flex items-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Criar OS
-                    </Button>
-                  </div>
-                </>
-              )}
+              {/* Botões de Ação */}
+              <Separator className="my-4" />
+              <div className="flex justify-between items-center">
+                {/* Botão Excluir */}
+                <Button
+                  onClick={() => handleDeleteAgendamento(agendamento)}
+                  variant="outline"
+                  className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200 flex items-center gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
+                </Button>
+
+                {/* Botão Criar OS */}
+                {agendamento.status !== 'convertido' && (
+                  <Button
+                    onClick={() => handleCreateOrder(agendamento)}
+                    className="bg-[#e5b034] hover:bg-[#d4a02a] text-white flex items-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Criar OS
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         );
