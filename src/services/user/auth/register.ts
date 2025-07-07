@@ -22,8 +22,8 @@ export async function register(
     console.log('Usando admin.createUser para role:', role);
     const { data, error } = await supabase.auth.admin.createUser({
       email,
-      password,
-      email_confirm: true, // Confirmar email automaticamente
+      password: password || '123456789', // Senha padrão se não fornecida
+      email_confirm: true, // Confirmar email automaticamente (sem envio)
       user_metadata: {
         name,
         role,

@@ -39,7 +39,7 @@ export async function linkClientWithUserAccount(
           const user = await userService.createUser({
             name: clientData.name || 'Cliente',
             email: clientData.email,
-            password: 'FixFogoes@2024', // Senha padrão segura que atende requisitos do Supabase
+            password: '123456789', // Senha padrão simples e fixa para todos os clientes
             role: 'client'
           });
           

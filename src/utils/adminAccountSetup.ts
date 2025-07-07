@@ -63,7 +63,7 @@ export const adminAccountSetup = {
       // 1. Criar no Supabase Auth usando admin.createUser
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: 'admin@fixfogoes.com.br',
-        password: '123456',
+        password: '123456789', // Senha padrão simples
         email_confirm: true,
         user_metadata: {
           name: 'Administrador Fix Fogões',
@@ -90,7 +90,7 @@ export const adminAccountSetup = {
           id: authData.user.id,
           name: 'Administrador Fix Fogões',
           email: 'admin@fixfogoes.com.br',
-          password: '123456', // Para compatibilidade
+          password: '123456789', // Senha padrão simples
           role: 'admin',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()

@@ -193,24 +193,25 @@ async def criar_cliente_com_auth_supabase(dados: Dict) -> str:
             logger.info(f"✅ Cliente existente encontrado: {cliente_id}")
             return cliente_id
 
-        # Gerar email se não fornecido (necessário para auth)
-        email = dados.get("email", "")
+        # Usar email fornecido pelo cliente (obrigatório)
+        email = dados.get("email", "").strip()
         if not email:
-            # Usar telefone como base para email único com domínio válido
-            telefone_limpo = ''.join(filter(str.isdigit, dados["telefone"]))
-            email = f"cliente{telefone_limpo}@fixfogoes.com.br"
+            # Se não tiver email, não criar conta auth (apenas cliente na tabela)
+            logger.warning(f"⚠️ Cliente {dados['nome']} sem email - criando apenas registro sem auth")
+            raise Exception("Email obrigatório para criação de conta de acesso")
 
         # Criar usuário na autenticação do Supabase
-        # Senha padrão segura que atende aos requisitos do Supabase
-        senha_padrao = "FixFogoes@2024"  # 8+ chars, maiúscula, minúscula, número, símbolo
+        # Senha padrão simples e fixa para todos os clientes
+        senha_padrao = "123456789"  # Senha padrão simples (9 chars para atender mínimo)
 
         auth_response = supabase.auth.admin.create_user({
             "email": email,
             "password": senha_padrao,
-            "email_confirm": True,  # Confirmar email automaticamente
+            "email_confirm": True,  # Confirmar email automaticamente (sem envio de email)
             "user_metadata": {
                 "name": dados["nome"],
-                "phone": dados["telefone"]
+                "phone": dados["telefone"],
+                "role": "client"
             }
         })
 
@@ -231,6 +232,15 @@ async def criar_cliente_com_auth_supabase(dados: Dict) -> str:
             response_novo_cliente = supabase.table("clients").insert(cliente_data).execute()
             cliente_id = response_novo_cliente.data[0]["id"]
             logger.info(f"✅ Cliente criado com auth: {cliente_id}")
+
+            # Log dos dados de acesso para comunicação ao cliente
+            logger.info(f"📧 DADOS DE ACESSO CRIADOS:")
+            logger.info(f"   👤 Nome: {dados['nome']}")
+            logger.info(f"   📧 Email: {email}")
+            logger.info(f"   🔐 Senha: {senha_padrao}")
+            logger.info(f"   🌐 Portal: app.fixfogoes.com.br")
+            logger.info(f"   📋 Pode acompanhar suas ordens de serviço online")
+
             return cliente_id
         else:
             logger.error("❌ Falha ao criar usuário na autenticação")
