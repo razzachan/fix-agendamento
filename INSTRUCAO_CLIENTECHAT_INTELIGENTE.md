@@ -15,8 +15,12 @@
 • *Valor:* #valor_servico#
 
 📍 *Endereço:* #endereco#
-🔧 *Equipamento:* #equipamento#
+🔧 *Equipamento(s):* %%% #external_return#.split("EQUIPAMENTOS:")[1].split("|")[0] %%%
 ⚠️ *Problema:* #problema#
+
+%%% if #external_return#.includes("QTD_EQUIPAMENTOS:") && parseInt(#external_return#.split("QTD_EQUIPAMENTOS:")[1].split("|")[0]) > 1 %%%
+📦 *Total de equipamentos:* %%% #external_return#.split("QTD_EQUIPAMENTOS:")[1].split("|")[0] %%%
+%%% endif %%%
 
 ✅ *Confirmação:* Seu agendamento foi confirmado! O técnico entrará em contato 30 minutos antes da chegada.
 
@@ -55,8 +59,15 @@ Acompanhe sua OS em tempo real!
 ## 🧠 Como Funciona a Lógica Inteligente:
 
 ### **1. 📊 Dados Estruturados do Middleware:**
+
+#### **🔧 Um Equipamento:**
 ```
-AGENDAMENTO_CONFIRMADO|OS:001|CLIENTE:João|HORARIO:10h-11h|TECNICO:Paulo|VALOR:R$ 150,00|CONTA_CRIADA:SIM|EMAIL:joao@gmail.com|SENHA:123456789|PORTAL:app.fixfogoes.com.br
+AGENDAMENTO_CONFIRMADO|OS:001|CLIENTE:João|HORARIO:10h-11h|TECNICO:Paulo|VALOR:R$ 150,00|EQUIPAMENTOS:Fogão|QTD_EQUIPAMENTOS:1|CONTA_CRIADA:SIM|EMAIL:joao@gmail.com|SENHA:123456789|PORTAL:app.fixfogoes.com.br
+```
+
+#### **🔧 Múltiplos Equipamentos:**
+```
+AGENDAMENTO_CONFIRMADO|OS:002|CLIENTE:Maria|HORARIO:14h-15h|TECNICO:Paulo|VALOR:R$ 280,00|EQUIPAMENTOS:Fogão, Geladeira e Micro-ondas|QTD_EQUIPAMENTOS:3|CONTA_CRIADA:NAO
 ```
 
 ### **2. 🔍 Detecção Inteligente:**
@@ -87,7 +98,7 @@ AGENDAMENTO_CONFIRMADO|OS:001|CLIENTE:João|HORARIO:10h-11h|TECNICO:Paulo|VALOR:
 
 ## 📱 Exemplos de Mensagens Finais:
 
-### **🆕 Cliente Novo (Conta Criada):**
+### **🆕 Cliente Novo - Um Equipamento:**
 ```
 🎉 AGENDAMENTO CONFIRMADO COM SUCESSO!
 
@@ -97,9 +108,34 @@ AGENDAMENTO_CONFIRMADO|OS:001|CLIENTE:João|HORARIO:10h-11h|TECNICO:Paulo|VALOR:
 • Horário: 10h-11h
 • Técnico: Paulo Cesar
 • Valor: R$ 150,00
+• Equipamento(s): Fogão
 
 🔐 SUA CONTA FOI CRIADA!
 📧 Email: joao@gmail.com
+🔑 Senha: 123456789
+🌐 Portal: app.fixfogoes.com.br
+
+📱 ACOMPANHE ONLINE:
+✅ Status em tempo real
+✅ Fotos do processo de reparo
+💾 Salve estes dados!
+```
+
+### **🆕 Cliente Novo - Múltiplos Equipamentos:**
+```
+🎉 AGENDAMENTO CONFIRMADO COM SUCESSO!
+
+📋 Detalhes do Agendamento:
+• OS: #003
+• Cliente: Ana Costa
+• Horário: 9h-10h
+• Técnico: Paulo Cesar
+• Valor: R$ 280,00
+• Equipamento(s): Fogão, Geladeira e Micro-ondas
+📦 Total de equipamentos: 3
+
+🔐 SUA CONTA FOI CRIADA!
+📧 Email: ana@gmail.com
 🔑 Senha: 123456789
 🌐 Portal: app.fixfogoes.com.br
 
@@ -117,6 +153,8 @@ AGENDAMENTO_CONFIRMADO|OS:001|CLIENTE:João|HORARIO:10h-11h|TECNICO:Paulo|VALOR:
 • OS: #002
 • Cliente: Maria Santos
 • Horário: 14h-15h
+• Equipamento(s): Fogão e Geladeira
+📦 Total de equipamentos: 2
 
 📱 PORTAL ONLINE:
 Se você já tem conta, acesse: app.fixfogoes.com.br

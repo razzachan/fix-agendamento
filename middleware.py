@@ -2784,13 +2784,27 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
             # Retorna dados estruturados que a instrução pode usar de forma inteligente
 
             # Dados básicos do agendamento
+            # 🔧 SUPORTE PARA MÚLTIPLOS EQUIPAMENTOS
+            equipamentos_lista = dados_reais.get('equipamentos', [])
+            if not equipamentos_lista and dados_reais.get('equipamento'):
+                equipamentos_lista = [dados_reais['equipamento']]
+
+            # Formatação inteligente de equipamentos
+            if len(equipamentos_lista) == 1:
+                equipamentos_texto = equipamentos_lista[0]
+            elif len(equipamentos_lista) == 2:
+                equipamentos_texto = f"{equipamentos_lista[0]} e {equipamentos_lista[1]}"
+            else:
+                equipamentos_texto = f"{', '.join(equipamentos_lista[:-1])} e {equipamentos_lista[-1]}"
+
             resposta_dados = {
                 "status": "confirmado",
                 "os_numero": os_criada['os_numero'],
                 "cliente": dados_reais['nome'],
                 "telefone": dados_reais['telefone'],
                 "endereco": dados_reais['endereco'],
-                "equipamento": dados_reais['equipamento'],
+                "equipamento": equipamentos_texto,  # Texto formatado para múltiplos equipamentos
+                "equipamentos_count": len(equipamentos_lista),  # Quantidade de equipamentos
                 "problema": dados_reais['problema'],
                 "horario": horario_escolhido,
                 "tecnico": dados_reais['tecnico'],
@@ -2808,7 +2822,7 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
                 })
 
             # Mensagem estruturada para ClienteChat usar
-            mensagem = f"""AGENDAMENTO_CONFIRMADO|OS:{resposta_dados['os_numero']}|CLIENTE:{resposta_dados['cliente']}|HORARIO:{resposta_dados['horario']}|TECNICO:{resposta_dados['tecnico']}|VALOR:{resposta_dados['valor']}"""
+            mensagem = f"""AGENDAMENTO_CONFIRMADO|OS:{resposta_dados['os_numero']}|CLIENTE:{resposta_dados['cliente']}|HORARIO:{resposta_dados['horario']}|TECNICO:{resposta_dados['tecnico']}|VALOR:{resposta_dados['valor']}|EQUIPAMENTOS:{resposta_dados['equipamento']}|QTD_EQUIPAMENTOS:{resposta_dados['equipamentos_count']}"""
 
             if resposta_dados['conta_criada']:
                 mensagem += f"""|CONTA_CRIADA:SIM|EMAIL:{resposta_dados['email_acesso']}|SENHA:{resposta_dados['senha_acesso']}|PORTAL:{resposta_dados['portal_url']}"""
