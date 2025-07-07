@@ -903,7 +903,10 @@ def converter_horario_para_iso(horario_str):
 
 def converter_horario_para_iso_direto(horario_iso_str):
     """Converter horário preservando o horário visual (não converter para UTC)"""
+    logger.info(f"🔍 DEBUG converter_horario_para_iso_direto: entrada = {horario_iso_str} (tipo: {type(horario_iso_str)})")
+
     if not horario_iso_str:
+        logger.info(f"🔍 DEBUG: horario_iso_str é vazio, retornando datetime.now()")
         return datetime.now().isoformat()
 
     try:
@@ -2910,7 +2913,9 @@ async def criar_os_completa(dados: dict):
                 tecnico_nome_real = tecnico_nome
 
         # Extrair horário para scheduled_time
-        horario_agendado_iso = converter_horario_para_iso_direto(dados.get("horario_agendado"))
+        horario_agendado_raw = dados.get("horario_agendado")
+        logger.info(f"🔍 DEBUG: horario_agendado_raw = {horario_agendado_raw} (tipo: {type(horario_agendado_raw)})")
+        horario_agendado_iso = converter_horario_para_iso_direto(horario_agendado_raw)
 
         # Extrair apenas o horário (HH:MM) do ISO datetime
         try:
