@@ -161,20 +161,32 @@ export const useMainCalendar = ({
 
           // 2. Buscar todas as ordens de serviço no intervalo de datas (excluindo canceladas)
           const allOrders = serviceOrders.filter(order => {
+            // DEBUG: Log da ordem para verificar dados
+            console.log(`🔍 [DEBUG] Ordem ${order.id}: scheduledDate="${order.scheduledDate}", status="${order.status}"`);
+
             // Excluir ordens canceladas do calendário
             if (order.status === 'cancelled' || order.status === 'quote_rejected' || order.status === 'returned') {
+              console.log(`🚫 [DEBUG] Ordem ${order.id} excluída por status: ${order.status}`);
               return false;
             }
 
             // Se tem data agendada, verificar se está no intervalo
             if (order.scheduledDate) {
               const orderDate = new Date(order.scheduledDate);
-              return orderDate >= startDate && orderDate <= endDate;
+              const inRange = orderDate >= startDate && orderDate <= endDate;
+              console.log(`📅 [DEBUG] Ordem ${order.id}: orderDate=${orderDate.toISOString()}, startDate=${startDate.toISOString()}, endDate=${endDate.toISOString()}, inRange=${inRange}`);
+              return inRange;
             }
+            console.log(`❌ [DEBUG] Ordem ${order.id} sem scheduledDate`);
             return false;
           });
 
           console.log(`📋 [useMainCalendar] Encontradas ${allOrders.length} ordens atribuídas em service_orders (todos os técnicos)`);
+
+          // DEBUG: Log das ordens encontradas
+          allOrders.forEach(order => {
+            console.log(`📋 [DEBUG] Ordem encontrada: ${order.id} - ${order.clientName} - ${order.scheduledDate}`);
+          });
 
           // 3. Converter ordens de serviço para formato de serviços agendados
           const ordersAsServices = allOrders.map(order => {
@@ -183,7 +195,7 @@ export const useMainCalendar = ({
             const endTime = new Date(startTime);
             endTime.setHours(startTime.getHours() + 1);
 
-            return {
+            const event = {
               id: `order-${order.id}`, // Prefixo para distinguir de scheduled_services
               serviceOrderId: order.id,
               technicianId: order.technicianId!,
@@ -197,6 +209,9 @@ export const useMainCalendar = ({
               status: mapServiceOrderStatusToCalendarStatus(order.status),
               createdAt: order.createdAt
             };
+
+            console.log(`🎯 [DEBUG] Evento criado: ${event.id} - ${event.clientName} - ${event.scheduledStartTime}`);
+            return event;
           });
 
           console.log(`🔄 [useMainCalendar] Convertidas ${ordersAsServices.length} ordens para formato de serviços (todos os técnicos)`);
