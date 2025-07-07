@@ -3917,11 +3917,33 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
             else:
                 logger.info(f"🚫 Pulando atualização de agendamento (ETAPA 2 direta)")
 
+            # 🔧 MENSAGEM ESTRUTURADA PARA CLIENTECHAT COM INFORMAÇÕES DE CONTA
+            # Formatação inteligente de equipamentos
+            if len(equipamentos) == 1:
+                equipamentos_texto = equipamentos[0]
+            elif len(equipamentos) == 2:
+                equipamentos_texto = f"{equipamentos[0]} e {equipamentos[1]}"
+            else:
+                equipamentos_texto = f"{', '.join(equipamentos[:-1])} e {equipamentos[-1]}"
+
+            # Mensagem estruturada para ClienteChat usar
+            mensagem = f"""AGENDAMENTO_CONFIRMADO|OS:{os_criada['os_numero']}|CLIENTE:{nome}|HORARIO:{horario_escolhido}|TECNICO:{dados_reais['tecnico']}|VALOR:R$ {dados_reais['valor_os']:.2f}|EQUIPAMENTOS:{equipamentos_texto}|QTD_EQUIPAMENTOS:{len(equipamentos)}"""
+
+            # Adicionar informações de conta criada
+            if os_criada.get('conta_criada'):
+                dados_acesso = os_criada.get('dados_acesso')
+                if dados_acesso:
+                    mensagem += f"""|CONTA_CRIADA:SIM|EMAIL:{dados_acesso['email']}|SENHA:{dados_acesso['senha']}|PORTAL:app.fixfogoes.com.br"""
+                else:
+                    mensagem += f"""|CONTA_CRIADA:SIM|PORTAL:app.fixfogoes.com.br"""
+            else:
+                mensagem += f"""|CONTA_CRIADA:NAO"""
+
             return JSONResponse(
                 status_code=200,
                 content={
                     "success": True,
-                    "message": f"✅ Agendamento confirmado com sucesso!\n\n📋 OS: {os_criada['os_numero']}\n👤 Cliente: {nome}\n⏰ Horário: {horario_escolhido}\n👨‍🔧 Técnico: {dados_reais['tecnico']}\n💰 Valor: R$ {dados_reais['valor_os']:.2f}",
+                    "message": mensagem,
                     "os_numero": os_criada['os_numero'],
                     "os_id": os_criada['os_id'],
                     "client_id": os_criada['cliente_id'],
