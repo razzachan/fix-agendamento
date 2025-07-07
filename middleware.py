@@ -1170,6 +1170,11 @@ async def geocodificar_endereco(endereco: str) -> Optional[Tuple[float, float]]:
     Geocodifica um endereço usando a API do OpenStreetMap Nominatim
     """
     try:
+        # Garantir encoding UTF-8 correto no endereço
+        if isinstance(endereco, bytes):
+            endereco = endereco.decode('utf-8')
+        endereco = endereco.encode('utf-8', errors='replace').decode('utf-8')
+
         encoded_address = endereco.replace(' ', '+') + ',+Brasil'
         url = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded_address}&limit=1&countrycodes=br"
 
@@ -1181,6 +1186,8 @@ async def geocodificar_endereco(endereco: str) -> Optional[Tuple[float, float]]:
             })
 
             if response.status_code == 200:
+                # Garantir encoding UTF-8 correto na resposta
+                response.encoding = 'utf-8'
                 data = response.json()
                 if data and len(data) > 0:
                     result = data[0]
