@@ -107,7 +107,7 @@ export interface CalendarEvent {
   equipment: string;
   problem: string;
   address: string;
-  status: 'confirmed' | 'suggested' | 'completed' | 'cancelled';
+  status: 'confirmed' | 'suggested' | 'completed' | 'cancelled' | 'in_progress';
   isUrgent?: boolean;
   serviceOrderId?: string;
   logisticsGroup?: 'A' | 'B' | 'C';
