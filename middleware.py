@@ -3726,7 +3726,13 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
             problemas = [pre_agendamento.get('problema', 'Problema')]
             tipos_atendimento = [pre_agendamento.get('tipo_atendimento_1', 'em_domicilio')]
         else:
-            equipamentos = [eq.get('equipamento', 'Equipamento') for eq in equipamentos_data]
+            # Verificar se equipamentos_data contém strings ou dicts
+            if equipamentos_data and isinstance(equipamentos_data[0], str):
+                # Lista de strings (formato antigo)
+                equipamentos = equipamentos_data
+            else:
+                # Lista de dicts (formato novo)
+                equipamentos = [eq.get('equipamento', 'Equipamento') for eq in equipamentos_data]
             problemas = problemas_data
             tipos_atendimento = tipos_atendimento_data
 
