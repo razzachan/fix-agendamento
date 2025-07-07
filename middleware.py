@@ -884,7 +884,7 @@ def converter_horario_para_iso(horario_str):
     return datetime.now().isoformat()
 
 def converter_horario_para_iso_direto(horario_iso_str):
-    """Converter horário ISO com timezone Brasil para UTC correto"""
+    """Converter horário preservando o horário visual (não converter para UTC)"""
     if not horario_iso_str:
         return datetime.now().isoformat()
 
@@ -898,11 +898,19 @@ def converter_horario_para_iso_direto(horario_iso_str):
             if dt_with_tz.tzinfo is None:
                 dt_with_tz = pytz.timezone('America/Sao_Paulo').localize(dt_with_tz)
 
-            # Converter para UTC
-            dt_utc = dt_with_tz.astimezone(pytz.UTC)
+            # ✅ PRESERVAR HORÁRIO VISUAL - NÃO CONVERTER PARA UTC
+            # Criar datetime "naive" com os mesmos componentes visuais
+            dt_visual = datetime(
+                dt_with_tz.year,
+                dt_with_tz.month,
+                dt_with_tz.day,
+                dt_with_tz.hour,
+                dt_with_tz.minute,
+                dt_with_tz.second
+            )
 
-            logger.info(f"🔄 Horário ISO convertido: '{horario_iso_str}' -> '{dt_utc.isoformat()}'")
-            return dt_utc.isoformat()
+            logger.info(f"🔄 Horário preservado: '{horario_iso_str}' -> '{dt_visual.isoformat()}'")
+            return dt_visual.isoformat()
 
         # Se não está em formato ISO, usar função original
         return converter_horario_para_iso(horario_iso_str)
