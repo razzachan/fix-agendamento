@@ -265,7 +265,7 @@ async def criar_cliente_com_auth_supabase(dados: Dict) -> str:
         response_fallback = supabase.table("clients").insert(cliente_data).execute()
         cliente_id = response_fallback.data[0]["id"]
         logger.warning(f"⚠️ Cliente criado sem auth (fallback): {cliente_id}")
-        return cliente_id
+        return {"cliente_id": cliente_id, "conta_criada": False, "dados_acesso": None}
 
 async def gerar_proximo_numero_os():
     """
