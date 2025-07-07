@@ -193,7 +193,7 @@ export async function login(email: string, password: string): Promise<User | nul
     }
 
     // Special account for Oficina Central created via admin panel
-    if (email === 'oficina.central@eletrofix.com' && password === '123456') {
+    if (email === 'oficina.central@eletrofix.com' && (password === '123456' || password === 'FixFogoes@2024')) {
       try {
         // Try to authenticate with Supabase first
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -258,7 +258,7 @@ export async function login(email: string, password: string): Promise<User | nul
     }
 
     // Special account for Oficina Norte created via admin panel
-    if (email === 'oficina.norte@eletrofix.com' && password === '123456') {
+    if (email === 'oficina.norte@eletrofix.com' && (password === '123456' || password === 'FixFogoes@2024')) {
       console.log('🏢 [Login] Processando login específico para Oficina Norte');
       try {
         // Try to authenticate with Supabase first

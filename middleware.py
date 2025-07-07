@@ -196,14 +196,17 @@ async def criar_cliente_com_auth_supabase(dados: Dict) -> str:
         # Gerar email se não fornecido (necessário para auth)
         email = dados.get("email", "")
         if not email:
-            # Usar telefone como base para email único
+            # Usar telefone como base para email único com domínio válido
             telefone_limpo = ''.join(filter(str.isdigit, dados["telefone"]))
-            email = f"cliente{telefone_limpo}@fixfogoes.temp"
+            email = f"cliente{telefone_limpo}@fixfogoes.com.br"
 
         # Criar usuário na autenticação do Supabase
+        # Senha padrão segura que atende aos requisitos do Supabase
+        senha_padrao = "FixFogoes@2024"  # 8+ chars, maiúscula, minúscula, número, símbolo
+
         auth_response = supabase.auth.admin.create_user({
             "email": email,
-            "password": "123456",
+            "password": senha_padrao,
             "email_confirm": True,  # Confirmar email automaticamente
             "user_metadata": {
                 "name": dados["nome"],
