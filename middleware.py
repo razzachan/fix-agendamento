@@ -192,7 +192,7 @@ async def criar_cliente_com_auth_supabase(dados: Dict) -> str:
             cliente_id = response_cliente.data[0]["id"]
             logger.info(f"✅ Cliente existente encontrado: {cliente_id}")
             # Retornar apenas o ID para clientes existentes (sem dados de acesso)
-            return cliente_id
+            return {"cliente_id": cliente_id, "conta_criada": False, "dados_acesso": None}
 
         # Usar email fornecido pelo cliente (obrigatório)
         email = dados.get("email", "").strip()
@@ -2869,16 +2869,14 @@ async def criar_os_completa(dados: dict):
         # Criar cliente usando autenticação Supabase
         resultado_cliente = await criar_cliente_com_auth_supabase(dados)
 
-        # Verificar se retornou dict (conta criada) ou string (cliente existente)
-        if isinstance(resultado_cliente, dict):
-            cliente_id = resultado_cliente["cliente_id"]
-            conta_criada = resultado_cliente["conta_criada"]
-            dados_acesso = resultado_cliente["dados_acesso"]
+        # Agora sempre retorna dict
+        cliente_id = resultado_cliente["cliente_id"]
+        conta_criada = resultado_cliente["conta_criada"]
+        dados_acesso = resultado_cliente["dados_acesso"]
+
+        if conta_criada:
             logger.info(f"✅ Cliente processado com nova conta: {cliente_id}")
         else:
-            cliente_id = resultado_cliente
-            conta_criada = False
-            dados_acesso = None
             logger.info(f"✅ Cliente existente processado: {cliente_id}")
 
         # Buscar ID do técnico pelo nome
