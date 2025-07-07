@@ -191,6 +191,7 @@ async def criar_cliente_com_auth_supabase(dados: Dict) -> str:
         if response_cliente.data:
             cliente_id = response_cliente.data[0]["id"]
             logger.info(f"✅ Cliente existente encontrado: {cliente_id}")
+            # Retornar apenas o ID para clientes existentes (sem dados de acesso)
             return cliente_id
 
         # Usar email fornecido pelo cliente (obrigatório)
@@ -241,7 +242,11 @@ async def criar_cliente_com_auth_supabase(dados: Dict) -> str:
             logger.info(f"   🌐 Portal: app.fixfogoes.com.br")
             logger.info(f"   📋 Pode acompanhar suas ordens de serviço online")
 
-            return cliente_id
+            # Retornar cliente_id e flag de conta criada
+            return {"cliente_id": cliente_id, "conta_criada": True, "dados_acesso": {
+                "email": email,
+                "senha": senha_padrao
+            }}
         else:
             logger.error("❌ Falha ao criar usuário na autenticação")
             raise Exception("Falha na criação do usuário")
@@ -2789,7 +2794,29 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
 👨‍🔧 *Técnico:* {dados_reais['tecnico']}
 💰 *Valor:* R$ {dados_reais['valor_os']:.2f}
 
-✅ Seu agendamento foi confirmado! O técnico entrará em contato próximo ao horário agendado.
+✅ Seu agendamento foi confirmado! O técnico entrará em contato próximo ao horário agendado."""
+
+            # Adicionar informações de acesso se conta foi criada
+            if os_criada.get("conta_criada") and os_criada.get("dados_acesso"):
+                dados_acesso = os_criada["dados_acesso"]
+                mensagem += f"""
+
+🔐 *SUA CONTA FOI CRIADA!*
+Agora você pode acompanhar sua OS online:
+
+📧 *Email:* {dados_acesso['email']}
+🔑 *Senha:* {dados_acesso['senha']}
+🌐 *Portal:* app.fixfogoes.com.br
+
+📱 *ACOMPANHE ONLINE:*
+✅ Status em tempo real
+✅ Fotos do processo de reparo
+✅ Notificações automáticas
+✅ Histórico completo
+
+💾 *Salve estes dados para acessar sempre!*"""
+
+            mensagem += f"""
 
 📞 *Dúvidas?* Entre em contato: (48) 98833-2664"""
 
@@ -2831,8 +2858,19 @@ async def criar_os_completa(dados: dict):
         logger.info(f"📋 Número da OS gerado: {os_numero}")
 
         # Criar cliente usando autenticação Supabase
-        cliente_id = await criar_cliente_com_auth_supabase(dados)
-        logger.info(f"✅ Cliente processado: {cliente_id}")
+        resultado_cliente = await criar_cliente_com_auth_supabase(dados)
+
+        # Verificar se retornou dict (conta criada) ou string (cliente existente)
+        if isinstance(resultado_cliente, dict):
+            cliente_id = resultado_cliente["cliente_id"]
+            conta_criada = resultado_cliente["conta_criada"]
+            dados_acesso = resultado_cliente["dados_acesso"]
+            logger.info(f"✅ Cliente processado com nova conta: {cliente_id}")
+        else:
+            cliente_id = resultado_cliente
+            conta_criada = False
+            dados_acesso = None
+            logger.info(f"✅ Cliente existente processado: {cliente_id}")
 
         # Buscar ID do técnico pelo nome
         tecnico_nome = dados.get("tecnico", "Paulo Cesar Betoni")
@@ -2901,7 +2939,9 @@ async def criar_os_completa(dados: dict):
             "success": True,
             "os_numero": os_numero,
             "os_id": os_id,
-            "cliente_id": cliente_id
+            "cliente_id": cliente_id,
+            "conta_criada": conta_criada,
+            "dados_acesso": dados_acesso
         }
 
     except Exception as e:
