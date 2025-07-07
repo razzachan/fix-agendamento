@@ -386,14 +386,24 @@ export const useMainCalendar = ({
         return event;
       });
 
+      // DEBUG: Log de todos os eventos antes do filtro
+      console.log(`🔍 [DEBUG] Eventos antes do filtro:`, calendarEvents.map(e => ({
+        id: e.id,
+        clientName: e.clientName,
+        status: e.status,
+        scheduledStartTime: e.scheduledStartTime
+      })));
+
       // Filtrar eventos relevantes para o calendário principal (excluir sugeridos e cancelados)
       // IMPORTANTE: Eventos cancelados NÃO devem aparecer no calendário
-      const relevantEvents = calendarEvents.filter(event =>
-        event.status === 'confirmed' ||    // ✅ INCLUIR AGENDADOS (scheduled)
-        event.status === 'completed' ||    // ✅ INCLUIR CONCLUÍDOS
-        event.status === 'in_progress'     // ✅ INCLUIR EM PROGRESSO
-        // ❌ Excluir apenas cancelados e sugeridos do calendário
-      );
+      const relevantEvents = calendarEvents.filter(event => {
+        const isRelevant = event.status === 'confirmed' ||    // ✅ INCLUIR AGENDADOS (scheduled)
+                          event.status === 'completed' ||    // ✅ INCLUIR CONCLUÍDOS
+                          event.status === 'in_progress';    // ✅ INCLUIR EM PROGRESSO
+
+        console.log(`🔍 [DEBUG] Evento ${event.id}: status="${event.status}", isRelevant=${isRelevant}`);
+        return isRelevant;
+      });
 
       console.log(`✅ [useMainCalendar] ${relevantEvents.length} eventos relevantes carregados (excluindo cancelados)`);
       setEvents(relevantEvents);
