@@ -3697,14 +3697,14 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         # 🔧 EXTRAIR DADOS DO CACHE (ETAPA 2)
         # Os dados foram salvos na ETAPA 1 e agora precisamos recuperá-los
 
-        # Para ETAPA 2, vamos usar dados padrão por enquanto
-        # TODO: Implementar recuperação completa dos dados do cache
-        endereco = "R. 224, 160 - Andorinha, Itapema - SC, 88220-000"  # Do exemplo real
-        nome = "Julio Cesar Betoni"  # Do exemplo real
+        # 🔧 USAR DADOS REAIS DA REQUISIÇÃO (ETAPA 2)
+        # Recuperar dados do pré-agendamento que contém os dados originais
+        nome = pre_agendamento.get('nome', 'Cliente')
+        endereco = pre_agendamento.get('endereco', '')
         telefone = telefone_contato  # Usar o telefone recebido
-        cpf = "42547597896"  # Do exemplo real
-        email = "akroma.julio@gmail.com"  # Do exemplo real
-        urgente = True  # Do exemplo real
+        cpf = pre_agendamento.get('cpf', '')
+        email = pre_agendamento.get('email', '')
+        urgente = pre_agendamento.get('urgente', True)
 
         logger.info(f"🔧 ETAPA 2: Usando dados do exemplo real:")
         logger.info(f"🔧   nome: '{nome}'")
@@ -3714,10 +3714,21 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         logger.info(f"🔧   email: '{email}'")
         logger.info(f"🔧   urgente: {urgente}")
 
-        # 🔧 CONSOLIDAR EQUIPAMENTOS E PROBLEMAS (DO EXEMPLO REAL)
-        equipamentos = ["fogão de 4 bocas"]  # Do exemplo real
-        problemas = ["chamas fracas"]  # Do exemplo real
-        tipos_atendimento = ["em_domicilio"]  # Do exemplo real
+        # 🔧 CONSOLIDAR EQUIPAMENTOS E PROBLEMAS (DADOS REAIS)
+        # Recuperar equipamentos do pré-agendamento
+        equipamentos_data = pre_agendamento.get('equipamentos', [])
+        problemas_data = pre_agendamento.get('problemas', [])
+        tipos_atendimento_data = pre_agendamento.get('tipos_atendimento', [])
+
+        # Se não há dados no cache, usar dados da requisição atual
+        if not equipamentos_data:
+            equipamentos = [pre_agendamento.get('equipamento', 'Equipamento')]
+            problemas = [pre_agendamento.get('problema', 'Problema')]
+            tipos_atendimento = [pre_agendamento.get('tipo_atendimento_1', 'em_domicilio')]
+        else:
+            equipamentos = [eq.get('equipamento', 'Equipamento') for eq in equipamentos_data]
+            problemas = problemas_data
+            tipos_atendimento = tipos_atendimento_data
 
         logger.info(f"🔧 ETAPA 2: {len(equipamentos)} equipamentos encontrados: {equipamentos}")
         logger.info(f"🔧 ETAPA 2: Problemas: {problemas}")
