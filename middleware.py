@@ -2780,45 +2780,40 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
 
             logger.info(f"✅ ETAPA 2: OS criada com sucesso - {os_criada['os_numero']}")
 
-            # Resposta final para o cliente
-            mensagem = f"""🎉 *AGENDAMENTO CONFIRMADO COM SUCESSO!*
+            # 🧠 RESPOSTA INTELIGENTE ESTRUTURADA PARA CLIENTECHAT
+            # Retorna dados estruturados que a instrução pode usar de forma inteligente
 
-📋 *Ordem de Serviço:* #{os_criada['os_numero']}
-👤 *Cliente:* {dados_reais['nome']}
-📱 *Telefone:* {dados_reais['telefone']}
-📍 *Endereço:* {dados_reais['endereco']}
-🔧 *Equipamento:* {dados_reais['equipamento']}
-⚠️ *Problema:* {dados_reais['problema']}
+            # Dados básicos do agendamento
+            resposta_dados = {
+                "status": "confirmado",
+                "os_numero": os_criada['os_numero'],
+                "cliente": dados_reais['nome'],
+                "telefone": dados_reais['telefone'],
+                "endereco": dados_reais['endereco'],
+                "equipamento": dados_reais['equipamento'],
+                "problema": dados_reais['problema'],
+                "horario": horario_escolhido,
+                "tecnico": dados_reais['tecnico'],
+                "valor": f"R$ {dados_reais['valor_os']:.2f}",
+                "conta_criada": os_criada.get("conta_criada", False)
+            }
 
-⏰ *Agendamento:* {horario_escolhido}
-👨‍🔧 *Técnico:* {dados_reais['tecnico']}
-💰 *Valor:* R$ {dados_reais['valor_os']:.2f}
-
-✅ Seu agendamento foi confirmado! O técnico entrará em contato próximo ao horário agendado."""
-
-            # Adicionar informações de acesso se conta foi criada
+            # Adicionar dados de acesso se conta foi criada
             if os_criada.get("conta_criada") and os_criada.get("dados_acesso"):
                 dados_acesso = os_criada["dados_acesso"]
-                mensagem += f"""
+                resposta_dados.update({
+                    "email_acesso": dados_acesso['email'],
+                    "senha_acesso": dados_acesso['senha'],
+                    "portal_url": "app.fixfogoes.com.br"
+                })
 
-🔐 *SUA CONTA FOI CRIADA!*
-Agora você pode acompanhar sua OS online:
+            # Mensagem estruturada para ClienteChat usar
+            mensagem = f"""AGENDAMENTO_CONFIRMADO|OS:{resposta_dados['os_numero']}|CLIENTE:{resposta_dados['cliente']}|HORARIO:{resposta_dados['horario']}|TECNICO:{resposta_dados['tecnico']}|VALOR:{resposta_dados['valor']}"""
 
-📧 *Email:* {dados_acesso['email']}
-🔑 *Senha:* {dados_acesso['senha']}
-🌐 *Portal:* app.fixfogoes.com.br
-
-📱 *ACOMPANHE ONLINE:*
-✅ Status em tempo real
-✅ Fotos do processo de reparo
-✅ Notificações automáticas
-✅ Histórico completo
-
-💾 *Salve estes dados para acessar sempre!*"""
-
-            mensagem += f"""
-
-📞 *Dúvidas?* Entre em contato: (48) 98833-2664"""
+            if resposta_dados['conta_criada']:
+                mensagem += f"""|CONTA_CRIADA:SIM|EMAIL:{resposta_dados['email_acesso']}|SENHA:{resposta_dados['senha_acesso']}|PORTAL:{resposta_dados['portal_url']}"""
+            else:
+                mensagem += f"""|CONTA_CRIADA:NAO"""
 
             return JSONResponse(
                 status_code=200,
