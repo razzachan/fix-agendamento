@@ -471,6 +471,19 @@ async def processar_horarios_com_otimizacao(
         if data_verificacao.weekday() >= 5:
             continue
 
+        # 🚫 REGRA GRUPO C: Nunca aos sábados e segundas-feiras
+        if grupo == 'C':
+            # Segunda-feira = 0, Sábado = 5
+            if data_verificacao.weekday() == 0:  # Segunda-feira
+                logger.info(f"🚫 GRUPO C: Pulando segunda-feira {data_str}")
+                continue
+            # Sábado já é pulado pelo fim de semana acima
+
+            # 🚫 REGRA GRUPO C: Nunca no dia seguinte se já houver Grupo C hoje
+            if await verificar_grupo_c_consecutivo(data_verificacao, technician_id, supabase):
+                logger.info(f"🚫 GRUPO C: Pulando {data_str} - já há Grupo C no dia anterior")
+                continue
+
         dias_verificados += 1
 
         data_str = data_verificacao.strftime('%Y-%m-%d')
@@ -1280,13 +1293,13 @@ def determinar_periodo_ideal_por_rota(endereco: str) -> str:
             logger.info("🗺️ Itapema detectado → Período ideal: MANHÃ")
             return "manha"
         elif any(cidade in endereco_lower for cidade in ['balneário camboriú', 'balneario camboriu', 'bc']):
-            logger.info("🗺️ Balneário Camboriú detectado → Período ideal: TARDE")
+            logger.info("🗺️ Balneário Camboriú detectado → Período: APENAS TARDE (nunca manhã)")
             return "tarde"
         elif any(cidade in endereco_lower for cidade in ['itajaí', 'itajai']):
-            logger.info("🗺️ Itajaí detectado → Período ideal: TARDE")
+            logger.info("🗺️ Itajaí detectado → Período: APENAS TARDE (nunca manhã)")
             return "tarde"
         elif any(cidade in endereco_lower for cidade in ['navegantes']):
-            logger.info("🗺️ Navegantes detectado → Período ideal: TARDE")
+            logger.info("🗺️ Navegantes detectado → Período: APENAS TARDE (nunca manhã)")
             return "tarde"
         else:
             logger.info("🗺️ Cidade não identificada na rota sequencial → Período: QUALQUER")
@@ -1295,6 +1308,39 @@ def determinar_periodo_ideal_por_rota(endereco: str) -> str:
     except Exception as e:
         logger.error(f"❌ Erro ao determinar período ideal: {e}")
         return "qualquer"
+
+async def verificar_grupo_c_consecutivo(data_verificacao: datetime, technician_id: str, supabase) -> bool:
+    """
+    🚫 Verifica se já existe agendamento Grupo C no dia anterior
+    Evita agendar Grupo C em dias consecutivos
+    """
+    try:
+        # Data do dia anterior
+        dia_anterior = data_verificacao - timedelta(days=1)
+        data_anterior_str = dia_anterior.strftime('%Y-%m-%d')
+
+        # Buscar agendamentos do técnico no dia anterior
+        response = supabase.table("service_orders").select("*").eq(
+            "technician_id", technician_id
+        ).execute()
+
+        if response.data:
+            for os in response.data:
+                scheduled_date_str = os.get('scheduled_date', '')
+                if scheduled_date_str.startswith(data_anterior_str):
+                    # Verificar se é Grupo C baseado no endereço
+                    endereco = os.get('pickup_address', '')
+                    if endereco:
+                        grupo = determine_logistics_group(endereco)
+                        if grupo == 'C':
+                            logger.info(f"🚫 Grupo C encontrado no dia anterior ({data_anterior_str}): OS {os.get('order_number', 'N/A')}")
+                            return True
+
+        return False
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao verificar Grupo C consecutivo: {e}")
+        return False
 
 def determine_logistics_group(endereco: str, coordinates: Optional[Tuple[float, float]] = None) -> str:
     """
@@ -1945,11 +1991,22 @@ async def estrategia_rota_manha(
 ) -> List[Dict]:
     """
     🌅 ESTRATÉGIA MANHÃ: Tijucas (35km) → Itapema (55km)
-    Horários: 8h-12h (começar cedo para otimizar deslocamento)
+    Horários: 9h-11h (começar cedo para otimizar deslocamento)
+
+    🚫 REGRA: BC, Itajaí, Navegantes NUNCA no período da manhã
     """
     logger.info("🌅 Aplicando estratégia ROTA MANHÃ (Tijucas → Itapema)")
     logger.info(f"🌅 DEBUG: Técnico ID: {technician_id}, Endereço: {endereco}")
     logger.info(f"🌅 DEBUG: Agendamentos na rota: {len(agendamentos_rota)}")
+
+    # 🚫 VALIDAÇÃO: BC, Itajaí, Navegantes não podem ser agendados de manhã
+    endereco_lower = endereco.lower()
+    cidades_bloqueadas = ['balneário camboriú', 'balneario camboriu', 'bc', 'itajaí', 'itajai', 'navegantes']
+
+    if any(cidade in endereco_lower for cidade in cidades_bloqueadas):
+        logger.warning(f"🚫 BLOQUEIO MANHÃ: {endereco} não pode ser agendado de manhã")
+        logger.info("🔄 Redirecionando para estratégia de tarde...")
+        return await estrategia_rota_tarde(technician_id, technician_name, endereco, agendamentos_rota, urgente, agora, supabase)
 
     # Horários otimizados para manhã (rota sequencial) - HORÁRIOS COMERCIAIS
     horarios_manha = [
