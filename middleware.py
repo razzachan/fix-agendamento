@@ -3573,14 +3573,7 @@ async def consultar_disponibilidade_interna(data: dict):
                     "email": data.get("email", "")
                 },
                 "equipamentos": equipamentos,
-                "problemas": problemas,
-                "grupo_logistico": grupo_logistico,
-                "tecnico_info": {
-                    "nome": tecnico_info['nome'],
-                    "especialidades": tecnico_info['especialidades'],
-                    "score": tecnico_info['score'],
-                    "motivo_selecao": tecnico_info['motivo_selecao']
-                }
+                "problemas": problemas
             }
         )
 
