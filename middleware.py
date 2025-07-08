@@ -3139,6 +3139,13 @@ async def finalizar_os(request: Request):
         os_data = response.data[0]
 
         # 2. Atualizar status para "completed"
+        # Garantir encoding correto das observações
+        if observacoes:
+            try:
+                observacoes = observacoes.encode('utf-8', errors='replace').decode('utf-8')
+            except:
+                observacoes = "Observações não disponíveis"
+
         update_data = {
             "status": "completed",
             "completed_date": datetime.now().isoformat(),
@@ -3150,6 +3157,13 @@ async def finalizar_os(request: Request):
         # 3. Preparar mensagem de avaliação Google
         cliente_nome = os_data.get("client_name", "Cliente")
         telefone = os_data.get("client_phone", "")
+
+        # Garantir encoding correto do nome
+        if cliente_nome:
+            try:
+                cliente_nome = cliente_nome.encode('utf-8', errors='replace').decode('utf-8')
+            except:
+                cliente_nome = "Cliente"
 
         mensagem_avaliacao = f"""🎉 *Serviço Concluído - OS {os_numero}*
 
