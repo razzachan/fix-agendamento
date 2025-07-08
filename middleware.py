@@ -144,12 +144,21 @@ async def verificar_horario_disponivel_tecnico(technician_id: str, horario_dt: d
 
         logger.info(f"🔍 DEBUG: Verificando {technician_id} em {data_str} {hora_str}")
 
+        # 🔧 CORREÇÃO CRÍTICA: scheduled_date é DATETIME, filtrar manualmente por data
         response_os = supabase.table("service_orders").select("*").eq(
             "technician_id", technician_id
-        ).eq("scheduled_date", data_str).eq("scheduled_time", hora_str).execute()
+        ).eq("scheduled_time", hora_str).execute()
 
+        # Filtrar manualmente por data
+        conflitos_os = []
         if response_os.data:
-            logger.info(f"❌ DEBUG: Conflito em service_orders: {len(response_os.data)} registros")
+            for os in response_os.data:
+                scheduled_date_str = os.get('scheduled_date', '')
+                if scheduled_date_str.startswith(data_str):
+                    conflitos_os.append(os)
+
+        if conflitos_os:
+            logger.info(f"❌ DEBUG: Conflito em service_orders: {len(conflitos_os)} registros")
             return False
 
         # Verificar conflitos em agendamentos_ai
@@ -1041,17 +1050,25 @@ async def verificar_horario_tecnico_disponivel(technician_id: str, date_str: str
         time_str = f"{hour:02d}:00"
         logger.debug(f"🔍 Verificando service_orders: technician_id={technician_id}, date={date_str}, time={time_str}")
 
+        # 🔧 CORREÇÃO CRÍTICA: scheduled_date é DATETIME, precisa usar ::date para comparar apenas a data
         response_os = supabase.table("service_orders").select("*").eq(
             "technician_id", technician_id
-        ).eq(
-            "scheduled_date", date_str
         ).eq(
             "scheduled_time", time_str
         ).execute()
 
-        if response_os.data and len(response_os.data) > 0:
-            logger.info(f"❌ Técnico {technician_id} ocupado em {date_str} às {hour}:00 (service_orders) - {len(response_os.data)} conflitos")
+        # Filtrar manualmente por data (Supabase não suporta ::date diretamente)
+        conflitos_os = []
+        if response_os.data:
             for os in response_os.data:
+                # Extrair apenas a data do scheduled_date (ignorar hora)
+                scheduled_date_str = os.get('scheduled_date', '')
+                if scheduled_date_str.startswith(date_str):
+                    conflitos_os.append(os)
+
+        if conflitos_os and len(conflitos_os) > 0:
+            logger.info(f"❌ Técnico {technician_id} ocupado em {date_str} às {hour}:00 (service_orders) - {len(conflitos_os)} conflitos")
+            for os in conflitos_os:
                 logger.debug(f"   📋 OS conflitante: {os.get('order_number', 'N/A')} - {os.get('scheduled_date', 'N/A')} {os.get('scheduled_time', 'N/A')}")
             return False
 
