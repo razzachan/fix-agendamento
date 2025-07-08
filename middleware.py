@@ -21,6 +21,10 @@ _supabase_client = None
 _technicians_cache = {}
 _cache_timestamp = None
 
+# Cache para geocodificação (evitar múltiplas consultas do mesmo endereço)
+_geocoding_cache = {}
+_geocoding_cache_timestamp = {}
+
 def calcular_data_inicio_otimizada(urgente: bool = False) -> datetime:
     """
     🎯 NOVA LÓGICA: Sempre calcular a data de início mais próxima possível
@@ -1170,13 +1174,26 @@ def extract_cep_from_address(endereco: str) -> str:
 
 async def geocodificar_endereco(endereco: str) -> Optional[Tuple[float, float]]:
     """
-    Geocodifica um endereço usando a API do OpenStreetMap Nominatim
+    Geocodifica um endereço usando a API do OpenStreetMap Nominatim com cache
     """
+    global _geocoding_cache, _geocoding_cache_timestamp
+
     try:
         # Garantir encoding UTF-8 correto no endereço
         if isinstance(endereco, bytes):
             endereco = endereco.decode('utf-8')
         endereco = endereco.encode('utf-8', errors='replace').decode('utf-8')
+
+        # Normalizar endereço para cache (remover espaços extras, etc.)
+        endereco_normalizado = ' '.join(endereco.split()).lower()
+
+        # Verificar cache (TTL de 1 hora)
+        now = datetime.now()
+        if endereco_normalizado in _geocoding_cache:
+            cache_time = _geocoding_cache_timestamp.get(endereco_normalizado)
+            if cache_time and (now - cache_time).total_seconds() < 3600:  # 1 hora
+                logger.info(f"🎯 Geocodificação do cache: {endereco}")
+                return _geocoding_cache[endereco_normalizado]
 
         encoded_address = endereco.replace(' ', '+') + ',+Brasil'
         url = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded_address}&limit=1&countrycodes=br"
@@ -1194,11 +1211,19 @@ async def geocodificar_endereco(endereco: str) -> Optional[Tuple[float, float]]:
                 data = response.json()
                 if data and len(data) > 0:
                     result = data[0]
-                    return (float(result['lon']), float(result['lat']))
+                    coords = (float(result['lon']), float(result['lat']))
 
+                    # Salvar no cache
+                    _geocoding_cache[endereco_normalizado] = coords
+                    _geocoding_cache_timestamp[endereco_normalizado] = now
+
+                    logger.info(f"🌍 Geocodificação bem-sucedida: {endereco} -> {coords}")
+                    return coords
+
+        logger.warning(f"⚠️ Geocodificação falhou para: {endereco}")
         return None
     except Exception as e:
-        logger.error(f"Erro na geocodificação: {e}")
+        logger.error(f"❌ Erro na geocodificação: {e}")
         return None
 
 def determinar_periodo_ideal_por_rota(endereco: str) -> str:
