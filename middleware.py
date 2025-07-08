@@ -740,6 +740,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# URL da página do Google para avaliações
+GOOGLE_REVIEW_URL = "https://g.page/r/CfjiXeK7gOSLEAg/review"
+
 # Modelo para agendamento
 class Agendamento(BaseModel):
     nome: str
@@ -3043,6 +3046,204 @@ async def health_check():
             "version": "3.1.4-PERFORMANCE-OPTIMIZED",
             "error": str(e)
         }
+
+@app.post("/solicitar-avaliacao-google")
+async def solicitar_avaliacao_google(request: Request):
+    """
+    Endpoint para solicitar avaliação no Google após conclusão do serviço
+    """
+    try:
+        data = await request.json()
+
+        # Dados obrigatórios
+        os_numero = data.get("os_numero", "")
+        cliente_nome = data.get("cliente_nome", "Cliente")
+        telefone = data.get("telefone", "")
+
+        if not os_numero or not telefone:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "OS número e telefone são obrigatórios"}
+            )
+
+        # Mensagem personalizada para solicitar avaliação
+        mensagem = f"""🎉 *Serviço Concluído - OS {os_numero}*
+
+Olá {cliente_nome}!
+
+✅ Seu serviço foi finalizado com sucesso!
+
+⭐ *Que tal nos ajudar com uma avaliação?*
+
+Sua opinião é muito importante para nós e ajuda outros clientes a conhecerem nosso trabalho.
+
+🔗 *Clique aqui para avaliar:*
+{GOOGLE_REVIEW_URL}
+
+📝 *Leva apenas 30 segundos!*
+
+Muito obrigado pela confiança! 🙏
+
+---
+*Fix Fogões - Assistência Técnica Especializada*
+📞 (48) 98833-2664"""
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": mensagem,
+                "google_review_url": GOOGLE_REVIEW_URL,
+                "os_numero": os_numero,
+                "cliente": cliente_nome,
+                "action": "request_google_review"
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao solicitar avaliação Google: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": "Erro interno do servidor"}
+        )
+
+@app.post("/finalizar-os")
+async def finalizar_os(request: Request):
+    """
+    Endpoint para finalizar OS e automaticamente solicitar avaliação Google
+    """
+    try:
+        data = await request.json()
+
+        # Dados obrigatórios
+        os_numero = data.get("os_numero", "")
+        observacoes = data.get("observacoes", "")
+
+        if not os_numero:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Número da OS é obrigatório"}
+            )
+
+        supabase = get_supabase_client()
+
+        # 1. Buscar a OS no banco
+        response = supabase.table("service_orders").select("*").eq("order_number", os_numero).execute()
+
+        if not response.data:
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "message": f"OS {os_numero} não encontrada"}
+            )
+
+        os_data = response.data[0]
+
+        # 2. Atualizar status para "completed"
+        update_data = {
+            "status": "completed",
+            "completed_date": datetime.now().isoformat(),
+            "final_observations": observacoes
+        }
+
+        supabase.table("service_orders").update(update_data).eq("id", os_data["id"]).execute()
+
+        # 3. Preparar mensagem de avaliação Google
+        cliente_nome = os_data.get("client_name", "Cliente")
+        telefone = os_data.get("client_phone", "")
+
+        mensagem_avaliacao = f"""🎉 *Serviço Concluído - OS {os_numero}*
+
+Olá {cliente_nome}!
+
+✅ Seu serviço foi finalizado com sucesso!
+
+⭐ *Que tal nos ajudar com uma avaliação?*
+
+Sua opinião é muito importante para nós e ajuda outros clientes a conhecerem nosso trabalho.
+
+🔗 *Avalie nosso serviço no Google:*
+{GOOGLE_REVIEW_URL}
+
+📝 *Leva apenas 30 segundos!*
+
+Muito obrigado pela confiança! 🙏
+
+---
+*Fix Fogões - Assistência Técnica Especializada*
+📞 (48) 98833-2664"""
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": f"OS {os_numero} finalizada com sucesso!",
+                "os_finalizada": {
+                    "numero": os_numero,
+                    "cliente": cliente_nome,
+                    "telefone": telefone,
+                    "data_conclusao": datetime.now().isoformat(),
+                    "observacoes": observacoes
+                },
+                "avaliacao_google": {
+                    "message": mensagem_avaliacao,
+                    "url": GOOGLE_REVIEW_URL,
+                    "action": "send_google_review_request"
+                }
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao finalizar OS: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": "Erro interno do servidor"}
+        )
+
+@app.get("/os-tecnico/{tecnico_id}")
+async def listar_os_tecnico(tecnico_id: str):
+    """
+    Lista as OS ativas de um técnico específico
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Buscar OS ativas do técnico
+        response = supabase.table("service_orders").select("*").eq(
+            "technician_id", tecnico_id
+        ).eq(
+            "status", "scheduled"
+        ).order("scheduled_date").execute()
+
+        os_ativas = []
+        for os in response.data:
+            os_ativas.append({
+                "id": os["id"],
+                "numero": os["order_number"],
+                "cliente": os["client_name"],
+                "telefone": os["client_phone"],
+                "endereco": os.get("pickup_address", ""),
+                "equipamento": os["equipment_type"],
+                "data_agendada": os["scheduled_date"],
+                "hora_agendada": os["scheduled_time"],
+                "valor": os.get("final_cost", 0),
+                "observacoes": os.get("service_description", "")
+            })
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "os_ativas": os_ativas,
+                "total": len(os_ativas)
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao listar OS do técnico: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": "Erro interno do servidor"}
+        )
 
 # Endpoint de DEBUG para ver dados do ClienteChat
 @app.post("/debug-clientechat")
