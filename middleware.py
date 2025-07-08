@@ -3201,20 +3201,28 @@ async def consultar_disponibilidade(request: Request):
             if urgente:
                 mensagem += f"🚨 *URGENTE*\n"
 
-            # Informações do técnico selecionado (mais limpo)
-            mensagem += f"\n👨‍🔧 *Técnico:* {tecnico_info['nome']}\n"
+            # Informações do técnico selecionado (mais detalhado e amigável)
+            mensagem += f"\n👨‍🔧 *Técnico Designado:* {tecnico_info['nome']}\n"
 
-            # Mostrar especialidades de forma mais natural
+            # Mostrar especialidades de forma mais natural e específica
             especialidades_texto = ""
             if "coifa" in tecnico_info['especialidades']:
-                especialidades_texto = "Especialista em coifas e exaustores"
-            elif "fogao" in tecnico_info['especialidades']:
-                especialidades_texto = "Especialista em fogões e fornos"
+                especialidades_texto = "🔧 Especialista em coifas, depuradores e exaustores"
+            elif "fogao" in tecnico_info['especialidades'] or "gas" in tecnico_info['especialidades']:
+                especialidades_texto = "🔥 Especialista em fogões, fornos e equipamentos à gás"
+            elif "lava-loucas" in tecnico_info['especialidades']:
+                especialidades_texto = "💧 Especialista em lava-louças e equipamentos de cozinha"
             else:
-                especialidades_texto = "Técnico especializado"
+                especialidades_texto = "⚙️ Técnico especializado em eletrodomésticos"
+
+            # Adicionar experiência se disponível
+            if tecnico_info.get('score', 0) > 10:
+                experiencia = "⭐ Técnico experiente e bem avaliado"
+            else:
+                experiencia = "✅ Técnico qualificado"
 
             mensagem += f"🎯 {especialidades_texto}\n"
-            mensagem += f"📞 {tecnico_info['telefone']}\n"
+            mensagem += f"{experiencia}\n"
 
             mensagem += f"\n🗓️ *Horários Disponíveis*\n\n"
 
@@ -3511,8 +3519,27 @@ async def consultar_disponibilidade_interna(data: dict):
             else:
                 janela_tempo = "Horário a definir"
 
-            # Adicionar à mensagem principal
-            mensagem += f"*{i}.* Data: {data_formatada} - {janela_tempo}\n"
+            # Adicionar à mensagem principal com mais informações
+            # Determinar período do dia
+            if hora_formatada and ':' in hora_formatada:
+                try:
+                    hora_num = int(hora_formatada.split(':')[0])
+                    if 9 <= hora_num <= 11:
+                        periodo = "🌅 Manhã"
+                    elif 13 <= hora_num <= 17:
+                        periodo = "🌞 Tarde"
+                    else:
+                        periodo = "⏰"
+                except:
+                    periodo = "⏰"
+            else:
+                periodo = "⏰"
+
+            # Extrair dia da semana
+            dia_semana_curto = dia_semana.split(',')[0] if ',' in dia_semana else dia_semana
+
+            mensagem += f"*{i}.* {periodo} {dia_semana_curto}, {data_formatada}\n"
+            mensagem += f"    📍 {janela_tempo}\n"
 
             # Adicionar à lista de opções simples
             opcoes_simples.append({
@@ -3522,10 +3549,11 @@ async def consultar_disponibilidade_interna(data: dict):
                 "datetime_completo": datetime_agendamento
             })
 
-        mensagem += "\n📝 *Como responder:*\n"
-        mensagem += "• Digite *1*, *2* ou *3* para escolher\n"
-        mensagem += "• Ou digite o horário desejado (ex: *9h*, *14h*)\n"
-        mensagem += "• Ou digite o período (*manhã*, *tarde*)"
+        mensagem += "\n💬 *Como escolher seu horário:*\n"
+        mensagem += "🔢 Digite *1*, *2* ou *3* para confirmar\n"
+        mensagem += "🕐 Ou digite o horário (ex: *10h*, *15h*)\n"
+        mensagem += "📅 Ou digite o período (*manhã*, *tarde*)\n"
+        mensagem += "\n✨ *Responda com sua opção preferida!*"
 
         return JSONResponse(
             status_code=200,
@@ -3545,7 +3573,14 @@ async def consultar_disponibilidade_interna(data: dict):
                     "email": data.get("email", "")
                 },
                 "equipamentos": equipamentos,
-                "problemas": problemas
+                "problemas": problemas,
+                "grupo_logistico": grupo_logistico,
+                "tecnico_info": {
+                    "nome": tecnico_info['nome'],
+                    "especialidades": tecnico_info['especialidades'],
+                    "score": tecnico_info['score'],
+                    "motivo_selecao": tecnico_info['motivo_selecao']
+                }
             }
         )
 
