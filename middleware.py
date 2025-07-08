@@ -3681,8 +3681,8 @@ async def consultar_disponibilidade_interna(data: dict):
         primeiro_equipamento = equipamentos[0]["equipamento"]
         lista_equipamentos = [eq["equipamento"] for eq in equipamentos]
 
-        # Determinar grupo logístico
-        grupo_logistico = determinar_grupo_logistico(endereco)
+        # Determinar grupo logístico (usando função atualizada com regras Grupo C)
+        grupo_logistico = determine_logistics_group(endereco)
 
         # Determinar urgência (filtrar placeholders)
         urgente_str = filtrar_placeholders(data.get("urgente", "não"))
