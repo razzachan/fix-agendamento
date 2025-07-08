@@ -784,9 +784,9 @@ class ConsultaDisponibilidade(BaseModel):
 
 # Configurações de roteirização inteligente
 FLORIANOPOLIS_CENTER = [-48.5554, -27.5969]  # Coordenadas do centro de referência
-GROUP_A_RADIUS = 10  # Até 10km do centro
-GROUP_B_RADIUS = 25  # Entre 10km e 25km do centro
-# Grupo C: Acima de 25km do centro
+GROUP_A_RADIUS = 15  # Até 15km do centro (corrigido)
+GROUP_B_RADIUS = 30  # Entre 15km e 30km do centro (corrigido)
+# Grupo C: Acima de 30km do centro
 
 # 🗺️ ROTA SEQUENCIAL LITORAL - Ordem por distanciamento real
 ROTA_LITORAL_SEQUENCIAL = [
@@ -1346,22 +1346,39 @@ def determine_logistics_group(endereco: str, coordinates: Optional[Tuple[float, 
     """
     Determina o grupo logístico baseado no endereço e/ou coordenadas
     """
+    # Prioridade 0: Validação específica para cidades do Grupo C (override)
+    endereco_lower = endereco.lower()
+    cidades_grupo_c = [
+        'balneário camboriú', 'balneario camboriu', 'bc',
+        'itajaí', 'itajai', 'navegantes', 'tijucas', 'itapema'
+    ]
+
+    if any(cidade in endereco_lower for cidade in cidades_grupo_c):
+        logger.info(f"🎯 OVERRIDE: {endereco} → GRUPO C (cidade específica)")
+        return 'C'
+
     # Prioridade 1: Usar coordenadas se disponíveis
     if coordinates:
-        return determine_logistics_group_by_coordinates(coordinates)
+        grupo_coords = determine_logistics_group_by_coordinates(coordinates)
+        logger.info(f"🗺️ Coordenadas: {coordinates} → GRUPO {grupo_coords}")
+        return grupo_coords
 
     # Prioridade 2: Usar CEP extraído do endereço
     cep = extract_cep_from_address(endereco)
     if cep:
-        return determine_logistics_group_by_cep(cep)
+        grupo_cep = determine_logistics_group_by_cep(cep)
+        logger.info(f"📮 CEP: {cep} → GRUPO {grupo_cep}")
+        return grupo_cep
 
     # Prioridade 3: Análise textual do endereço
-    endereco_lower = endereco.lower()
     if any(cidade in endereco_lower for cidade in ['florianópolis', 'florianopolis']):
+        logger.info(f"🏙️ Análise textual: {endereco} → GRUPO A")
         return 'A'
     elif any(cidade in endereco_lower for cidade in ['são josé', 'sao jose', 'palhoça', 'palhoca', 'biguaçu', 'biguacu']):
+        logger.info(f"🌆 Análise textual: {endereco} → GRUPO B")
         return 'B'
     else:
+        logger.info(f"🏖️ Análise textual: {endereco} → GRUPO C (padrão)")
         return 'C'
 
 # Função para obter técnicos do banco de dados
