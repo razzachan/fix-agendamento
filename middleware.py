@@ -2642,16 +2642,167 @@ async def inserir_agendamento(agendamento: Dict[str, Any]) -> Dict[str, Any]:
     logger.info(f"🚫 FUNÇÃO inserir_agendamento DESABILITADA - não criando pré-agendamento")
     return {"success": False, "error": "Função desabilitada - usar apenas ETAPA 2"}
 
+async def verificar_duplicata_agendamento(data: dict) -> dict:
+    """
+    🛡️ Verificação inteligente de duplicatas de agendamento
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Extrair dados para verificação
+        cpf = data.get("cpf", "").strip()
+        telefone = data.get("telefone", "").strip()
+        endereco = data.get("endereco", "").strip()
+        equipamento = data.get("equipamento", "").strip()
+        nome = data.get("nome", "").strip()
+
+        # Janela de tempo para verificação (últimas 2 horas)
+        agora = datetime.now()
+        janela_tempo = agora - timedelta(hours=2)
+
+        logger.info(f"🛡️ Verificando duplicatas para: CPF={cpf}, Tel={telefone}, Nome={nome}")
+
+        # 1. VERIFICAR DUPLICATAS EXATAS EM SERVICE_ORDERS
+        if cpf or telefone:
+            query = supabase.table("service_orders").select("*")
+
+            if cpf:
+                query = query.eq("client_cpf", cpf)
+            elif telefone:
+                query = query.eq("client_phone", telefone)
+
+            response = query.gte("created_at", janela_tempo.isoformat()).execute()
+
+            if response.data:
+                for os in response.data:
+                    # Verificar similaridade dos dados
+                    similaridade = 0
+                    total_checks = 0
+
+                    # Comparar equipamento
+                    if equipamento and os.get("equipment_type"):
+                        total_checks += 1
+                        if equipamento.lower() in os.get("equipment_type", "").lower():
+                            similaridade += 1
+
+                    # Comparar endereço
+                    if endereco and os.get("pickup_address"):
+                        total_checks += 1
+                        endereco_os = os.get("pickup_address", "").lower()
+                        if any(palavra in endereco_os for palavra in endereco.lower().split() if len(palavra) > 3):
+                            similaridade += 1
+
+                    # Comparar nome
+                    if nome and os.get("client_name"):
+                        total_checks += 1
+                        if nome.lower() in os.get("client_name", "").lower():
+                            similaridade += 1
+
+                    # Se similaridade > 70%, considerar duplicata
+                    if total_checks > 0 and (similaridade / total_checks) > 0.7:
+                        tempo_criacao = datetime.fromisoformat(os.get("created_at", "").replace("Z", "+00:00"))
+                        minutos_atras = int((agora - tempo_criacao.replace(tzinfo=None)).total_seconds() / 60)
+
+                        logger.warning(f"🚨 DUPLICATA DETECTADA: OS {os.get('order_number')} criada há {minutos_atras} minutos")
+
+                        return {
+                            "is_duplicate": True,
+                            "duplicate_type": "exact",
+                            "existing_os": os,
+                            "minutes_ago": minutos_atras,
+                            "similarity_score": round((similaridade / total_checks) * 100, 1)
+                        }
+
+        # 2. VERIFICAR DUPLICATAS EM AGENDAMENTOS_AI (pré-agendamentos)
+        if telefone:
+            response_ai = supabase.table("agendamentos_ai").select("*").eq(
+                "telefone", telefone
+            ).gte("created_at", janela_tempo.isoformat()).execute()
+
+            if response_ai.data and len(response_ai.data) > 1:
+                logger.warning(f"🚨 MÚLTIPLOS PRÉ-AGENDAMENTOS: {len(response_ai.data)} para telefone {telefone}")
+
+                return {
+                    "is_duplicate": True,
+                    "duplicate_type": "pre_scheduling",
+                    "count": len(response_ai.data),
+                    "latest": response_ai.data[0]
+                }
+
+        logger.info("✅ Nenhuma duplicata detectada")
+        return {"is_duplicate": False}
+
+    except Exception as e:
+        logger.error(f"❌ Erro na verificação de duplicatas: {e}")
+        return {"is_duplicate": False}
+
 # Endpoint para ETAPA 1 - Neural Chain 1 do ClienteChat
 @app.post("/agendamento-inteligente")
 async def agendamento_inteligente(request: Request):
     """
-    🎯 ENDPOINT INTELIGENTE: Detecta automaticamente ETAPA 1 ou ETAPA 2
+    🎯 ENDPOINT INTELIGENTE: Detecta automaticamente ETAPA 1 ou ETAPA 2 com proteção anti-duplicata
     """
     try:
         data = await request.json()
         logger.info(f"🚀 NEURAL CHAIN 1: Executando consulta de disponibilidade")
         logger.info(f"Agendamento inteligente - dados recebidos: {data}")
+
+        # 🛡️ VERIFICAÇÃO ANTI-DUPLICATA
+        duplicata_check = await verificar_duplicata_agendamento(data)
+
+        if duplicata_check["is_duplicate"]:
+            if duplicata_check["duplicate_type"] == "exact":
+                os_existente = duplicata_check["existing_os"]
+                minutos = duplicata_check["minutes_ago"]
+
+                mensagem_duplicata = f"""🚨 *Agendamento já existe!*
+
+Detectamos que você já tem um agendamento recente:
+
+📋 *OS:* {os_existente.get('order_number', 'N/A')}
+👤 *Cliente:* {os_existente.get('client_name', 'N/A')}
+🔧 *Equipamento:* {os_existente.get('equipment_type', 'N/A')}
+⏰ *Criado há:* {minutos} minutos
+
+✅ *Seu agendamento está confirmado!*
+
+Se precisar de alterações, entre em contato:
+📞 (48) 98833-2664"""
+
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "success": True,
+                        "message": mensagem_duplicata,
+                        "duplicate_detected": True,
+                        "existing_order": os_existente.get('order_number'),
+                        "action": "duplicate_warning"
+                    }
+                )
+
+            elif duplicata_check["duplicate_type"] == "pre_scheduling":
+                count = duplicata_check["count"]
+
+                mensagem_multiplos = f"""⚠️ *Múltiplas tentativas detectadas*
+
+Encontramos {count} tentativas de agendamento recentes.
+
+🔄 *Processando seu agendamento...*
+
+Por favor, aguarde alguns instantes e evite clicar novamente.
+
+📞 Dúvidas: (48) 98833-2664"""
+
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "success": True,
+                        "message": mensagem_multiplos,
+                        "duplicate_detected": True,
+                        "multiple_attempts": count,
+                        "action": "wait_processing"
+                    }
+                )
 
         # 🧠 DETECÇÃO INTELIGENTE DE ETAPA
         logger.info("🔍 DEBUG: Iniciando detecção inteligente de etapa")
