@@ -46,7 +46,7 @@ def calcular_data_inicio_otimizada(urgente: bool = False) -> datetime:
     logger.info(f"🎯 Data início otimizada: {inicio.strftime('%Y-%m-%d')} (Urgente: {urgente})")
     return inicio
 
-async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente: bool = False, tipo_atendimento: str = "em_domicilio") -> List[Dict]:
+async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente: bool = False, tipo_atendimento: str = "em_domicilio", endereco: str = "") -> List[Dict]:
     """
     🎯 NOVA FUNÇÃO: Gera horários sempre priorizando as datas mais próximas disponíveis
 
@@ -70,7 +70,12 @@ async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente:
             inicio = calcular_data_inicio_otimizada(urgente)
             max_dias = 5  # Buscar em até 5 dias (mais restrito)
 
+        # Determinar grupo logístico do endereço solicitado
+        grupo_solicitado = determine_logistics_group(endereco) if endereco else "A"
+        logger.info(f"🎯 Grupo logístico solicitado: {grupo_solicitado}")
+
         horarios_disponiveis = []
+        supabase = get_supabase_client()
 
         # Horários comerciais preferenciais
         horarios_comerciais = [
@@ -91,6 +96,15 @@ async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente:
             if data_verificacao.weekday() >= 5:
                 continue
 
+            # 🚫 VERIFICAR CONFLITOS DE GRUPOS LOGÍSTICOS
+            conflito_info = await verificar_conflito_grupos_logisticos(
+                data_verificacao, grupo_solicitado, technician_id, supabase
+            )
+
+            if conflito_info["conflito"]:
+                logger.warning(f"🚫 BLOQUEANDO {data_verificacao.strftime('%d/%m/%Y')}: {conflito_info['motivo']}")
+                continue
+
             # Verificar cada horário do dia
             for horario_info in horarios_comerciais:
                 if len(horarios_disponiveis) >= 3:
@@ -108,6 +122,11 @@ async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente:
                 logger.info(f"🔍 DEBUG: {data_verificacao.strftime('%d/%m/%Y')} {horario_info['hora']}h - Disponível: {disponivel}")
 
                 if disponivel:
+                    # 🚫 VERIFICAR CONFLITOS DE GRUPOS LOGÍSTICOS
+                    # Primeiro precisamos determinar o grupo do endereço atual
+                    # Como não temos o endereço aqui, vamos fazer a verificação na função que chama
+                    # Por enquanto, vamos continuar e fazer a verificação depois
+
                     # Formatar data
                     dias_semana = {
                         'Monday': 'Segunda-feira', 'Tuesday': 'Terça-feira',
@@ -1303,6 +1322,71 @@ def determinar_periodo_ideal_por_rota(endereco: str) -> str:
     except Exception as e:
         logger.error(f"❌ Erro ao determinar período ideal: {e}")
         return "qualquer"
+
+async def verificar_conflito_grupos_logisticos(data_verificacao: datetime, grupo_solicitado: str, technician_id: str, supabase) -> dict:
+    """
+    🚫 Verifica se já existem agendamentos de outros grupos logísticos no mesmo dia
+    Evita misturar Grupo A/B com Grupo C no mesmo dia
+    """
+    try:
+        data_str = data_verificacao.strftime('%Y-%m-%d')
+        logger.info(f"🔍 Verificando conflitos de grupos para {data_str} - Grupo solicitado: {grupo_solicitado}")
+
+        # Buscar todos os agendamentos do técnico no dia
+        response = supabase.table("service_orders").select("*").eq(
+            "technician_id", technician_id
+        ).execute()
+
+        grupos_existentes = set()
+        agendamentos_dia = []
+
+        if response.data:
+            for os in response.data:
+                scheduled_date_str = os.get('scheduled_date', '')
+                if scheduled_date_str.startswith(data_str):
+                    endereco = os.get('pickup_address', '')
+                    if endereco:
+                        grupo = determine_logistics_group(endereco)
+                        grupos_existentes.add(grupo)
+                        agendamentos_dia.append({
+                            'os': os.get('order_number', 'N/A'),
+                            'endereco': endereco[:50] + '...' if len(endereco) > 50 else endereco,
+                            'grupo': grupo
+                        })
+
+        # Verificar conflitos
+        conflito = False
+        motivo = ""
+
+        if grupos_existentes:
+            logger.info(f"📊 Grupos existentes em {data_str}: {list(grupos_existentes)}")
+
+            # Regra: Não misturar Grupo C com A/B
+            if grupo_solicitado == 'C' and ('A' in grupos_existentes or 'B' in grupos_existentes):
+                conflito = True
+                motivo = f"Dia já tem Grupo A/B: {list(grupos_existentes)}"
+            elif grupo_solicitado in ['A', 'B'] and 'C' in grupos_existentes:
+                conflito = True
+                motivo = f"Dia já tem Grupo C"
+
+            if conflito:
+                logger.warning(f"🚫 CONFLITO DETECTADO em {data_str}: {motivo}")
+                for ag in agendamentos_dia:
+                    logger.info(f"   - OS {ag['os']}: {ag['endereco']} (Grupo {ag['grupo']})")
+        else:
+            logger.info(f"✅ Nenhum agendamento encontrado em {data_str}")
+
+        return {
+            "conflito": conflito,
+            "motivo": motivo,
+            "grupos_existentes": list(grupos_existentes),
+            "agendamentos_dia": agendamentos_dia,
+            "data": data_str
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao verificar conflitos de grupos: {e}")
+        return {"conflito": False, "motivo": "Erro na verificação"}
 
 async def verificar_grupo_c_consecutivo(data_verificacao: datetime, technician_id: str, supabase) -> bool:
     """
@@ -3859,7 +3943,8 @@ async def consultar_disponibilidade_interna(data: dict):
         horarios_disponiveis = await gerar_horarios_proximas_datas_disponiveis(
             tecnico_info['tecnico_id'],
             urgente,
-            tipo_atendimento
+            tipo_atendimento,
+            endereco
         )
 
         # Ajustar grupo logístico nos horários
