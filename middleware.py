@@ -46,7 +46,7 @@ def calcular_data_inicio_otimizada(urgente: bool = False) -> datetime:
     logger.info(f"🎯 Data início otimizada: {inicio.strftime('%Y-%m-%d')} (Urgente: {urgente})")
     return inicio
 
-async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente: bool = False) -> List[Dict]:
+async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente: bool = False, tipo_atendimento: str = "em_domicilio") -> List[Dict]:
     """
     🎯 NOVA FUNÇÃO: Gera horários sempre priorizando as datas mais próximas disponíveis
 
@@ -56,9 +56,20 @@ async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente:
     3. Para assim que encontrar 3 horários
     """
     try:
-        logger.info(f"🎯 Gerando horários próximas datas - Técnico: {technician_id}, Urgente: {urgente}")
+        logger.info(f"🎯 Gerando horários próximas datas - Técnico: {technician_id}, Urgente: {urgente}, Tipo: {tipo_atendimento}")
 
-        inicio = calcular_data_inicio_otimizada(urgente)
+        # 🎯 LÓGICA ESPECÍFICA POR TIPO DE ATENDIMENTO
+        if tipo_atendimento in ["coleta_diagnostico", "coleta_conserto"]:
+            # COLETA: Prazo até 7 dias úteis (mais flexível)
+            logger.info(f"📦 COLETA: Prazo estendido até 7 dias úteis")
+            inicio = calcular_data_inicio_otimizada(urgente)
+            max_dias = 10  # Buscar em até 10 dias para ter mais opções
+        else:
+            # EM DOMICÍLIO: Preferencialmente mesmo dia/próximo dia
+            logger.info(f"🏠 DOMICÍLIO: Prioridade para datas próximas")
+            inicio = calcular_data_inicio_otimizada(urgente)
+            max_dias = 5  # Buscar em até 5 dias (mais restrito)
+
         horarios_disponiveis = []
 
         # Horários comerciais preferenciais
@@ -72,7 +83,7 @@ async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente:
 
         # Buscar sequencialmente até encontrar 3 horários
         dia_offset = 0
-        while len(horarios_disponiveis) < 3 and dia_offset < 20:  # Máximo 20 dias
+        while len(horarios_disponiveis) < 3 and dia_offset < max_dias:  # Limite baseado no tipo de atendimento
             data_verificacao = inicio + timedelta(days=dia_offset)
             dia_offset += 1
 
@@ -3826,6 +3837,10 @@ async def consultar_disponibilidade_interna(data: dict):
         else:
             urgente = False  # Padrão quando placeholder filtrado
 
+        # Extrair tipo de atendimento
+        tipo_atendimento = data.get("tipo_atendimento_1", "em_domicilio")
+        logger.info(f"🎯 ETAPA 1: Tipo de atendimento: {tipo_atendimento}")
+
         # Determinar técnico otimizado para ETAPA 1
         logger.info(f"🎯 ETAPA 1: Iniciando determinação de técnico para equipamentos: {lista_equipamentos}")
         logger.info(f"🎯 ETAPA 1: Grupo logístico: {grupo_logistico}, Urgente: {urgente}")
@@ -3841,7 +3856,8 @@ async def consultar_disponibilidade_interna(data: dict):
         # Usar nova função que sempre busca as datas mais próximas
         horarios_disponiveis = await gerar_horarios_proximas_datas_disponiveis(
             tecnico_info['tecnico_id'],
-            urgente
+            urgente,
+            tipo_atendimento
         )
 
         # Ajustar grupo logístico nos horários
