@@ -2667,7 +2667,7 @@ async def verificar_duplicata_agendamento(data: dict) -> dict:
             query = supabase.table("service_orders").select("*")
 
             if cpf:
-                query = query.eq("client_cpf", cpf)
+                query = query.eq("client_cpf_cnpj", cpf)
             elif telefone:
                 query = query.eq("client_phone", telefone)
 
