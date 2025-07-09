@@ -979,23 +979,7 @@ def determinar_tecnico(equipamento: str) -> str:
     else:
         return "Paulo Cesar (betonipaulo@gmail.com)"
 
-def determinar_grupo_logistico(endereco: str) -> str:
-    """
-    Determina o grupo logístico baseado no endereço
-    """
-    endereco_lower = endereco.lower()
-
-    # Grupo A - Centro de Florianópolis
-    if any(bairro in endereco_lower for bairro in ['centro', 'agronômica', 'trindade', 'córrego grande']):
-        return "A"
-
-    # Grupo B - Grande Florianópolis
-    elif any(cidade in endereco_lower for cidade in ['são josé', 'palhoça', 'biguaçu', 'santo amaro']):
-        return "B"
-
-    # Grupo C - Litoral e interior
-    else:
-        return "C"
+# FUNÇÃO ANTIGA REMOVIDA - AGORA USA determine_logistics_group() COM REGRAS GRUPO C
 
 async def gerar_horarios_disponiveis_v4(tecnico: str, grupo_logistico: str, urgente: bool, data_base: datetime = None) -> List[Dict]:
     """
