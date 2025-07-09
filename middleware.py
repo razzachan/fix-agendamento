@@ -2883,7 +2883,9 @@ async def criar_pre_agendamento_etapa1(data: dict, telefone: str):
             "equipamentos": equipamentos,  # Array completo
             "problema": data.get("problema", ""),  # Campo problema obrigatório
             "status": "pendente",
-            "urgente": data.get("urgente", "não").lower() == "sim"
+            "urgente": data.get("urgente", "não").lower() == "sim",
+            "tipo_atendimento_1": data.get("tipo_atendimento_1", "em_domicilio"),  # Salvar tipo de atendimento
+            "tipos_atendimento": [data.get("tipo_atendimento_1", "em_domicilio")]  # Array para compatibilidade
         }
 
         # Inserir no banco
@@ -4382,8 +4384,10 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         logger.info(f"🔧 ETAPA 2: Usando lógica completa do endpoint de confirmação")
 
         # Determinar tipo de serviço e valor baseado nos equipamentos
-        service_type = "em_domicilio"
+        service_type = tipos_atendimento[0] if tipos_atendimento else "em_domicilio"
         final_cost = 280.00  # Valor do exemplo real
+
+        logger.info(f"🎯 ETAPA 2: Tipo de atendimento usado: {service_type}")
 
         # Consolidar descrição dos problemas
         descricao_completa = " | ".join(problemas) if problemas else "Não especificado"
