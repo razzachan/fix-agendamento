@@ -125,12 +125,24 @@ async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente:
                 if len(horarios_disponiveis) >= 3:
                     break
 
-                horario_dt = data_verificacao.replace(
-                    hour=horario_info["hora"],
-                    minute=0,
-                    second=0,
-                    microsecond=0
-                )
+                # ✅ PRESERVAR TIMEZONE BRASIL AO CRIAR HORÁRIO
+                if data_verificacao.tzinfo is not None:
+                    # Se tem timezone, usar replace preservando timezone
+                    horario_dt = data_verificacao.replace(
+                        hour=horario_info["hora"],
+                        minute=0,
+                        second=0,
+                        microsecond=0
+                    )
+                else:
+                    # Se não tem timezone, assumir Brasil e localizar
+                    horario_dt = data_verificacao.replace(
+                        hour=horario_info["hora"],
+                        minute=0,
+                        second=0,
+                        microsecond=0
+                    )
+                    horario_dt = pytz.timezone('America/Sao_Paulo').localize(horario_dt)
 
                 # Verificar disponibilidade
                 disponivel = await verificar_horario_disponivel_tecnico(technician_id, horario_dt)
@@ -993,19 +1005,10 @@ def converter_horario_para_iso_direto(horario_iso_str):
             if dt_with_tz.tzinfo is None:
                 dt_with_tz = pytz.timezone('America/Sao_Paulo').localize(dt_with_tz)
 
-            # ✅ PRESERVAR HORÁRIO VISUAL - NÃO CONVERTER PARA UTC
-            # Criar datetime "naive" com os mesmos componentes visuais
-            dt_visual = datetime(
-                dt_with_tz.year,
-                dt_with_tz.month,
-                dt_with_tz.day,
-                dt_with_tz.hour,
-                dt_with_tz.minute,
-                dt_with_tz.second
-            )
-
-            logger.info(f"🔄 Horário preservado: '{horario_iso_str}' -> '{dt_visual.isoformat()}'")
-            return dt_visual.isoformat()
+            # ✅ PRESERVAR HORÁRIO E TIMEZONE BRASIL
+            # Manter o datetime com timezone para o banco de dados
+            logger.info(f"🔄 Horário preservado com timezone: '{horario_iso_str}' -> '{dt_with_tz.isoformat()}'")
+            return dt_with_tz.isoformat()
 
         # Se não está em formato ISO, usar função original
         return converter_horario_para_iso(horario_iso_str)
