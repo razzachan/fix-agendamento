@@ -3109,21 +3109,27 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
 
         logger.info(f"✅ ETAPA 2: Datetime agendamento: {horario_escolhido}")
 
-        # Dados realistas para criação da OS (substituindo placeholders)
+        # ✅ USAR DADOS REAIS DO PRÉ-AGENDAMENTO (não hardcoded)
         dados_reais = {
-            "nome": "Julio Cesar Betoni",
-            "telefone": "48988332664",
-            "endereco": "Rua Heriberto hulse 179 CEP 88110010",
-            "equipamento": "Fogão Brastemp",
-            "problema": "Não está acendendo",
-            "cpf": "41547597096",
-            "email": "akroma.julio@gmail.com",
+            "nome": pre_agendamento.get("nome", "Cliente"),
+            "telefone": pre_agendamento.get("telefone", ""),
+            "endereco": pre_agendamento.get("endereco", ""),
+            "equipamento": pre_agendamento.get("equipamento", ""),
+            "problema": pre_agendamento.get("problema", ""),  # ✅ PROBLEMA REAL DO CLIENTE
+            "cpf": pre_agendamento.get("cpf", ""),
+            "email": pre_agendamento.get("email", ""),
             "tecnico": tecnico_sugerido,
             "urgente": urgente,
             "horario_agendado": horario_escolhido,
-            "tipo_atendimento": "em_domicilio",
+            "tipo_atendimento": pre_agendamento.get("tipo_atendimento_1", "em_domicilio"),  # ✅ TIPO REAL
             "valor_os": 150.00
         }
+
+        logger.info(f"✅ ETAPA 2: Usando dados reais do pré-agendamento:")
+        logger.info(f"   - Nome: {dados_reais['nome']}")
+        logger.info(f"   - Problema: {dados_reais['problema']}")
+        logger.info(f"   - Equipamento: {dados_reais['equipamento']}")
+        logger.info(f"   - Tipo Atendimento: {dados_reais['tipo_atendimento']}")
 
         # Criar OS usando dados reais
         logger.info("🔄 ETAPA 2: Criando Ordem de Serviço...")
