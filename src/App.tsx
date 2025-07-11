@@ -39,6 +39,7 @@ import SimpleMapTest from './pages/SimpleMapTest';
 import Quotes from './pages/Quotes';
 import RepairsAndDeliveries from './pages/RepairsAndDeliveries';
 import TrackingPage from './pages/TrackingPage';
+import SLAMonitoring from './pages/SLAMonitoring';
 import NotFound from './pages/NotFound';
 // Client Pages
 import { ClientPortal } from './pages/client/ClientPortal';
@@ -233,6 +234,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <AppLayout><AI /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/tracking"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><SLAMonitoring /></AppLayout>
                   </ProtectedRoute>
                 }
               />
