@@ -4318,26 +4318,40 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         logger.info(f"🔧   urgente: {urgente}")
 
         # 🔧 CONSOLIDAR EQUIPAMENTOS E PROBLEMAS (DADOS REAIS)
-        # Recuperar equipamentos do pré-agendamento
+        # ✅ USAR CAMPOS INDIVIDUAIS PRIMEIRO (mais confiáveis)
+        equipamento_principal = pre_agendamento.get('equipamento', '')
+        problema_principal = pre_agendamento.get('problema', '')
+        tipo_atendimento_principal = pre_agendamento.get('tipo_atendimento_1', 'em_domicilio')
+
+        # ✅ RECUPERAR ARRAYS (se existirem)
         equipamentos_data = pre_agendamento.get('equipamentos', [])
         problemas_data = pre_agendamento.get('problemas', [])
         tipos_atendimento_data = pre_agendamento.get('tipos_atendimento', [])
 
-        # Se não há dados no cache, usar dados da requisição atual
-        if not equipamentos_data:
-            equipamentos = [pre_agendamento.get('equipamento', 'Equipamento')]
-            problemas = [pre_agendamento.get('problema', 'Problema')]
-            tipos_atendimento = [pre_agendamento.get('tipo_atendimento_1', 'em_domicilio')]
-        else:
-            # Verificar se equipamentos_data contém strings ou dicts
+        # ✅ CONSOLIDAR DADOS (priorizar campos individuais)
+        if equipamento_principal:
+            equipamentos = [equipamento_principal]
+        elif equipamentos_data:
             if equipamentos_data and isinstance(equipamentos_data[0], str):
-                # Lista de strings (formato antigo)
                 equipamentos = equipamentos_data
             else:
-                # Lista de dicts (formato novo)
                 equipamentos = [eq.get('equipamento', 'Equipamento') for eq in equipamentos_data]
+        else:
+            equipamentos = ['Equipamento']
+
+        if problema_principal:
+            problemas = [problema_principal]  # ✅ USAR PROBLEMA INDIVIDUAL
+        elif problemas_data:
             problemas = problemas_data
+        else:
+            problemas = ['Problema não especificado']
+
+        if tipo_atendimento_principal:
+            tipos_atendimento = [tipo_atendimento_principal]  # ✅ USAR TIPO INDIVIDUAL
+        elif tipos_atendimento_data:
             tipos_atendimento = tipos_atendimento_data
+        else:
+            tipos_atendimento = ['em_domicilio']
 
         logger.info(f"🔧 ETAPA 2: {len(equipamentos)} equipamentos encontrados: {equipamentos}")
         logger.info(f"🔧 ETAPA 2: Problemas: {problemas}")
