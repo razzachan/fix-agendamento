@@ -197,22 +197,23 @@ export function useSidebarBadges(): SidebarBadgeStats {
   };
 
   /**
-   * Busca total de clientes (sem filtro de data pois não há created_at)
+   * 👥 CLIENTES: Removido badge desnecessário
+   *
+   * ❌ LÓGICA ANTERIOR: Mostrava badge baseado no total de clientes (count - 10)
+   * ✅ NOVA LÓGICA: Clientes não precisam de notificação urgente
+   *
+   * 📝 JUSTIFICATIVA:
+   * - Ter muitos clientes é positivo, não um problema
+   * - Não há ação urgente necessária apenas por ter clientes
+   * - Badge deve indicar itens que precisam de atenção imediata
    */
   const fetchClientsBadge = async (badges: SidebarBadgeData) => {
     try {
-      // Como a tabela clients não tem created_at, vamos contar o total de clientes
-      const { count, error } = await supabase
-        .from('clients')
-        .select('*', { count: 'exact', head: true });
+      // 🚫 REMOVIDO: Badge desnecessário para clientes
+      // Clientes não precisam de notificação no menu lateral
+      badges.clients = 0;
 
-      if (error) {
-        console.warn('Erro ao buscar clientes:', error);
-        badges.clients = 0;
-      } else {
-        // Mostrar apenas se há mais de 10 clientes (indicativo de atividade)
-        badges.clients = (count && count > 10) ? Math.min(count - 10, 99) : 0;
-      }
+      console.log('👥 [Clientes] Badge removido - clientes não precisam de notificação urgente');
     } catch (error) {
       console.error('Erro geral ao buscar clientes:', error);
       badges.clients = 0;
@@ -229,10 +230,14 @@ export function useSidebarBadges(): SidebarBadgeStats {
   };
 
   /**
-   * Busca questões financeiras que precisam de atenção
+   * 💰 FINANCEIRO: Badge para questões financeiras urgentes
+   *
+   * ✅ LÓGICA VÁLIDA: Mostra itens que precisam de ação financeira
    * - Pagamentos em atraso (concluído há mais de 3 dias sem pagamento)
-   * - Ordens com valor alto (>R$ 500) aguardando pagamento
+   * - Ordens com valor alto (>R$ 100) aguardando pagamento
    * - Pagamentos parciais pendentes
+   *
+   * 📝 JUSTIFICATIVA: Problemas financeiros precisam de atenção imediata
    */
   const fetchFinanceBadge = async (badges: SidebarBadgeData) => {
     try {
@@ -447,11 +452,16 @@ export function useSidebarBadges(): SidebarBadgeStats {
   };
 
   /**
-   * Busca violações críticas de SLA
+   * 📍 RASTREAMENTO: Badge para violações críticas de SLA
+   *
+   * ✅ LÓGICA VÁLIDA: Mostra problemas operacionais que precisam de ação
    * - Ordens em aberto há mais de 24h sem agendamento
    * - Agendamentos atrasados (passaram da data)
    * - Reparos parados há mais de 7 dias
    * - Equipamentos prontos há mais de 5 dias
+   *
+   * 📝 JUSTIFICATIVA: Violações de SLA afetam qualidade do serviço
+   * 🎯 MAPEAMENTO: Este badge aparece no menu "Rastreamento"
    */
   const fetchSLAViolationsBadge = async (badges: SidebarBadgeData) => {
     try {
