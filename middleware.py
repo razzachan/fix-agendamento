@@ -96,6 +96,21 @@ async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente:
             if data_verificacao.weekday() >= 5:
                 continue
 
+            # 🚫 REGRA GRUPO C: Nunca aos sábados e segundas-feiras
+            if grupo_solicitado == 'C':
+                # Segunda-feira = 0, Sábado = 5
+                if data_verificacao.weekday() == 0:  # Segunda-feira
+                    data_str = data_verificacao.strftime('%d/%m/%Y')
+                    logger.warning(f"🚫 GRUPO C: Pulando segunda-feira {data_str}")
+                    continue
+                # Sábado já é pulado pelo fim de semana acima
+
+                # 🚫 REGRA GRUPO C: Nunca no dia seguinte se já houver Grupo C hoje
+                if await verificar_grupo_c_consecutivo(data_verificacao, technician_id, supabase):
+                    data_str = data_verificacao.strftime('%d/%m/%Y')
+                    logger.warning(f"🚫 GRUPO C: Pulando {data_str} - já há Grupo C no dia anterior")
+                    continue
+
             # 🚫 VERIFICAR CONFLITOS DE GRUPOS LOGÍSTICOS
             conflito_info = await verificar_conflito_grupos_logisticos(
                 data_verificacao, grupo_solicitado, technician_id, supabase
