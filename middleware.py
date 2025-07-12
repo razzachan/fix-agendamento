@@ -3381,6 +3381,7 @@ async def health_check():
 async def solicitar_avaliacao_google(request: Request):
     """
     Endpoint para solicitar avaliação no Google após conclusão do serviço
+    🤖 INTEGRAÇÃO CLIENTECHAT: Este endpoint é chamado automaticamente quando OS é concluída
     """
     try:
         data = await request.json()
@@ -3390,10 +3391,27 @@ async def solicitar_avaliacao_google(request: Request):
         cliente_nome = data.get("cliente_nome", "Cliente")
         telefone = data.get("telefone", "")
 
-        if not os_numero or not telefone:
+        logger.info(f"🤖 [ClienteChat] Solicitação de avaliação recebida:")
+        logger.info(f"   - OS: {os_numero}")
+        logger.info(f"   - Cliente: {cliente_nome}")
+        logger.info(f"   - Telefone: {telefone}")
+
+        if not os_numero:
             return JSONResponse(
                 status_code=400,
-                content={"success": False, "message": "OS número e telefone são obrigatórios"}
+                content={"success": False, "message": "Número da OS é obrigatório"}
+            )
+
+        # Se não tem telefone, retornar mensagem mas não falhar
+        if not telefone:
+            logger.warning(f"⚠️ [ClienteChat] OS {os_numero} sem telefone - avaliação não será enviada via WhatsApp")
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": f"OS {os_numero} concluída, mas sem telefone para envio de avaliação",
+                    "action": "no_phone_available"
+                }
             )
 
         # Mensagem personalizada para solicitar avaliação
@@ -3418,6 +3436,9 @@ Muito obrigado pela confiança! 🙏
 *Fix Fogões - Assistência Técnica Especializada*
 📞 (48) 98833-2664"""
 
+        logger.info(f"✅ [ClienteChat] Mensagem de avaliação preparada para OS {os_numero}")
+        logger.info(f"🔗 [ClienteChat] URL Google Reviews: {GOOGLE_REVIEW_URL}")
+
         return JSONResponse(
             status_code=200,
             content={
@@ -3426,7 +3447,9 @@ Muito obrigado pela confiança! 🙏
                 "google_review_url": GOOGLE_REVIEW_URL,
                 "os_numero": os_numero,
                 "cliente": cliente_nome,
-                "action": "request_google_review"
+                "telefone": telefone,
+                "action": "send_google_review_via_clientechat",
+                "clientechat_ready": True  # Indica que está pronto para ClienteChat processar
             }
         )
 
