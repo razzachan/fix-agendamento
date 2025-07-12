@@ -3381,7 +3381,7 @@ async def health_check():
 async def solicitar_avaliacao_google(request: Request):
     """
     Endpoint para solicitar avaliação no Google após conclusão do serviço
-    🤖 INTEGRAÇÃO CLIENTECHAT: Este endpoint é chamado automaticamente quando OS é concluída
+    🤖 INTEGRAÇÃO CLIENTECHAT: Retorna dados estruturados para #external_return#
     """
     try:
         data = await request.json()
@@ -3402,17 +3402,10 @@ async def solicitar_avaliacao_google(request: Request):
                 content={"success": False, "message": "Número da OS é obrigatório"}
             )
 
-        # Se não tem telefone, retornar mensagem mas não falhar
+        # Se não tem telefone, ainda retornar dados para ClienteChat processar
         if not telefone:
-            logger.warning(f"⚠️ [ClienteChat] OS {os_numero} sem telefone - avaliação não será enviada via WhatsApp")
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "success": True,
-                    "message": f"OS {os_numero} concluída, mas sem telefone para envio de avaliação",
-                    "action": "no_phone_available"
-                }
-            )
+            logger.warning(f"⚠️ [ClienteChat] OS {os_numero} sem telefone")
+            telefone = "SEM_TELEFONE"
 
         # Mensagem personalizada para solicitar avaliação
         mensagem = f"""🎉 *Serviço Concluído - OS {os_numero}*
@@ -3439,17 +3432,25 @@ Muito obrigado pela confiança! 🙏
         logger.info(f"✅ [ClienteChat] Mensagem de avaliação preparada para OS {os_numero}")
         logger.info(f"🔗 [ClienteChat] URL Google Reviews: {GOOGLE_REVIEW_URL}")
 
+        logger.info(f"✅ [ClienteChat] Dados preparados para #external_return#")
+        logger.info(f"📋 [ClienteChat] External return: AVALIACAO_SOLICITADA|OS:{os_numero}|CLIENTE:{cliente_nome}")
+
+        # 🎯 FORMATO COMPATÍVEL COM CLIENTECHAT (igual ao agendamento)
+        # Retornar dados estruturados para #external_return#
+        external_return = f"AVALIACAO_SOLICITADA|OS:{os_numero}|CLIENTE:{cliente_nome}|TELEFONE:{telefone}|URL:{GOOGLE_REVIEW_URL}|STATUS:ENVIADO"
+
         return JSONResponse(
             status_code=200,
             content={
                 "success": True,
-                "message": mensagem,
+                "message": external_return,  # ClienteChat vai usar isso no #external_return#
+                "mensagem_formatada": mensagem,  # Mensagem pronta para envio
                 "google_review_url": GOOGLE_REVIEW_URL,
                 "os_numero": os_numero,
                 "cliente": cliente_nome,
                 "telefone": telefone,
-                "action": "send_google_review_via_clientechat",
-                "clientechat_ready": True  # Indica que está pronto para ClienteChat processar
+                "action": "clientechat_external_return",
+                "external_return": external_return  # Dados estruturados para ClienteChat
             }
         )
 
