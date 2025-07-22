@@ -18,12 +18,133 @@ from contextlib import asynccontextmanager
 
 # Cache global para otimização
 _supabase_client = None
+
+def obter_valor_servico(tipo_atendimento: str, valor_clientechat: float = None) -> float:
+    """
+    Obtém o valor do serviço baseado no valor do ClienteChat
+
+    LÓGICA CORRETA (FLEXÍVEL):
+    - TODOS os tipos usam valor do ClienteChat (mais flexível)
+    - em_domicilio: Valor do ClienteChat
+    - coleta_conserto: Valor do ClienteChat
+    - coleta_diagnostico: Valor do ClienteChat (bot sempre passa o mesmo valor)
+    """
+    logger.info(f"💰 Obtendo valor para: tipo={tipo_atendimento}, valor_clientechat={valor_clientechat}")
+
+    # TODOS os tipos usam valor do ClienteChat (mais flexível)
+    if valor_clientechat and valor_clientechat > 0:
+        valor_final = valor_clientechat
+        logger.info(f"📱 VALOR DO CLIENTECHAT: R$ {valor_final} para {tipo_atendimento}")
+    else:
+        # Fallback se não vier valor do ClienteChat
+        valores_fallback = {
+            "em_domicilio": 150.00,
+            "coleta_conserto": 120.00,
+            "coleta_diagnostico": 350.00  # Fallback para coleta diagnóstico
+        }
+        valor_final = valores_fallback.get(tipo_atendimento, 150.00)
+        logger.warning(f"⚠️ FALLBACK: Usando valor padrão R$ {valor_final} para {tipo_atendimento}")
+
+    logger.info(f"✅ Valor final definido: R$ {valor_final}")
+    return valor_final
 _technicians_cache = {}
 _cache_timestamp = None
 
 # Cache para geocodificação (evitar múltiplas consultas do mesmo endereço)
 _geocoding_cache = {}
 _geocoding_cache_timestamp = {}
+
+def verificar_horario_real_sistema() -> dict:
+    """
+    🕐 VERIFICAÇÃO DE HORÁRIO REAL DO SISTEMA
+    Sempre verifica e loga o horário atual antes de fazer pesquisas
+    """
+    try:
+        # Horário UTC
+        agora_utc = datetime.now(pytz.UTC)
+
+        # Horário Brasil (São Paulo)
+        agora_brasil = datetime.now(pytz.timezone('America/Sao_Paulo'))
+
+        # Horário local do sistema
+        agora_local = datetime.now()
+
+        # Informações detalhadas
+        info_horario = {
+            "utc": {
+                "datetime": agora_utc.isoformat(),
+                "formatted": agora_utc.strftime('%d/%m/%Y %H:%M:%S UTC'),
+                "timestamp": agora_utc.timestamp()
+            },
+            "brasil": {
+                "datetime": agora_brasil.isoformat(),
+                "formatted": agora_brasil.strftime('%d/%m/%Y %H:%M:%S (Brasília)'),
+                "timezone": str(agora_brasil.tzinfo),
+                "weekday": agora_brasil.strftime('%A'),
+                "weekday_pt": ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'][agora_brasil.weekday() % 7]
+            },
+            "local": {
+                "datetime": agora_local.isoformat(),
+                "formatted": agora_local.strftime('%d/%m/%Y %H:%M:%S (Local)'),
+                "timezone": "Local System"
+            },
+            "diferenca_utc_brasil": (agora_brasil.utcoffset().total_seconds() / 3600) if agora_brasil.utcoffset() else -3
+        }
+
+        # Log detalhado do horário atual
+        logger.info("🕐 ═══════════════════════════════════════════════════════════")
+        logger.info("🕐 VERIFICAÇÃO DE HORÁRIO REAL DO SISTEMA")
+        logger.info("🕐 ═══════════════════════════════════════════════════════════")
+        logger.info(f"🌍 UTC:     {info_horario['utc']['formatted']}")
+        logger.info(f"🇧🇷 BRASIL: {info_horario['brasil']['formatted']}")
+        logger.info(f"💻 LOCAL:   {info_horario['local']['formatted']}")
+        logger.info(f"📅 DIA:     {info_horario['brasil']['weekday_pt']} ({info_horario['brasil']['weekday']})")
+        logger.info(f"⏰ FUSO:    UTC{info_horario['diferenca_utc_brasil']:+.0f}h")
+        logger.info("🕐 ═══════════════════════════════════════════════════════════")
+
+        return info_horario
+
+    except Exception as e:
+        logger.error(f"❌ Erro na verificação de horário: {e}")
+        return {
+            "erro": str(e),
+            "fallback_utc": datetime.now(pytz.UTC).isoformat(),
+            "fallback_brasil": datetime.now(pytz.timezone('America/Sao_Paulo')).isoformat()
+        }
+
+def validar_data_pesquisa(data_inicio: datetime, contexto: str = "pesquisa") -> datetime:
+    """
+    🔍 VALIDAÇÃO DE DATA PARA PESQUISAS
+    Garante que a data de início está correta e não é no passado
+    """
+    try:
+        agora_brasil = datetime.now(pytz.timezone('America/Sao_Paulo'))
+
+        # Se data_inicio não tem timezone, assumir Brasil
+        if data_inicio.tzinfo is None:
+            data_inicio = pytz.timezone('America/Sao_Paulo').localize(data_inicio)
+
+        # Converter para timezone Brasil se necessário
+        if data_inicio.tzinfo != pytz.timezone('America/Sao_Paulo'):
+            data_inicio = data_inicio.astimezone(pytz.timezone('America/Sao_Paulo'))
+
+        # Verificar se não é no passado
+        if data_inicio.date() < agora_brasil.date():
+            logger.warning(f"⚠️ {contexto.upper()}: Data no passado detectada!")
+            logger.warning(f"   Data solicitada: {data_inicio.strftime('%d/%m/%Y')}")
+            logger.warning(f"   Data atual: {agora_brasil.strftime('%d/%m/%Y')}")
+            logger.warning(f"   Ajustando para próximo dia útil...")
+
+            # Ajustar para próximo dia útil
+            data_inicio = calcular_data_inicio_otimizada(urgente=False)
+
+        logger.info(f"✅ {contexto.upper()}: Data validada - {data_inicio.strftime('%d/%m/%Y %H:%M:%S (Brasília)')}")
+        return data_inicio
+
+    except Exception as e:
+        logger.error(f"❌ Erro na validação de data para {contexto}: {e}")
+        # Fallback para próximo dia útil
+        return calcular_data_inicio_otimizada(urgente=False)
 
 def calcular_data_inicio_otimizada(urgente: bool = False) -> datetime:
     """
@@ -34,7 +155,9 @@ def calcular_data_inicio_otimizada(urgente: bool = False) -> datetime:
 
     Isso garante que sempre oferecemos as datas mais próximas disponíveis
     """
+    # 🕐 SEMPRE USAR HORÁRIO BRASIL CORRETO
     agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
+    logger.info(f"🕐 Horário atual para cálculo: {agora.strftime('%d/%m/%Y %H:%M:%S (Brasília)')}")
 
     # 🎯 SEMPRE COMEÇAR NO PRÓXIMO DIA ÚTIL DISPONÍVEL
     inicio = agora + timedelta(days=1)
@@ -1865,6 +1988,16 @@ async def obter_horarios_disponiveis_otimizados(
 # Função para obter horários disponíveis
 async def obter_horarios_disponiveis(data_inicio: datetime, dias: int = 5) -> List[Dict[str, Any]]:
     """Obtém horários disponíveis dos técnicos nos próximos dias"""
+    # 🕐 LOG DO HORÁRIO DE REFERÊNCIA PARA A PESQUISA
+    agora_brasil = datetime.now(pytz.timezone('America/Sao_Paulo'))
+    logger.info(f"🔍 PESQUISA DE HORÁRIOS - Referência: {agora_brasil.strftime('%d/%m/%Y %H:%M:%S (Brasília)')}")
+    logger.info(f"🔍 PESQUISA DE HORÁRIOS - Data início original: {data_inicio.strftime('%d/%m/%Y %H:%M:%S')}")
+
+    # 🔍 VALIDAR DATA DE INÍCIO ANTES DA PESQUISA
+    data_inicio = validar_data_pesquisa(data_inicio, "pesquisa de horários")
+    logger.info(f"🔍 PESQUISA DE HORÁRIOS - Data início validada: {data_inicio.strftime('%d/%m/%Y %H:%M:%S')}")
+    logger.info(f"🔍 PESQUISA DE HORÁRIOS - Dias a pesquisar: {dias}")
+
     supabase = get_supabase_client()
     horarios_disponiveis = []
 
@@ -2769,9 +2902,9 @@ async def verificar_duplicata_agendamento(data: dict) -> dict:
         equipamento = data.get("equipamento", "").strip()
         nome = data.get("nome", "").strip()
 
-        # Janela de tempo para verificação (últimas 2 horas)
+        # Janela de tempo para verificação (últimas 4 horas - mais rigorosa)
         agora = datetime.now()
-        janela_tempo = agora - timedelta(hours=2)
+        janela_tempo = agora - timedelta(hours=4)
 
         logger.info(f"🛡️ Verificando duplicatas para: CPF={cpf}, Tel={telefone}, Nome={nome}")
 
@@ -2811,8 +2944,8 @@ async def verificar_duplicata_agendamento(data: dict) -> dict:
                         if nome.lower() in os.get("client_name", "").lower():
                             similaridade += 1
 
-                    # Se similaridade > 70%, considerar duplicata
-                    if total_checks > 0 and (similaridade / total_checks) > 0.7:
+                    # Se similaridade > 60%, considerar duplicata (mais rigoroso)
+                    if total_checks > 0 and (similaridade / total_checks) > 0.6:
                         tempo_criacao = datetime.fromisoformat(os.get("created_at", "").replace("Z", "+00:00"))
                         minutos_atras = int((agora - tempo_criacao.replace(tzinfo=None)).total_seconds() / 60)
 
@@ -2826,21 +2959,30 @@ async def verificar_duplicata_agendamento(data: dict) -> dict:
                             "similarity_score": round((similaridade / total_checks) * 100, 1)
                         }
 
-        # 2. VERIFICAR DUPLICATAS EM AGENDAMENTOS_AI (pré-agendamentos)
+        # 2. VERIFICAR DUPLICATAS EM AGENDAMENTOS_AI (pré-agendamentos) - MAIS RIGOROSO
         if telefone:
             response_ai = supabase.table("agendamentos_ai").select("*").eq(
                 "telefone", telefone
             ).gte("created_at", janela_tempo.isoformat()).execute()
 
-            if response_ai.data and len(response_ai.data) > 1:
-                logger.warning(f"🚨 MÚLTIPLOS PRÉ-AGENDAMENTOS: {len(response_ai.data)} para telefone {telefone}")
+            if response_ai.data and len(response_ai.data) > 0:
+                # Verificar se há pré-agendamentos muito recentes (últimos 30 minutos)
+                janela_recente = agora - timedelta(minutes=30)
+                agendamentos_recentes = [
+                    ag for ag in response_ai.data
+                    if datetime.fromisoformat(ag.get("created_at", "").replace("Z", "+00:00")).replace(tzinfo=None) > janela_recente
+                ]
 
-                return {
-                    "is_duplicate": True,
-                    "duplicate_type": "pre_scheduling",
-                    "count": len(response_ai.data),
-                    "latest": response_ai.data[0]
-                }
+                if agendamentos_recentes:
+                    logger.warning(f"🚨 PRÉ-AGENDAMENTO RECENTE: {len(agendamentos_recentes)} para telefone {telefone} nos últimos 30 min")
+
+                    return {
+                        "is_duplicate": True,
+                        "duplicate_type": "recent_pre_scheduling",
+                        "count": len(agendamentos_recentes),
+                        "latest": agendamentos_recentes[0],
+                        "minutes_ago": int((agora - datetime.fromisoformat(agendamentos_recentes[0].get("created_at", "").replace("Z", "+00:00")).replace(tzinfo=None)).total_seconds() / 60)
+                    }
 
         logger.info("✅ Nenhuma duplicata detectada")
         return {"is_duplicate": False}
@@ -2856,9 +2998,22 @@ async def agendamento_inteligente(request: Request):
     🎯 ENDPOINT INTELIGENTE: Detecta automaticamente ETAPA 1 ou ETAPA 2 com proteção anti-duplicata
     """
     try:
+        # 🕐 SEMPRE VERIFICAR HORÁRIO REAL ANTES DE QUALQUER OPERAÇÃO
+        info_horario = verificar_horario_real_sistema()
+
         data = await request.json()
         logger.info(f"🚀 NEURAL CHAIN 1: Executando consulta de disponibilidade")
         logger.info(f"Agendamento inteligente - dados recebidos: {data}")
+
+        # Log do horário de referência para as pesquisas
+        logger.info(f"📅 HORÁRIO DE REFERÊNCIA PARA PESQUISAS: {info_horario['brasil']['formatted']}")
+
+        # 💰 LOG DO VALOR DO SERVIÇO
+        valor_servico = data.get("valor_servico")
+        if valor_servico:
+            logger.info(f"💰 VALOR DO SERVIÇO recebido do ClienteChat: R$ {valor_servico}")
+        else:
+            logger.warning(f"⚠️ VALOR DO SERVIÇO não informado pelo ClienteChat")
 
         # 🛡️ VERIFICAÇÃO ANTI-DUPLICATA
         duplicata_check = await verificar_duplicata_agendamento(data)
@@ -2893,10 +3048,21 @@ Se precisar de alterações, entre em contato:
                     }
                 )
 
-            elif duplicata_check["duplicate_type"] == "pre_scheduling":
+            elif duplicata_check["duplicate_type"] in ["pre_scheduling", "recent_pre_scheduling"]:
                 count = duplicata_check["count"]
+                minutos = duplicata_check.get("minutes_ago", 0)
 
-                mensagem_multiplos = f"""⚠️ *Múltiplas tentativas detectadas*
+                if duplicata_check["duplicate_type"] == "recent_pre_scheduling":
+                    mensagem_multiplos = f"""🚨 *Agendamento em andamento!*
+
+Detectamos uma tentativa de agendamento há {minutos} minutos.
+
+⏳ *Seu agendamento está sendo processado...*
+
+Por favor, aguarde alguns instantes e evite clicar novamente.
+Se não receber confirmação em 5 minutos, tente novamente."""
+                else:
+                    mensagem_multiplos = f"""⚠️ *Múltiplas tentativas detectadas*
 
 Encontramos {count} tentativas de agendamento recentes.
 
@@ -2987,7 +3153,8 @@ async def criar_pre_agendamento_etapa1(data: dict, telefone: str):
             "status": "pendente",
             "urgente": data.get("urgente", "não").lower() == "sim",
             "tipo_atendimento_1": data.get("tipo_atendimento_1", "em_domicilio"),  # Salvar tipo de atendimento
-            "tipos_atendimento": [data.get("tipo_atendimento_1", "em_domicilio")]  # Array para compatibilidade
+            "tipos_atendimento": [data.get("tipo_atendimento_1", "em_domicilio")],  # Array para compatibilidade
+            "valor_servico": data.get("valor_servico")  # 💰 SALVAR VALOR DO CLIENTECHAT
         }
 
         # Inserir no banco
@@ -3140,7 +3307,10 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
             "urgente": urgente,
             "horario_agendado": horario_escolhido,
             "tipo_atendimento": pre_agendamento.get("tipo_atendimento_1", "em_domicilio"),  # ✅ TIPO REAL
-            "valor_os": 150.00
+            "valor_os": obter_valor_servico(
+                pre_agendamento.get("tipo_atendimento_1", "em_domicilio"),
+                pre_agendamento.get("valor_servico")  # Valor deve estar salvo no pré-agendamento
+            )
         }
 
         logger.info(f"✅ ETAPA 2: Usando dados reais do pré-agendamento:")
@@ -3319,7 +3489,10 @@ async def criar_os_completa(dados: dict):
             "completed_date": None,  # ✅ AINDA NÃO COMPLETADO
             "needs_pickup": dados.get("tipo_atendimento") in ["coleta_conserto", "coleta_diagnostico"],  # ✅ BASEADO NO TIPO
             "current_location": "client",  # ✅ SEMPRE INICIA NO CLIENTE (independente do tipo)
-            "final_cost": dados.get("valor_os", 150.00),
+            "final_cost": obter_valor_servico(
+                dados.get("tipo_atendimento", "em_domicilio"),
+                dados.get("valor_os")
+            ),
             "order_number": os_numero,
             "pickup_address": dados["endereco"]
         }
@@ -3328,6 +3501,37 @@ async def criar_os_completa(dados: dict):
         os_id = response_os.data[0]["id"]
 
         logger.info(f"✅ OS criada com sucesso: {os_numero} (ID: {os_id})")
+
+        # 🔧 CORREÇÃO: Criar agendamento específico em scheduled_services
+        # Para manter consistência com o resto do sistema
+        if tecnico_id and horario_agendado_iso:
+            try:
+                # Calcular horário de fim (1 hora depois)
+                horario_inicio = datetime.fromisoformat(horario_agendado_iso.replace('Z', '+00:00'))
+                horario_fim = horario_inicio + timedelta(hours=1)
+
+                agendamento_data = {
+                    "service_order_id": os_id,
+                    "technician_id": tecnico_id,
+                    "technician_name": tecnico_nome_real,
+                    "client_name": dados["nome"],
+                    "scheduled_start_time": horario_inicio.isoformat(),
+                    "scheduled_end_time": horario_fim.isoformat(),
+                    "address": dados["endereco"],
+                    "description": dados["problema"],
+                    "status": "scheduled"
+                }
+
+                response_agendamento = supabase.table("scheduled_services").insert(agendamento_data).execute()
+                agendamento_id = response_agendamento.data[0]["id"]
+
+                logger.info(f"✅ Agendamento criado com sucesso: {agendamento_id}")
+                logger.info(f"🕐 Horário: {horario_inicio.strftime('%d/%m/%Y %H:%M')} - {horario_fim.strftime('%H:%M')}")
+
+            except Exception as e:
+                logger.error(f"❌ Erro ao criar agendamento: {str(e)}")
+                # Não falhar a criação da OS por causa do agendamento
+                pass
 
         return {
             "success": True,
@@ -3377,88 +3581,47 @@ async def health_check():
             "error": str(e)
         }
 
+@app.get("/test-avaliacao")
+async def test_avaliacao():
+    """Endpoint de teste para avaliação"""
+    return {"success": True, "message": "Endpoint funcionando!"}
+
 @app.post("/solicitar-avaliacao-google")
 async def solicitar_avaliacao_google(request: Request):
     """
     Endpoint para solicitar avaliação no Google após conclusão do serviço
-    🤖 INTEGRAÇÃO CLIENTECHAT: Retorna dados estruturados para #external_return#
+    🤖 INTEGRAÇÃO CLIENTECHAT: Dispara neural chain automaticamente
     """
     try:
         data = await request.json()
-
-        # Dados obrigatórios
-        os_numero = data.get("os_numero", "")
+        os_numero = data.get("os_numero", "#000")
         cliente_nome = data.get("cliente_nome", "Cliente")
         telefone = data.get("telefone", "")
+        trigger_neural_chain = data.get("trigger_neural_chain", False)
 
-        logger.info(f"🤖 [ClienteChat] Solicitação de avaliação recebida:")
-        logger.info(f"   - OS: {os_numero}")
-        logger.info(f"   - Cliente: {cliente_nome}")
-        logger.info(f"   - Telefone: {telefone}")
+        # URL do Google Reviews (definida no início do arquivo)
+        google_url = "https://g.page/r/CfjiXeK7gOSLEAg/review"
 
-        if not os_numero:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Número da OS é obrigatório"}
-            )
-
-        # Se não tem telefone, ainda retornar dados para ClienteChat processar
-        if not telefone:
-            logger.warning(f"⚠️ [ClienteChat] OS {os_numero} sem telefone")
-            telefone = "SEM_TELEFONE"
-
-        # Mensagem personalizada para solicitar avaliação
-        mensagem = f"""🎉 *Serviço Concluído - OS {os_numero}*
-
-Olá {cliente_nome}!
-
-✅ Seu serviço foi finalizado com sucesso!
-
-⭐ *Que tal nos ajudar com uma avaliação?*
-
-Sua opinião é muito importante para nós e ajuda outros clientes a conhecerem nosso trabalho.
-
-🔗 *Clique aqui para avaliar:*
-{GOOGLE_REVIEW_URL}
-
-📝 *Leva apenas 30 segundos!*
-
-Muito obrigado pela confiança! 🙏
-
----
-*Fix Fogões - Assistência Técnica Especializada*
-📞 (48) 98833-2664"""
-
-        logger.info(f"✅ [ClienteChat] Mensagem de avaliação preparada para OS {os_numero}")
-        logger.info(f"🔗 [ClienteChat] URL Google Reviews: {GOOGLE_REVIEW_URL}")
-
-        logger.info(f"✅ [ClienteChat] Dados preparados para #external_return#")
-        logger.info(f"📋 [ClienteChat] External return: AVALIACAO_SOLICITADA|OS:{os_numero}|CLIENTE:{cliente_nome}")
-
-        # 🎯 FORMATO COMPATÍVEL COM CLIENTECHAT (igual ao agendamento)
-        # Retornar dados estruturados para #external_return#
-        external_return = f"AVALIACAO_SOLICITADA|OS:{os_numero}|CLIENTE:{cliente_nome}|TELEFONE:{telefone}|URL:{GOOGLE_REVIEW_URL}|STATUS:ENVIADO"
+        # Dados estruturados para #external_return#
+        external_return = f"AVALIACAO_SOLICITADA|OS:{os_numero}|CLIENTE:{cliente_nome}|TELEFONE:{telefone}|URL:{google_url}|STATUS:ENVIADO"
 
         return JSONResponse(
             status_code=200,
             content={
                 "success": True,
-                "message": external_return,  # ClienteChat vai usar isso no #external_return#
-                "mensagem_formatada": mensagem,  # Mensagem pronta para envio
-                "google_review_url": GOOGLE_REVIEW_URL,
+                "message": external_return,
+                "external_return": external_return,
                 "os_numero": os_numero,
                 "cliente": cliente_nome,
                 "telefone": telefone,
-                "action": "clientechat_external_return",
-                "external_return": external_return  # Dados estruturados para ClienteChat
+                "neural_chain_triggered": trigger_neural_chain and telefone != ""
             }
         )
 
     except Exception as e:
-        logger.error(f"Erro ao solicitar avaliação Google: {e}")
         return JSONResponse(
             status_code=500,
-            content={"success": False, "message": "Erro interno do servidor"}
+            content={"success": False, "message": f"Erro: {str(e)}"}
         )
 
 @app.post("/finalizar-os")
@@ -3915,6 +4078,13 @@ async def agendamento_inteligente_completo(request: Request):
 # Função interna para consulta de disponibilidade
 async def consultar_disponibilidade_interna(data: dict):
     try:
+        # 🕐 VERIFICAR HORÁRIO REAL ANTES DA CONSULTA
+        logger.info("🔍 ═══════════════════════════════════════════════════════════")
+        logger.info("🔍 INICIANDO CONSULTA DE DISPONIBILIDADE")
+        info_horario = verificar_horario_real_sistema()
+        logger.info(f"🔍 Horário de referência: {info_horario['brasil']['formatted']}")
+        logger.info("🔍 ═══════════════════════════════════════════════════════════")
+
         # Extrair dados básicos e filtrar placeholders
         endereco = filtrar_placeholders(data.get("endereco", ""))
         nome = filtrar_placeholders(data.get("nome", ""))
@@ -4532,9 +4702,14 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
 
         # Determinar tipo de serviço e valor baseado nos equipamentos
         service_type = tipos_atendimento[0] if tipos_atendimento else "em_domicilio"
-        final_cost = 280.00  # Valor do exemplo real
+
+        # 🎯 OBTER VALOR BASEADO NO TIPO DE ATENDIMENTO
+        # Tentar extrair valor do pré-agendamento (se foi salvo na ETAPA 1)
+        valor_clientechat = pre_agendamento.get('valor_servico') or pre_agendamento.get('valor_os')
+        final_cost = obter_valor_servico(service_type, valor_clientechat)
 
         logger.info(f"🎯 ETAPA 2: Tipo de atendimento usado: {service_type}")
+        logger.info(f"💰 ETAPA 2: Valor calculado: R$ {final_cost:.2f}")
 
         # Consolidar descrição dos problemas
         descricao_completa = " | ".join(problemas) if problemas else "Não especificado"
