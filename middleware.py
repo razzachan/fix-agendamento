@@ -2985,15 +2985,16 @@ async def agendamento_inteligente(request: Request):
     🎯 ENDPOINT INTELIGENTE: Detecta automaticamente ETAPA 1 ou ETAPA 2 com proteção anti-duplicata
     """
     try:
-        # 🕐 SEMPRE VERIFICAR HORÁRIO REAL ANTES DE QUALQUER OPERAÇÃO
-        info_horario = verificar_horario_real_sistema()
+        # 🕐 VERIFICAR HORÁRIO REAL ANTES DE QUALQUER OPERAÇÃO (TEMPORARIAMENTE COMENTADO PARA DEBUG)
+        # info_horario = verificar_horario_real_sistema()
 
         data = await request.json()
         logger.info(f"🚀 NEURAL CHAIN 1: Executando consulta de disponibilidade")
         logger.info(f"Agendamento inteligente - dados recebidos: {data}")
 
         # Log do horário de referência para as pesquisas
-        logger.info(f"📅 HORÁRIO DE REFERÊNCIA PARA PESQUISAS: {info_horario['brasil']['formatted']}")
+        agora_brasil = datetime.now(pytz.timezone('America/Sao_Paulo'))
+        logger.info(f"📅 HORÁRIO DE REFERÊNCIA PARA PESQUISAS: {agora_brasil.strftime('%d/%m/%Y %H:%M:%S (Brasília)')}")
 
         # 💰 LOG DO VALOR DO SERVIÇO
         valor_servico = data.get("valor_servico")
@@ -4065,11 +4066,11 @@ async def agendamento_inteligente_completo(request: Request):
 # Função interna para consulta de disponibilidade
 async def consultar_disponibilidade_interna(data: dict):
     try:
-        # 🕐 VERIFICAR HORÁRIO REAL ANTES DA CONSULTA
+        # 🕐 VERIFICAR HORÁRIO REAL ANTES DA CONSULTA (TEMPORARIAMENTE COMENTADO PARA DEBUG)
         logger.info("🔍 ═══════════════════════════════════════════════════════════")
         logger.info("🔍 INICIANDO CONSULTA DE DISPONIBILIDADE")
-        info_horario = verificar_horario_real_sistema()
-        logger.info(f"🔍 Horário de referência: {info_horario['brasil']['formatted']}")
+        agora_brasil = datetime.now(pytz.timezone('America/Sao_Paulo'))
+        logger.info(f"🔍 Horário de referência: {agora_brasil.strftime('%d/%m/%Y %H:%M:%S (Brasília)')}")
         logger.info("🔍 ═══════════════════════════════════════════════════════════")
 
         # Extrair dados básicos e filtrar placeholders
