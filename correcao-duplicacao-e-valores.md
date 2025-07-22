@@ -107,19 +107,21 @@ Se não receber confirmação em 5 minutos, tente novamente."""
 ### **📊 Valores por Tipo de Atendimento:**
 
 #### **🏠 Em Domicílio:**
-- **Valor**: Definido pelo ClienteChat
-- **Fallback**: R$ 150,00
+- **Valor**: **SEMPRE** definido pelo ClienteChat
+- **Fallback**: R$ 150,00 (apenas casos excepcionais)
 - **Uso**: `obter_valor_servico("em_domicilio", valor_clientechat)`
 
 #### **🔧 Coleta Conserto:**
-- **Valor**: Definido pelo ClienteChat
-- **Fallback**: R$ 120,00
+- **Valor**: **SEMPRE** definido pelo ClienteChat
+- **Fallback**: R$ 120,00 (apenas casos excepcionais)
 - **Uso**: `obter_valor_servico("coleta_conserto", valor_clientechat)`
 
 #### **🔍 Coleta Diagnóstico:**
-- **Valor**: Definido pelo ClienteChat
-- **Fallback**: R$ 350,00 (NÃO mais R$ 280,00!)
+- **Valor**: **SEMPRE** definido pelo ClienteChat
+- **Fallback**: R$ 350,00 (apenas casos excepcionais - NÃO mais R$ 280,00!)
 - **Uso**: `obter_valor_servico("coleta_diagnostico", valor_clientechat)`
+
+**🎯 IMPORTANTE: TODOS os valores são recebidos do ClienteChat! Os fallbacks são apenas para casos excepcionais onde o ClienteChat não envia o valor.**
 
 ### **🔄 Fluxo de Valores:**
 ```

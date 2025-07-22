@@ -202,9 +202,11 @@ logger.info(f"📅 HORÁRIO DE REFERÊNCIA: {info_horario['brasil']['formatted']
 
 #### **💰 Valores Agora Corretos:**
 - ✅ **coleta_diagnostico**: R$ 80,00 (ClienteChat) ou R$ 350,00 (fallback)
-- ✅ **coleta_conserto**: R$ 120,00 (fallback)
-- ✅ **em_domicilio**: R$ 150,00 (fallback)
+- ✅ **coleta_conserto**: Valor do ClienteChat ou R$ 120,00 (fallback)
+- ✅ **em_domicilio**: Valor do ClienteChat ou R$ 150,00 (fallback)
 - ❌ **Nunca mais**: R$ 280,00 incorreto
+
+**🎯 TODOS os valores são recebidos do ClienteChat! Os fallbacks são apenas para casos excepcionais.**
 
 ### **🎯 RESULTADO FINAL:**
 **O sistema está 80% funcional! As principais correções foram implementadas com sucesso. Os problemas restantes são menores e podem ser resolvidos facilmente: encoding UTF-8 e detecção de ETAPA 2. 🚀✨**
