@@ -4114,6 +4114,12 @@ async def consultar_disponibilidade_interna(data: dict):
             endereco = "Balneário Camboriú, SC"  # Padrão para determinar grupo logístico
             telefone = "48999999999"
             equipamentos = [{"equipamento": "Equipamento", "tipo": "Não especificado"}]
+
+        # 🔧 VERIFICAÇÃO ADICIONAL: Garantir que equipamentos não está vazio
+        if not equipamentos:
+            logger.warning("⚠️ Lista de equipamentos vazia, adicionando equipamento padrão")
+            equipamentos = [{"equipamento": "Equipamento", "tipo": "Não especificado"}]
+
         # Esta função é para consulta de disponibilidade, não para confirmação
         # Determinar técnico baseado no primeiro equipamento usando sistema otimizado
         primeiro_equipamento = equipamentos[0]["equipamento"]
