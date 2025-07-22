@@ -111,6 +111,8 @@ export interface CalendarEvent {
   isUrgent?: boolean;
   serviceOrderId?: string;
   logisticsGroup?: 'A' | 'B' | 'C';
+  finalCost?: number; // ✅ Valor da OS
+  clientPhone?: string; // ✅ Telefone do cliente
 }
 
 // Tipos para disponibilidade de técnicos

@@ -4,6 +4,7 @@ import { ServiceOrder, Client } from '@/types';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { createOrUpdateClient } from './clientOperations';
+import { generateNextOrderNumber } from '@/utils/orderNumberUtils';
 
 /**
  * Creates a new service order in the database
@@ -71,8 +72,13 @@ export async function createServiceOrder(serviceOrder: ServiceOrder): Promise<st
 
     console.log(`💰 Valor final calculado: R$ ${finalCost.toFixed(2)}`);
 
+    // ✅ Gerar número sequencial da OS (igual ao middleware)
+    const orderNumber = await generateNextOrderNumber();
+    console.log(`🔢 Número da OS gerado: ${orderNumber}`);
+
     const orderData = {
       // id: removido - deixar o banco gerar o ID fixo automaticamente
+      order_number: orderNumber, // ✅ Adicionar número sequencial da OS
       client_id: clientId,
       client_name: serviceOrder.clientName,
       technician_id: serviceOrder.technicianId || null,

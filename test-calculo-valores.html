@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Cálculo de Valores de Serviço</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-card {
+            background: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { border-left: 4px solid #28a745; }
+        .info { border-left: 4px solid #17a2b8; }
+        .warning { border-left: 4px solid #ffc107; }
+        h1 { color: #333; text-align: center; }
+        h2 { color: #007bff; }
+        .scenario {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .calculation {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        .result {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 18px;
+            text-align: center;
+        }
+        .old-value {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 5px 10px;
+            border-radius: 4px;
+            text-decoration: line-through;
+        }
+        .new-value {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .price {
+            font-weight: bold;
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧮 Teste: Cálculo Inteligente de Valores</h1>
+    
+    <div class="test-card success">
+        <h2>✅ Problema Identificado e Resolvido</h2>
+        <p><strong>Problema:</strong> Middleware estava usando valores fixos (R$ 150,00 e R$ 280,00) para todas as OS.</p>
+        <p><strong>Solução:</strong> Implementada função <code>calcular_valor_servico()</code> que calcula valores baseados em:</p>
+        <ul>
+            <li>Tipo de atendimento</li>
+            <li>Tipo de equipamento</li>
+            <li>Complexidade do problema</li>
+        </ul>
+    </div>
+
+    <div class="test-card info">
+        <h2>📊 Lógica de Cálculo</h2>
+        
+        <h3>1. Valores Base por Tipo de Atendimento</h3>
+        <table>
+            <tr>
+                <th>Tipo de Atendimento</th>
+                <th>Valor Base</th>
+                <th>Descrição</th>
+            </tr>
+            <tr>
+                <td>em_domicilio</td>
+                <td class="price">R$ 150,00</td>
+                <td>Serviço realizado na casa do cliente</td>
+            </tr>
+            <tr>
+                <td>coleta_diagnostico</td>
+                <td class="price">R$ 80,00</td>
+                <td>Taxa de coleta para diagnóstico</td>
+            </tr>
+            <tr>
+                <td>coleta_conserto</td>
+                <td class="price">R$ 120,00</td>
+                <td>Taxa de coleta para conserto</td>
+            </tr>
+        </table>
+
+        <h3>2. Multiplicadores por Equipamento</h3>
+        <table>
+            <tr>
+                <th>Equipamento</th>
+                <th>Multiplicador</th>
+                <th>Justificativa</th>
+            </tr>
+            <tr>
+                <td>Fogão</td>
+                <td>1.0x</td>
+                <td>Equipamento padrão</td>
+            </tr>
+            <tr>
+                <td>Forno</td>
+                <td>1.2x</td>
+                <td>Mais complexo</td>
+            </tr>
+            <tr>
+                <td>Cooktop</td>
+                <td>1.1x</td>
+                <td>Tecnologia indução</td>
+            </tr>
+            <tr>
+                <td>Lava-louça</td>
+                <td>1.3x</td>
+                <td>Mais complexo</td>
+            </tr>
+            <tr>
+                <td>Micro-ondas</td>
+                <td>1.1x</td>
+                <td>Eletrônico</td>
+            </tr>
+            <tr>
+                <td>Coifa</td>
+                <td>0.9x</td>
+                <td>Mais simples</td>
+            </tr>
+            <tr>
+                <td>Depurador</td>
+                <td>0.8x</td>
+                <td>Mais simples</td>
+            </tr>
+        </table>
+
+        <h3>3. Ajuste por Complexidade</h3>
+        <p><strong>+15%</strong> para problemas que contenham:</p>
+        <ul>
+            <li>"não liga", "não aquece", "não funciona"</li>
+            <li>"queimado", "curto", "elétrico"</li>
+            <li>"fiação", "placa", "display", "eletrônico"</li>
+        </ul>
+    </div>
+
+    <div class="test-card info">
+        <h2>🧪 Cenários de Teste</h2>
+
+        <div class="scenario">
+            <h3>Cenário 1: Fogão em domicílio - problema simples</h3>
+            <p><strong>Dados:</strong> em_domicilio + Fogão 4 bocas + "Boca não acende"</p>
+            <div class="calculation">
+                Cálculo: R$ 150,00 × 1.0 × 1.0 = R$ 150,00
+            </div>
+            <div class="result">Resultado: R$ 150,00</div>
+        </div>
+
+        <div class="scenario">
+            <h3>Cenário 2: Forno em domicílio - problema complexo</h3>
+            <p><strong>Dados:</strong> em_domicilio + Forno elétrico + "Não aquece e display não funciona"</p>
+            <div class="calculation">
+                Cálculo: R$ 150,00 × 1.2 × 1.15 = R$ 207,00 → R$ 210,00 (arredondado)
+            </div>
+            <div class="result">Resultado: R$ 210,00</div>
+        </div>
+
+        <div class="scenario">
+            <h3>Cenário 3: Lava-louça coleta diagnóstico</h3>
+            <p><strong>Dados:</strong> coleta_diagnostico + Lava-louça + "Não liga"</p>
+            <div class="calculation">
+                Cálculo: R$ 80,00 × 1.3 × 1.15 = R$ 119,60 → R$ 120,00 (arredondado)
+            </div>
+            <div class="result">Resultado: R$ 120,00</div>
+        </div>
+
+        <div class="scenario">
+            <h3>Cenário 4: Cooktop coleta conserto</h3>
+            <p><strong>Dados:</strong> coleta_conserto + Cooktop indução + "Queimado"</p>
+            <div class="calculation">
+                Cálculo: R$ 120,00 × 1.1 × 1.15 = R$ 151,80 → R$ 150,00 (arredondado)
+            </div>
+            <div class="result">Resultado: R$ 150,00</div>
+        </div>
+
+        <div class="scenario">
+            <h3>Cenário 5: Micro-ondas em domicílio</h3>
+            <p><strong>Dados:</strong> em_domicilio + Micro-ondas + "Não aquece"</p>
+            <div class="calculation">
+                Cálculo: R$ 150,00 × 1.1 × 1.15 = R$ 189,75 → R$ 190,00 (arredondado)
+            </div>
+            <div class="result">Resultado: R$ 190,00</div>
+        </div>
+
+        <div class="scenario">
+            <h3>Cenário 6: Coifa em domicílio</h3>
+            <p><strong>Dados:</strong> em_domicilio + Coifa + "Motor com ruído"</p>
+            <div class="calculation">
+                Cálculo: R$ 150,00 × 0.9 × 1.0 = R$ 135,00 → R$ 140,00 (arredondado)
+            </div>
+            <div class="result">Resultado: R$ 140,00</div>
+        </div>
+    </div>
+
+    <div class="test-card warning">
+        <h2>⚠️ Comparação: Antes vs Depois</h2>
+        <table>
+            <tr>
+                <th>Cenário</th>
+                <th>Valor Antigo (Fixo)</th>
+                <th>Valor Novo (Calculado)</th>
+                <th>Diferença</th>
+            </tr>
+            <tr>
+                <td>Fogão simples</td>
+                <td><span class="old-value">R$ 280,00</span></td>
+                <td><span class="new-value">R$ 150,00</span></td>
+                <td>-R$ 130,00</td>
+            </tr>
+            <tr>
+                <td>Forno complexo</td>
+                <td><span class="old-value">R$ 280,00</span></td>
+                <td><span class="new-value">R$ 210,00</span></td>
+                <td>-R$ 70,00</td>
+            </tr>
+            <tr>
+                <td>Lava-louça coleta</td>
+                <td><span class="old-value">R$ 150,00</span></td>
+                <td><span class="new-value">R$ 120,00</span></td>
+                <td>-R$ 30,00</td>
+            </tr>
+            <tr>
+                <td>Micro-ondas</td>
+                <td><span class="old-value">R$ 280,00</span></td>
+                <td><span class="new-value">R$ 190,00</span></td>
+                <td>-R$ 90,00</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="test-card success">
+        <h2>✅ Benefícios da Nova Implementação</h2>
+        <ul>
+            <li><strong>Preços mais justos:</strong> Valores baseados na complexidade real</li>
+            <li><strong>Diferenciação por tipo:</strong> Coleta vs domicílio têm preços diferentes</li>
+            <li><strong>Flexibilidade:</strong> Fácil ajustar multiplicadores e valores base</li>
+            <li><strong>Transparência:</strong> Logs detalhados do cálculo</li>
+            <li><strong>Consistência:</strong> Mesma lógica para ETAPA 1 e ETAPA 2</li>
+        </ul>
+    </div>
+
+    <div class="test-card info">
+        <h2>🔧 Implementação no Middleware</h2>
+        <p><strong>Arquivos modificados:</strong></p>
+        <ul>
+            <li><code>middleware.py</code> - Função calcular_valor_servico() adicionada</li>
+            <li>Linha 4496 - ETAPA 2 agora usa cálculo inteligente</li>
+            <li>Linha 3205-3209 - Confirmação de pré-agendamentos usa cálculo inteligente</li>
+        </ul>
+        
+        <p><strong>Logs adicionados:</strong></p>
+        <ul>
+            <li>Valor base por tipo de atendimento</li>
+            <li>Multiplicadores aplicados por equipamento</li>
+            <li>Ajustes por complexidade</li>
+            <li>Valor final calculado</li>
+        </ul>
+    </div>
+
+    <script>
+        console.log('🧮 Sistema de cálculo inteligente de valores implementado!');
+        console.log('📊 Agora os valores são calculados baseados em:');
+        console.log('   - Tipo de atendimento');
+        console.log('   - Tipo de equipamento');
+        console.log('   - Complexidade do problema');
+        console.log('✅ Não mais valores fixos de R$ 150,00 ou R$ 280,00!');
+    </script>
+</body>
+</html>

@@ -20,6 +20,7 @@ interface UseMainCalendarReturn {
   isLoading: boolean;
   error: string | null;
   refreshEvents: () => void;
+  updateEvent: (eventId: string, updates: Partial<CalendarEvent>) => void;
   getEventsForDay: (date: Date) => CalendarEvent[];
   getEventsByTimeSlot: (date: Date, hour: number) => CalendarEvent[];
 }
@@ -77,6 +78,20 @@ export const useMainCalendar = ({
     const startTime = new Date(service.scheduledStartTime);
     const endTime = new Date(service.scheduledEndTime);
 
+    // Extrair equipamento e problema da description se não estiverem disponíveis no relatedOrder
+    let equipment = relatedOrder?.equipment || 'Equipamento não especificado';
+    let problem = relatedOrder?.problem || service.description;
+
+    // Se não há equipment válido, tentar extrair da description (formato: "Equipamento - Problema")
+    if ((!relatedOrder?.equipment || equipment === 'Equipamento não especificado') && service.description && service.description.includes(' - ')) {
+      const parts = service.description.split(' - ');
+      if (parts.length >= 2) {
+        equipment = parts[0].trim();
+        problem = parts.slice(1).join(' - ').trim(); // Caso haja múltiplos " - "
+
+      }
+    }
+
     return {
       id: service.id,
       startTime,
@@ -84,8 +99,8 @@ export const useMainCalendar = ({
       clientName: service.clientName,
       technicianId: service.technicianId || '',
       technicianName: service.technicianName || 'Não atribuído',
-      equipment: relatedOrder?.equipment || 'Equipamento não especificado',
-      problem: relatedOrder?.problem || service.description,
+      equipment,
+      problem,
       address: service.address,
       status: service.status === 'scheduled' ? 'confirmed' :
               service.status === 'confirmed' ? 'confirmed' :  // ✅ ADICIONAR MAPEAMENTO PARA 'confirmed'
@@ -94,7 +109,9 @@ export const useMainCalendar = ({
               service.status === 'in_progress' ? 'in_progress' : 'suggested',
       isUrgent: relatedOrder?.isUrgent || false,
       serviceOrderId: service.serviceOrderId || undefined,
-      logisticsGroup: relatedOrder?.logisticsGroup as 'A' | 'B' | 'C' || undefined
+      logisticsGroup: relatedOrder?.logisticsGroup as 'A' | 'B' | 'C' || undefined,
+      finalCost: service.finalCost || relatedOrder?.finalCost, // ✅ Incluir valor da OS
+      clientPhone: service.clientPhone || relatedOrder?.clientPhone // ✅ Incluir telefone do cliente
     };
   };
 
@@ -159,37 +176,44 @@ export const useMainCalendar = ({
           });
           console.log(`📋 [useMainCalendar] Encontrados ${allScheduledServices.length} serviços em scheduled_services (todos os técnicos, excluindo cancelados)`);
 
-          // 2. Buscar todas as ordens de serviço no intervalo de datas (excluindo canceladas)
-          const allOrders = serviceOrders.filter(order => {
-            // DEBUG: Log da ordem para verificar dados
-            console.log(`🔍 [DEBUG] Ordem ${order.id}: scheduledDate="${order.scheduledDate}", status="${order.status}"`);
-
-            // Excluir ordens canceladas do calendário
+          // 2. Buscar ordens de serviço SEM agendamento específico (órfãs)
+          const orphanOrders = serviceOrders.filter(order => {
+            // Excluir ordens canceladas
             if (order.status === 'cancelled' || order.status === 'quote_rejected' || order.status === 'returned') {
-              console.log(`🚫 [DEBUG] Ordem ${order.id} excluída por status: ${order.status}`);
               return false;
             }
 
-            // Se tem data agendada, verificar se está no intervalo
-            if (order.scheduledDate) {
-              const orderDate = new Date(order.scheduledDate);
-              const inRange = orderDate >= startDate && orderDate <= endDate;
-              console.log(`📅 [DEBUG] Ordem ${order.id}: orderDate=${orderDate.toISOString()}, startDate=${startDate.toISOString()}, endDate=${endDate.toISOString()}, inRange=${inRange}`);
-              return inRange;
+            // Verificar se tem data agendada no intervalo
+            if (!order.scheduledDate) return false;
+
+            const orderDate = new Date(order.scheduledDate);
+            const inRange = orderDate >= startDate && orderDate <= endDate;
+
+            if (!inRange) return false;
+
+            // 🔧 ANTI-DUPLICAÇÃO: Verificar se já existe agendamento específico
+            const hasScheduledService = allScheduledServices.some(service =>
+              service.serviceOrderId === order.id
+            );
+
+            if (hasScheduledService) {
+              console.log(`🚫 [ANTI-DUPLICAÇÃO] Ordem ${order.id} já tem agendamento específico - ignorando`);
+              return false;
             }
-            console.log(`❌ [DEBUG] Ordem ${order.id} sem scheduledDate`);
-            return false;
+
+            console.log(`📋 [ÓRFÃ] Ordem ${order.id} sem agendamento específico - incluindo no calendário`);
+            return true;
           });
 
-          console.log(`📋 [useMainCalendar] Encontradas ${allOrders.length} ordens atribuídas em service_orders (todos os técnicos)`);
+          console.log(`📋 [useMainCalendar] Encontradas ${orphanOrders.length} ordens órfãs (sem agendamento específico)`);
 
-          // DEBUG: Log das ordens encontradas
-          allOrders.forEach(order => {
-            console.log(`📋 [DEBUG] Ordem encontrada: ${order.id} - ${order.clientName} - ${order.scheduledDate}`);
+          // DEBUG: Log das ordens órfãs
+          orphanOrders.forEach(order => {
+            console.log(`📋 [DEBUG] Ordem órfã: ${order.id} - ${order.clientName} - ${order.scheduledDate}`);
           });
 
-          // 3. Converter ordens de serviço para formato de serviços agendados
-          const ordersAsServices = allOrders.map(order => {
+          // 3. Converter ordens órfãs para formato de serviços agendados
+          const ordersAsServices = orphanOrders.map(order => {
             // Calcular horário de fim (1 hora após o início)
             const startTime = new Date(order.scheduledDate!);
             const endTime = new Date(startTime);
@@ -245,26 +269,40 @@ export const useMainCalendar = ({
 
           console.log(`📋 [useMainCalendar] Encontrados ${filteredServices.length} serviços em scheduled_services (técnico ${technicianId})`);
 
-          // 2. Buscar ordens de serviço do técnico específico (excluindo canceladas)
-          const technicianOrders = serviceOrders.filter(order => {
+          // 2. Buscar ordens órfãs do técnico específico (sem agendamento específico)
+          const technicianOrphanOrders = serviceOrders.filter(order => {
             if (order.technicianId !== technicianId) return false;
 
-            // Excluir ordens canceladas do calendário
+            // Excluir ordens canceladas
             if (order.status === 'cancelled' || order.status === 'quote_rejected' || order.status === 'returned') {
               return false;
             }
 
-            if (order.scheduledDate) {
-              const orderDate = new Date(order.scheduledDate);
-              return orderDate >= startDate && orderDate <= endDate;
+            if (!order.scheduledDate) return false;
+
+            const orderDate = new Date(order.scheduledDate);
+            const inRange = orderDate >= startDate && orderDate <= endDate;
+
+            if (!inRange) return false;
+
+            // 🔧 ANTI-DUPLICAÇÃO: Verificar se já existe agendamento específico
+            const hasScheduledService = filteredServices.some(service =>
+              service.serviceOrderId === order.id
+            );
+
+            if (hasScheduledService) {
+              console.log(`🚫 [ANTI-DUPLICAÇÃO] Ordem ${order.id} já tem agendamento específico - ignorando`);
+              return false;
             }
-            return false;
+
+            console.log(`📋 [ÓRFÃ] Ordem ${order.id} sem agendamento específico - incluindo`);
+            return true;
           });
 
-          console.log(`📋 [useMainCalendar] Encontradas ${technicianOrders.length} ordens atribuídas em service_orders (técnico ${technicianId})`);
+          console.log(`📋 [useMainCalendar] Encontradas ${technicianOrphanOrders.length} ordens órfãs (técnico ${technicianId})`);
 
-          // 3. Converter ordens para formato de serviços
-          const ordersAsServices = technicianOrders.map(order => {
+          // 3. Converter ordens órfãs para formato de serviços
+          const ordersAsServices = technicianOrphanOrders.map(order => {
             const startTime = new Date(order.scheduledDate!);
             const endTime = new Date(startTime);
             endTime.setHours(startTime.getHours() + 1);
@@ -317,12 +355,12 @@ export const useMainCalendar = ({
 
         console.log(`📋 [useMainCalendar] Encontrados ${filteredServices.length} serviços em scheduled_services`);
 
-        // 2. Buscar ordens de serviço atribuídas ao técnico na tabela service_orders (excluindo canceladas)
-        const technicianOrders = serviceOrders.filter(order => {
+        // 2. Buscar ordens órfãs do técnico (sem agendamento específico)
+        const technicianOrphanOrders = serviceOrders.filter(order => {
           // Filtrar apenas ordens atribuídas ao técnico
           if (order.technicianId !== targetTechnicianId) return false;
 
-          // Excluir ordens canceladas do calendário
+          // Excluir ordens canceladas
           if (order.status === 'cancelled' || order.status === 'quote_rejected' || order.status === 'returned') {
             return false;
           }
@@ -330,17 +368,31 @@ export const useMainCalendar = ({
           // Se tem data agendada, verificar se está no intervalo
           if (order.scheduledDate) {
             const orderDate = new Date(order.scheduledDate);
-            return orderDate >= startDate && orderDate <= endDate;
+            const inRange = orderDate >= startDate && orderDate <= endDate;
+
+            if (!inRange) return false;
+
+            // 🔧 ANTI-DUPLICAÇÃO: Verificar se já existe agendamento específico
+            const hasScheduledService = filteredServices.some(service =>
+              service.serviceOrderId === order.id
+            );
+
+            if (hasScheduledService) {
+              console.log(`🚫 [ANTI-DUPLICAÇÃO] Ordem ${order.id} já tem agendamento específico - ignorando`);
+              return false;
+            }
+
+            return true;
           }
 
-          // Se não tem data agendada, mostrar na semana atual (como "pendente de agendamento")
+          // Se não tem data agendada, mostrar como "pendente de agendamento"
           return true;
         });
 
-        console.log(`📋 [useMainCalendar] Encontradas ${technicianOrders.length} ordens atribuídas em service_orders`);
+        console.log(`📋 [useMainCalendar] Encontradas ${technicianOrphanOrders.length} ordens órfãs`);
 
-        // 3. Converter ordens de serviço para formato de serviços agendados
-        const ordersAsServices = technicianOrders.map(order => {
+        // 3. Converter ordens órfãs para formato de serviços agendados
+        const ordersAsServices = technicianOrphanOrders.map(order => {
           // Calcular horário de fim (1 hora após o início)
           const startTime = new Date(order.scheduledDate!);
           const endTime = new Date(startTime);
@@ -375,14 +427,9 @@ export const useMainCalendar = ({
       // Converter para CalendarEvent
       const calendarEvents: CalendarEvent[] = scheduledServices.map(service => {
         const relatedOrder = serviceOrders.find(order => order.id === service.serviceOrderId);
+
         const event = convertToCalendarEvent(service, relatedOrder);
-        console.log(`🔍 [useMainCalendar] Evento convertido:`, {
-          id: event.id,
-          clientName: event.clientName,
-          status: event.status,
-          serviceStatus: service.status,
-          orderStatus: relatedOrder?.status
-        });
+
         return event;
       });
 
@@ -425,11 +472,38 @@ export const useMainCalendar = ({
 
   // Buscar eventos de um slot de horário específico
   const getEventsByTimeSlot = useCallback((date: Date, hour: number): CalendarEvent[] => {
-    return events.filter(event => {
+    const result = events.filter(event => {
       const eventHour = event.startTime.getHours();
       return isSameDay(event.startTime, date) && eventHour === hour;
     });
+
+    // Debug: Log quando há eventos no slot
+    if (result.length > 0) {
+      console.warn(`🔍 [getEventsByTimeSlot] ${format(date, 'dd/MM')} ${hour}h: ${result.length} eventos`);
+    }
+
+    return result;
   }, [events]);
+
+  // Função para atualização otimista de eventos
+  const updateEvent = useCallback((eventId: string, updates: Partial<CalendarEvent>) => {
+    console.warn(`🔄 [UPDATE EVENT] Atualizando ${eventId} otimisticamente`);
+    setEvents(prevEvents => {
+      const newEvents = prevEvents.map(event => {
+        if (event.id === eventId) {
+          const updatedEvent = { ...event, ...updates };
+          console.warn(`✅ [UPDATE EVENT] Evento ${eventId} atualizado:`, {
+            antes: { startTime: event.startTime, endTime: event.endTime },
+            depois: { startTime: updatedEvent.startTime, endTime: updatedEvent.endTime }
+          });
+          return updatedEvent;
+        }
+        return event;
+      });
+      console.warn(`📊 [UPDATE EVENT] Total de eventos após atualização: ${newEvents.length}`);
+      return newEvents;
+    });
+  }, []);
 
   // Função para atualizar eventos
   const refreshEvents = useCallback(() => {
@@ -508,6 +582,7 @@ export const useMainCalendar = ({
     isLoading,
     error,
     refreshEvents,
+    updateEvent,
     getEventsForDay,
     getEventsByTimeSlot
   };

@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, MapPin, User, Wrench, Search, Filter, Calendar } from 'lucide-react';
+import { Clock, MapPin, User, Wrench, Search, Filter, Calendar, DollarSign, Phone } from 'lucide-react';
 
 interface ListViewProps {
   events: CalendarEvent[];
@@ -240,12 +240,28 @@ const ListView: React.FC<ListViewProps> = ({
                               <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
                               <span className="text-sm text-gray-600">{event.address}</span>
                             </div>
+                            {/* ✅ Telefone do Cliente */}
+                            {event.clientPhone && (
+                              <div className="flex items-center gap-2">
+                                <Phone className="h-4 w-4 text-blue-500" />
+                                <span className="text-sm font-medium text-blue-600">{event.clientPhone}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
                         {event.problem && (
                           <div className="mt-3 text-sm text-gray-600 bg-gray-100 p-2 rounded">
                             <strong>Problema:</strong> {event.problem}
+                          </div>
+                        )}
+
+                        {/* ✅ Valor da OS - Design Elegante */}
+                        {event.finalCost && event.finalCost > 0 && (
+                          <div className="mt-3 flex items-center gap-2 bg-emerald-50 text-emerald-700 p-3 rounded-lg border border-emerald-200">
+                            <DollarSign className="h-5 w-5" />
+                            <span className="font-semibold text-lg">R$ {event.finalCost.toFixed(2)}</span>
+                            <span className="text-sm text-emerald-600 ml-auto">Valor do Serviço</span>
                           </div>
                         )}
                       </CardContent>

@@ -229,9 +229,12 @@ export class CustomerRatingService {
         return false;
       }
 
-      // 🤖 INTEGRAÇÃO CLIENTECHAT: Disparar avaliação via middleware
+      // 🤖 INTEGRAÇÃO CLIENTECHAT: Chamar middleware que dispara neural chain
       try {
-        console.log('🤖 [CustomerRatingService] Disparando avaliação via ClienteChat...');
+        console.log('🤖 [CustomerRatingService] Chamando middleware para disparar neural chain...');
+
+        // 🎯 ESTRATÉGIA CORRETA: Chamar endpoint que retorna dados para #external_return#
+        // A neural chain do ClienteChat vai receber esses dados automaticamente
 
         const middlewareResponse = await fetch('https://fix-agendamento-production.up.railway.app/solicitar-avaliacao-google', {
           method: 'POST',
@@ -239,21 +242,23 @@ export class CustomerRatingService {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            os_numero: order.order_number || `#${serviceOrderId.slice(-3).padStart(3, '0')}`, // Usar order_number real
+            os_numero: order.order_number || `#${serviceOrderId.slice(-3).padStart(3, '0')}`,
             cliente_nome: order.client_name,
             telefone: order.client_phone || '',
+            trigger_neural_chain: true  // Flag para indicar que deve disparar neural chain
           })
         });
 
         if (middlewareResponse.ok) {
           const middlewareData = await middlewareResponse.json();
-          console.log('✅ [CustomerRatingService] Avaliação ClienteChat enviada:', middlewareData.message?.substring(0, 100) + '...');
+          console.log('✅ [CustomerRatingService] Middleware chamado, neural chain deve ser disparada');
+          console.log('📋 [CustomerRatingService] External return:', middlewareData.external_return);
         } else {
-          console.warn('⚠️ [CustomerRatingService] Falha ao enviar via ClienteChat (continuando)');
+          console.warn('⚠️ [CustomerRatingService] Falha ao chamar middleware (continuando)');
         }
+
       } catch (middlewareError) {
         console.warn('⚠️ [CustomerRatingService] Erro ao chamar middleware (continuando):', middlewareError);
-        // Não falhar se middleware não responder
       }
 
       console.log('✅ Solicitação de avaliação enviada para ordem:', serviceOrderId);

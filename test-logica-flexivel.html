@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✅ Lógica Flexível - Valores do ClienteChat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { border-left: 4px solid #28a745; }
+        .info { border-left: 4px solid #17a2b8; }
+        .warning { border-left: 4px solid #ffc107; }
+        h1 { color: #333; text-align: center; }
+        h2 { color: #007bff; }
+        .scenario {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .old-logic {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .new-logic {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .code {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .price {
+            font-weight: bold;
+            color: #28a745;
+        }
+        .flexible {
+            background: #e3f2fd;
+            color: #0d47a1;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>✅ Lógica Flexível Implementada</h1>
+    
+    <div class="card success">
+        <h2>🎯 Mudança Implementada</h2>
+        <p><strong>Solicitação:</strong> "o coleta diagnostico pode seguir o valor do clientechat tambem. nao precisa ser fixo. pois sempre o bot passará o mesmo valor. mas fica mais flexivel."</p>
+        
+        <div class="old-logic">
+            <strong>❌ ANTES (Lógica Rígida):</strong><br>
+            • em_domicilio: Valor do ClienteChat<br>
+            • coleta_conserto: Valor do ClienteChat<br>
+            • coleta_diagnostico: <strong>R$ 350,00 FIXO</strong>
+        </div>
+        
+        <div class="new-logic">
+            <strong>✅ DEPOIS (Lógica Flexível):</strong><br>
+            • em_domicilio: Valor do ClienteChat<br>
+            • coleta_conserto: Valor do ClienteChat<br>
+            • coleta_diagnostico: <strong>Valor do ClienteChat</strong> (flexível!)
+        </div>
+    </div>
+
+    <div class="card info">
+        <h2>🔧 Código Atualizado</h2>
+        <div class="code">
+def obter_valor_servico(tipo_atendimento: str, valor_clientechat: float = None) -> float:
+    # TODOS os tipos usam valor do ClienteChat (mais flexível)
+    if valor_clientechat and valor_clientechat > 0:
+        valor_final = valor_clientechat
+        logger.info(f"📱 VALOR DO CLIENTECHAT: R$ {valor_final} para {tipo_atendimento}")
+    else:
+        # Fallback se não vier valor do ClienteChat
+        valores_fallback = {
+            "em_domicilio": 150.00,
+            "coleta_conserto": 120.00,
+            "coleta_diagnostico": 350.00  # Fallback para coleta diagnóstico
+        }
+        valor_final = valores_fallback.get(tipo_atendimento, 150.00)
+        logger.warning(f"⚠️ FALLBACK: Usando valor padrão R$ {valor_final}")
+    
+    return valor_final
+        </div>
+    </div>
+
+    <div class="card info">
+        <h2>🧪 Cenários de Teste</h2>
+
+        <div class="scenario">
+            <h3>Cenário 1: Coleta Diagnóstico - Valor Padrão</h3>
+            <p><strong>ClienteChat envia:</strong></p>
+            <div class="code">
+{
+  "tipo_atendimento_1": "coleta_diagnostico",
+  "valor_servico": 350.00,
+  "equipamento": "Forno"
+}
+            </div>
+            <p><strong>Resultado:</strong> <span class="price">R$ 350,00</span> (valor do ClienteChat)</p>
+            <p><span class="flexible">FLEXÍVEL</span> - Bot controla o valor</p>
+        </div>
+
+        <div class="scenario">
+            <h3>Cenário 2: Coleta Diagnóstico - Valor Diferente</h3>
+            <p><strong>ClienteChat envia:</strong></p>
+            <div class="code">
+{
+  "tipo_atendimento_1": "coleta_diagnostico",
+  "valor_servico": 400.00,
+  "equipamento": "Lava-louça"
+}
+            </div>
+            <p><strong>Resultado:</strong> <span class="price">R$ 400,00</span> (valor do ClienteChat)</p>
+            <p><span class="flexible">FLEXÍVEL</span> - Bot pode ajustar conforme necessário</p>
+        </div>
+
+        <div class="scenario">
+            <h3>Cenário 3: Em Domicílio</h3>
+            <p><strong>ClienteChat envia:</strong></p>
+            <div class="code">
+{
+  "tipo_atendimento_1": "em_domicilio",
+  "valor_servico": 180.00,
+  "equipamento": "Fogão"
+}
+            </div>
+            <p><strong>Resultado:</strong> <span class="price">R$ 180,00</span> (valor do ClienteChat)</p>
+        </div>
+
+        <div class="scenario">
+            <h3>Cenário 4: Coleta Conserto</h3>
+            <p><strong>ClienteChat envia:</strong></p>
+            <div class="code">
+{
+  "tipo_atendimento_1": "coleta_conserto",
+  "valor_servico": 250.00,
+  "equipamento": "Micro-ondas"
+}
+            </div>
+            <p><strong>Resultado:</strong> <span class="price">R$ 250,00</span> (valor do ClienteChat)</p>
+        </div>
+    </div>
+
+    <div class="card warning">
+        <h2>🛡️ Sistema de Fallback</h2>
+        <p>Se o ClienteChat <strong>não enviar</strong> valor_servico:</p>
+        
+        <table>
+            <tr>
+                <th>Tipo de Atendimento</th>
+                <th>Valor Fallback</th>
+                <th>Quando Usado</th>
+            </tr>
+            <tr>
+                <td>em_domicilio</td>
+                <td class="price">R$ 150,00</td>
+                <td>Apenas se não vier do ClienteChat</td>
+            </tr>
+            <tr>
+                <td>coleta_conserto</td>
+                <td class="price">R$ 120,00</td>
+                <td>Apenas se não vier do ClienteChat</td>
+            </tr>
+            <tr>
+                <td>coleta_diagnostico</td>
+                <td class="price">R$ 350,00</td>
+                <td>Apenas se não vier do ClienteChat</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="card success">
+        <h2>✅ Vantagens da Lógica Flexível</h2>
+        <ul>
+            <li><strong>🎛️ Controle Total do Bot:</strong> ClienteChat controla todos os valores</li>
+            <li><strong>🔄 Flexibilidade:</strong> Pode ajustar valores conforme necessário</li>
+            <li><strong>🧪 Testes Fáceis:</strong> Bot pode testar diferentes valores</li>
+            <li><strong>📊 Promoções:</strong> Bot pode aplicar descontos ou valores especiais</li>
+            <li><strong>🎯 Personalização:</strong> Valores podem variar por região, cliente, etc.</li>
+            <li><strong>🛡️ Segurança:</strong> Fallbacks garantem que sempre há um valor</li>
+        </ul>
+    </div>
+
+    <div class="card info">
+        <h2>📋 Logs do Sistema</h2>
+        <p>Agora o sistema registra:</p>
+        <div class="code">
+💰 VALOR DO SERVIÇO recebido do ClienteChat: R$ 350.00
+💰 Obtendo valor para: tipo=coleta_diagnostico, valor_clientechat=350.0
+📱 VALOR DO CLIENTECHAT: R$ 350.0 para coleta_diagnostico
+✅ Valor final definido: R$ 350.0
+💰 ETAPA 2: Valor calculado: R$ 350.00
+        </div>
+    </div>
+
+    <div class="card success">
+        <h2>🎉 Status Final</h2>
+        <p><strong>✅ IMPLEMENTAÇÃO COMPLETA!</strong></p>
+        <ul>
+            <li>✅ Todos os tipos usam valor do ClienteChat</li>
+            <li>✅ Sistema totalmente flexível</li>
+            <li>✅ Bot tem controle total dos valores</li>
+            <li>✅ Fallbacks de segurança implementados</li>
+            <li>✅ Logs detalhados para debugging</li>
+        </ul>
+        
+        <p><strong>O middleware agora é 100% flexível conforme solicitado! 🎯</strong></p>
+    </div>
+
+    <script>
+        console.log('✅ Lógica flexível implementada!');
+        console.log('🎛️ Todos os valores agora vêm do ClienteChat');
+        console.log('🔄 Sistema totalmente flexível');
+        console.log('🛡️ Fallbacks de segurança mantidos');
+    </script>
+</body>
+</html>

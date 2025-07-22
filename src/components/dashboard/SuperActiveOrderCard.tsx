@@ -211,6 +211,10 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
             <span>
               {hasMultipleOrders ? `${currentOrders.length} Ordens Ativas` : 'Ordem Ativa'}
             </span>
+            {/* Indicador de filtro do dia atual */}
+            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+              Hoje
+            </Badge>
 {(hasMultipleOrders || currentOrders.length > 0) && (
               <div className="flex gap-1">
                 <Badge variant="secondary" className="bg-[#e5b034]/20 text-[#e5b034] border-[#e5b034]/30">
@@ -249,21 +253,56 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Cliente e Endereço Principal */}
-        <div className="space-y-2">
+        {/* Cliente, Telefone e Endereço Principal */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
+          {/* Nome do Cliente */}
           <div className="flex items-center gap-2">
-            <User className="w-4 h-4 text-muted-foreground" />
-            <span className="font-semibold">{primaryOrder.clientName}</span>
+            <User className="w-4 h-4 text-blue-600" />
+            <span className="font-semibold text-gray-900">{primaryOrder.clientName}</span>
           </div>
+
+          {/* Telefone do Cliente */}
+          {primaryOrder.clientPhone && (
+            <div className="flex items-center gap-2">
+              <Phone className="w-4 h-4 text-green-600" />
+              <a
+                href={`tel:${primaryOrder.clientPhone}`}
+                className="text-sm font-medium text-green-600 hover:text-green-700 hover:underline cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {primaryOrder.clientPhone}
+              </a>
+            </div>
+          )}
+
+          {/* Endereço */}
           {primaryOrder.pickupAddress && (
             <div className="flex items-start gap-2">
-              <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-              <span className="text-sm text-muted-foreground">
+              <MapPin className="w-4 h-4 text-orange-600 mt-0.5" />
+              <span className="text-sm text-gray-600">
                 {primaryOrder.pickupAddress}
               </span>
             </div>
           )}
         </div>
+
+        {/* 🔥 AÇÃO PRINCIPAL - POSIÇÃO PRIORITÁRIA */}
+        {onUpdateStatus && (
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg p-4 shadow-sm">
+            <div className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
+              <Zap className="w-4 h-4" />
+              🚀 AÇÃO PRINCIPAL - {primaryOrder.equipmentType}
+            </div>
+            <NextStatusButton
+              serviceOrder={primaryOrder}
+              onUpdateStatus={async (orderId: string, newStatus: string, notes?: string) => {
+                await onUpdateStatus(orderId, newStatus as ServiceOrderStatus, notes);
+                return true;
+              }}
+              relatedOrders={orders.filter(o => o.id !== primaryOrder.id)}
+            />
+          </div>
+        )}
 
         {/* INFORMAÇÕES DO EQUIPAMENTO E PROBLEMA - DESTAQUE PRINCIPAL */}
         <div className="bg-[#e5b034]/10 border border-[#e5b034]/30 rounded-lg p-3 space-y-2">
@@ -346,6 +385,18 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
           )}
         </div>
 
+        {/* 🔹 DIVISÓRIA ELEGANTE - Separação Principal vs Outros */}
+        {hasMultipleOrders && (
+          <div className="flex items-center gap-3 py-4">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-gray-300"></div>
+            <div className="flex items-center gap-2 px-3 py-1 bg-white border border-gray-200 rounded-full shadow-sm">
+              <Package className="w-3 h-3 text-gray-500" />
+              <span className="text-xs font-medium text-gray-600">Outros Equipamentos</span>
+            </div>
+            <div className="flex-1 h-px bg-gradient-to-l from-transparent via-gray-300 to-gray-300"></div>
+          </div>
+        )}
+
         {/* Resumo dos Equipamentos Adicionais (apenas se múltiplos) */}
         {hasMultipleOrders && !isExpanded && (
           <div className="bg-muted/50 rounded-lg p-3 space-y-3">
@@ -378,6 +429,25 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
                 return (
                   <div key={order.id} className="p-2 bg-white rounded border border-gray-200 hover:border-gray-300 cursor-pointer transition-all"
                        onClick={() => setIsExpanded(true)}>
+                    {/* Cliente e Telefone */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1 min-w-0 flex-1">
+                        <User className="w-3 h-3 text-blue-600 flex-shrink-0" />
+                        <span className="text-xs font-medium text-gray-900 truncate">
+                          {order.clientName}
+                        </span>
+                      </div>
+                      {order.clientPhone && (
+                        <a
+                          href={`tel:${order.clientPhone}`}
+                          className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 ml-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Phone className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium truncate">
                         {order.equipmentType} {order.equipmentModel && `- ${order.equipmentModel}`}
@@ -453,17 +523,23 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
 
         {/* Vista Expandida - Detalhes de Todas as Ordens */}
         {isExpanded && (
-          <div className="space-y-4 border-t pt-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Detalhes dos Equipamentos</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsExpanded(false)}
-                className="h-auto p-1"
-              >
-                <ChevronUp className="w-4 h-4" />
-              </Button>
+          <div className="space-y-4">
+            {/* 🔹 DIVISÓRIA EXPANDIDA - Detalhes Completos */}
+            <div className="flex items-center gap-3 py-2">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-300 to-blue-300"></div>
+              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full shadow-sm">
+                <Package className="w-3 h-3 text-blue-600" />
+                <span className="text-xs font-medium text-blue-700">Detalhes dos Equipamentos</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsExpanded(false)}
+                  className="h-auto p-0.5 ml-1 hover:bg-blue-100"
+                >
+                  <ChevronUp className="w-3 h-3 text-blue-600" />
+                </Button>
+              </div>
+              <div className="flex-1 h-px bg-gradient-to-l from-transparent via-blue-300 to-blue-300"></div>
             </div>
 
             {/* Ordens Atuais */}
@@ -492,6 +568,32 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
                     onClick={() => setSelectedOrderId(selectedOrderId === order.id ? null : order.id)}
                   >
                     <div className="space-y-2">
+                      {/* Informações do Cliente */}
+                      <div className="bg-gray-50 border border-gray-200 rounded p-2 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <User className="w-3 h-3 text-blue-600" />
+                            <span className="text-sm font-medium text-gray-900">{order.clientName}</span>
+                          </div>
+                          {order.clientPhone && (
+                            <a
+                              href={`tel:${order.clientPhone}`}
+                              className="flex items-center gap-1 text-sm text-green-600 hover:text-green-700 hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Phone className="w-3 h-3" />
+                              <span className="text-xs">{order.clientPhone}</span>
+                            </a>
+                          )}
+                        </div>
+                        {order.pickupAddress && (
+                          <div className="flex items-start gap-2">
+                            <MapPin className="w-3 h-3 text-orange-600 mt-0.5" />
+                            <span className="text-xs text-gray-600">{order.pickupAddress}</span>
+                          </div>
+                        )}
+                      </div>
+
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="font-medium text-sm">
@@ -651,20 +753,6 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
 
         {/* Ações Rápidas */}
         <div className="space-y-3 pt-2">
-          {/* Ação Principal - Ordem Única ou Primeira Ordem */}
-          {!isExpanded && onUpdateStatus && (
-            <div className="space-y-2">
-              <NextStatusButton
-                serviceOrder={primaryOrder}
-                onUpdateStatus={async (orderId: string, newStatus: string, notes?: string) => {
-                  await onUpdateStatus(orderId, newStatus as ServiceOrderStatus, notes);
-                  return true;
-                }}
-                relatedOrders={orders.filter(o => o.id !== primaryOrder.id)}
-              />
-            </div>
-          )}
-
           {/* Botões de Navegação e Contato */}
           <div className="flex gap-2">
             {/* Botão de Navegação */}
@@ -728,18 +816,27 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
             </div>
           )}
 
-          {!isExpanded && currentOrders.length > 0 && (
+          {currentOrders.length > 0 && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsExpanded(true)}
+              onClick={() => setIsExpanded(!isExpanded)}
               className="h-auto px-3 py-1 text-xs border-[#e5b034] text-[#e5b034] hover:bg-[#e5b034]/10"
             >
-              <Zap className="w-3 h-3 mr-1" />
-              {hasMultipleOrders
-                ? `Detalhes (${currentOrders.length + overdueOrders.length})`
-                : 'Ver Detalhes'
-              }
+              {isExpanded ? (
+                <>
+                  <ChevronUp className="w-3 h-3 mr-1" />
+                  Recolher Detalhes
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3 h-3 mr-1" />
+                  {hasMultipleOrders
+                    ? `Ver Detalhes (${currentOrders.length + overdueOrders.length})`
+                    : 'Ver Detalhes'
+                  }
+                </>
+              )}
             </Button>
           )}
         </div>

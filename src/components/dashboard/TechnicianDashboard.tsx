@@ -82,6 +82,17 @@ const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     order.status === 'completed' || order.status === 'cancelled'
   );
 
+  // 🔧 FILTRO: Ordens ativas apenas do dia atual (para não poluir o dashboard)
+  const todayActiveOrders = activeOrders.filter(order => {
+    if (!order.scheduledDate) return true; // Incluir ordens sem data (podem ser urgentes)
+
+    const orderDate = new Date(order.scheduledDate);
+    const today = new Date();
+
+    // Verificar se é do dia atual
+    return orderDate.toDateString() === today.toDateString();
+  });
+
   // Função para detectar ordens atrasadas
   const isOrderOverdue = (order: ServiceOrder): boolean => {
     if (!order.scheduledDate) return false;
@@ -100,9 +111,9 @@ const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     return now > oneHourLater;
   };
 
-  // Separar ordens atuais e atrasadas
-  const overdueOrders = activeOrders.filter(order => isOrderOverdue(order));
-  const currentActiveOrders = activeOrders.filter(order => !isOrderOverdue(order));
+  // Separar ordens atuais e atrasadas (usando ordens filtradas do dia atual)
+  const overdueOrders = todayActiveOrders.filter(order => isOrderOverdue(order));
+  const currentActiveOrders = todayActiveOrders.filter(order => !isOrderOverdue(order));
 
   // Filtrar ordens coletadas que precisam ser deixadas na oficina
   const collectedOrders = technicianOrders.filter(order =>

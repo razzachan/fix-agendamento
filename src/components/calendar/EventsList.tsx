@@ -2,6 +2,7 @@
 import React, { useEffect } from 'react';
 import { ScheduledService } from '@/types';
 import EventItem from './EventItem';
+import TestEventItem from './TestEventItem'; // ✅ Componente de teste
 import EventsLoading from './EventsLoading';
 import EventsEmptyState from './EventsEmptyState';
 import { motion } from 'framer-motion';

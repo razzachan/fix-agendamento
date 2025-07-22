@@ -7,7 +7,12 @@ import { format, startOfDay, endOfDay, parseISO } from 'date-fns';
 export const scheduledServiceQueryService = {
   async getAll(): Promise<ScheduledService[]> {
     try {
-      const { data, error } = await supabase.from('scheduled_services').select('*');
+      const { data, error } = await supabase
+        .from('scheduled_services')
+        .select(`
+          *,
+          service_orders!service_order_id(final_cost, client_phone)
+        `);
 
       if (error) {
         throw error;
@@ -21,7 +26,11 @@ export const scheduledServiceQueryService = {
           normalizedDate: format(new Date(service.scheduled_start_time), 'yyyy-MM-dd')
         })));
       }
-      return data.map(mapScheduledService);
+      return data.map(item => mapScheduledService({
+        ...item,
+        final_cost: item.service_orders?.final_cost || null,
+        client_phone: item.service_orders?.client_phone || null
+      }));
     } catch (error) {
       console.error('Erro ao buscar serviços agendados:', error);
       toast.error('Erro ao carregar serviços agendados.');
@@ -38,7 +47,10 @@ export const scheduledServiceQueryService = {
       
       const { data, error } = await supabase
         .from('scheduled_services')
-        .select('*')
+        .select(`
+          *,
+          service_orders!service_order_id(final_cost, client_phone)
+        `)
         .eq('technician_id', technicianId);
 
       if (error) {
@@ -59,7 +71,11 @@ export const scheduledServiceQueryService = {
         })));
       }
       
-      return data ? data.map(mapScheduledService) : [];
+      return data ? data.map(item => mapScheduledService({
+        ...item,
+        final_cost: item.service_orders?.final_cost || null,
+        client_phone: item.service_orders?.client_phone || null
+      })) : [];
     } catch (error) {
       console.error(`Erro ao buscar serviços agendados para o técnico ${technicianId}:`, error);
       return [];
@@ -103,7 +119,10 @@ export const scheduledServiceQueryService = {
     try {
       const { data, error } = await supabase
         .from('scheduled_services')
-        .select('*')
+        .select(`
+          *,
+          service_orders!service_order_id(final_cost, client_phone)
+        `)
         .eq('technician_id', technicianId)
         .gte('scheduled_start_time', dayStart.toISOString())
         .lte('scheduled_start_time', dayEnd.toISOString());
@@ -117,7 +136,11 @@ export const scheduledServiceQueryService = {
       if (data?.length > 0) {
         console.log('Detalhes dos serviços encontrados:', JSON.stringify(data.slice(0, 2)));
       }
-      return data.map(mapScheduledService);
+      return data.map(item => mapScheduledService({
+        ...item,
+        final_cost: item.service_orders?.final_cost || null,
+        client_phone: item.service_orders?.client_phone || null
+      }));
     } catch (error) {
       console.error(`Erro ao buscar agenda do técnico ${technicianId} para a data ${date.toISOString()}:`, error);
       return [];

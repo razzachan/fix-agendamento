@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Valor no Calendário</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .debug-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .debug-title {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .debug-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+        }
+        .success { border-left-color: #28a745; }
+        .warning { border-left-color: #ffc107; }
+        .error { border-left-color: #dc3545; }
+        .code {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+        .test-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: white;
+        }
+        .value-display {
+            color: #28a745;
+            font-weight: bold;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Valor da OS no Calendário</h1>
+    
+    <div class="debug-section">
+        <h2 class="debug-title">📋 Problemas Identificados</h2>
+        <div class="debug-item error">
+            <strong>❌ Valor não aparece nos cards do calendário</strong>
+            <p>O usuário não consegue ver o valor da OS nos cards do calendário.</p>
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h2 class="debug-title">🔧 Correções Implementadas</h2>
+        <div class="debug-item success">
+            <strong>✅ 1. Adicionado finalCost ao ScheduledService</strong>
+            <div class="code">finalCost?: number; // ✅ Valor da OS relacionada</div>
+        </div>
+        
+        <div class="debug-item success">
+            <strong>✅ 2. Modificado consultas com JOIN</strong>
+            <div class="code">service_orders!service_order_id(final_cost)</div>
+        </div>
+        
+        <div class="debug-item success">
+            <strong>✅ 3. Adicionado finalCost ao CalendarEvent</strong>
+            <div class="code">finalCost?: number; // ✅ Valor da OS</div>
+        </div>
+        
+        <div class="debug-item success">
+            <strong>✅ 4. Implementado busca direta no EventItem</strong>
+            <div class="code">useEffect(() => {
+  if (!service.serviceOrderId || service.finalCost) return;
+  // Buscar valor da service_orders
+}, [service.serviceOrderId]);</div>
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h2 class="debug-title">🧪 Teste Visual</h2>
+        <p>Como o valor deveria aparecer nos cards:</p>
+        
+        <div class="test-card">
+            <h3>João Silva</h3>
+            <p>📍 Rua das Flores, 123</p>
+            <p>🔧 Reparo de Fogão</p>
+            <p>👨‍🔧 Paulo Cesar</p>
+            <div class="value-display">💰 R$ 150,00</div>
+            <p>🕒 09:00 - 10:00</p>
+        </div>
+        
+        <div class="test-card">
+            <h3>Maria Santos</h3>
+            <p>📍 Av. Principal, 456</p>
+            <p>🔧 Micro-ondas</p>
+            <p>👨‍🔧 Carlos Silva</p>
+            <div class="value-display">💰 R$ 200,50</div>
+            <p>🕒 14:00 - 15:00</p>
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h2 class="debug-title">🔍 Como Debugar</h2>
+        <div class="debug-item warning">
+            <strong>1. Abrir DevTools (F12)</strong>
+            <p>Verificar logs no console para ver se os dados estão chegando.</p>
+        </div>
+        
+        <div class="debug-item warning">
+            <strong>2. Procurar por logs:</strong>
+            <div class="code">🔍 [mapScheduledService] Dados recebidos:
+💰 [mapScheduledService] Final cost calculado:
+🔍 [EventItem] Serviço:
+🔍 [EventItem] Buscando valor da OS:</div>
+        </div>
+        
+        <div class="debug-item warning">
+            <strong>3. Verificar se há service_orders com final_cost > 0</strong>
+            <p>Pode ser que não existam ordens com valor definido no banco.</p>
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h2 class="debug-title">🎯 Próximos Passos</h2>
+        <div class="debug-item">
+            <strong>1. Verificar dados no banco</strong>
+            <p>Confirmar se existem service_orders com final_cost preenchido.</p>
+        </div>
+        
+        <div class="debug-item">
+            <strong>2. Testar consulta direta</strong>
+            <p>Executar consulta SQL para verificar JOIN.</p>
+        </div>
+        
+        <div class="debug-item">
+            <strong>3. Verificar logs do browser</strong>
+            <p>Analisar se os dados estão chegando no frontend.</p>
+        </div>
+    </div>
+
+    <script>
+        console.log('🔍 Debug page loaded');
+        console.log('📋 Verificar se os logs aparecem no calendário real');
+        console.log('💰 Procurar por valores de final_cost nos dados');
+    </script>
+</body>
+</html>

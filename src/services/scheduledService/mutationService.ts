@@ -117,30 +117,94 @@ export const scheduledServiceMutationService = {
 
   async updateServiceDateTime(serviceId: string, newStartTime: Date, newEndTime?: Date) {
     try {
-      console.log(`🔄 Atualizando data/hora do serviço ${serviceId} para ${newStartTime.toISOString()}`);
+      console.log(`🔄 [DRAG&DROP] Atualizando ${serviceId} para ${newStartTime.toISOString()}`);
+
+      // Validações básicas
+      if (!serviceId || typeof serviceId !== 'string') {
+        throw new Error(`Service ID inválido: ${serviceId}`);
+      }
+
+      if (!newStartTime || !(newStartTime instanceof Date)) {
+        throw new Error(`Data inválida: ${newStartTime}`);
+      }
 
       // Se não foi fornecida uma nova hora de fim, calcular baseado na duração padrão (1 hora)
       const endTime = newEndTime || new Date(newStartTime.getTime() + 60 * 60 * 1000);
 
-      const { data, error } = await supabase
-        .from('scheduled_services')
-        .update({
+      // Verificar se é um ID de service_order (começa com "order-")
+      if (serviceId.startsWith('order-')) {
+        // Extrair o ID real da service_order (remover prefixo "order-")
+        const realOrderId = serviceId.replace('order-', '');
+
+        // Atualizar a service_order
+        const { data: orderData, error: orderError } = await supabase
+          .from('service_orders')
+          .update({
+            scheduled_date: newStartTime.toISOString()
+          })
+          .eq('id', realOrderId)
+          .select()
+          .single();
+
+        if (orderError) {
+          console.error('❌ [DRAG&DROP] Erro ao atualizar service_order:', orderError);
+          throw new Error(`Falha ao atualizar service_order: ${orderError.message}`);
+        }
+
+        console.log(`✅ [DRAG&DROP] Service_order atualizada com sucesso!`);
+
+        // Retornar um objeto compatível com ScheduledService
+        return {
+          id: serviceId, // Manter o ID original com prefixo
+          createdAt: orderData.created_at || new Date().toISOString(),
+          serviceOrderId: orderData.id,
+          technicianId: orderData.technician_id,
+          technicianName: orderData.technician_name || '',
+          clientId: orderData.client_id,
+          clientName: orderData.client_name,
+          scheduledStartTime: newStartTime.toISOString(),
+          scheduledEndTime: endTime.toISOString(),
+          address: orderData.address || '',
+          description: orderData.description || '',
+          status: 'scheduled'
+        };
+      } else {
+        // Lógica original para scheduled_services
+        // Verificar se o serviço existe
+        const { data: existingService, error: checkError } = await supabase
+          .from('scheduled_services')
+          .select('id, service_order_id, scheduled_start_time, scheduled_end_time')
+          .eq('id', serviceId)
+          .single();
+
+        if (checkError) {
+          console.error('❌ [DRAG&DROP] Erro ao verificar serviço existente:', checkError);
+          throw new Error(`Serviço não encontrado: ${checkError.message}`);
+        }
+
+        // Atualizar o scheduled_service
+        const updatePayload = {
           scheduled_start_time: newStartTime.toISOString(),
           scheduled_end_time: endTime.toISOString()
-        })
-        .eq('id', serviceId)
-        .select()
-        .single();
+        };
 
-      if (error) {
-        console.error('Erro ao atualizar data/hora do serviço:', error);
-        throw error;
+        const { data, error } = await supabase
+          .from('scheduled_services')
+          .update(updatePayload)
+          .eq('id', serviceId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ [DRAG&DROP] Erro no UPDATE:', error);
+          throw new Error(`Falha no UPDATE: ${error.message}`);
+        }
+
+        console.log(`✅ [DRAG&DROP] Scheduled service atualizado!`);
+        return mapScheduledService(data);
       }
-
-      console.log(`✅ Serviço ${serviceId} atualizado com sucesso para ${newStartTime.toISOString()}`);
-      return data ? mapScheduledService(data) : null;
     } catch (error) {
-      console.error(`❌ Erro ao atualizar data/hora do serviço ${serviceId}:`, error);
+      console.error(`❌ [DRAG&DROP] ERRO:`, error);
       throw error;
     }
   }

@@ -16,7 +16,8 @@ import {
   RefreshCcw,
   Settings,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Move
 } from 'lucide-react';
 import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, addMonths, subMonths, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -94,6 +95,7 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
     technicians,
     isLoading,
     refreshEvents,
+    updateEvent,
     getEventsForDay,
     getEventsByTimeSlot
   } = useMainCalendar({
@@ -170,44 +172,49 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
 
   // Função para atualizar evento (drag & drop)
   const handleEventUpdate = useCallback(async (eventId: string, newStartTime: Date) => {
-    console.log('🔄 TechnicianCalendar handleEventUpdate:', { eventId, newStartTime });
+    console.log(`🔄 [TECH] Atualizando ${eventId} para ${newStartTime.toISOString()}`);
+
+    // 1. ATUALIZAÇÃO OTIMISTA - Atualizar interface imediatamente
+    const newEndTime = new Date(newStartTime.getTime() + 60 * 60 * 1000); // +1 hora
+    updateEvent(eventId, {
+      startTime: newStartTime,
+      endTime: newEndTime
+    });
+    console.log(`🔄 [TECH] Interface atualizada otimisticamente`);
 
     try {
-      console.log('💾 Atualizando no Supabase...');
-
+      // 2. SALVAR NO BANCO DE DADOS
       const updatedService = await scheduledServiceService.updateServiceDateTime(eventId, newStartTime);
 
       if (!updatedService) {
         throw new Error('Falha ao atualizar serviço no banco de dados');
       }
 
-      console.log('✅ Serviço atualizado no banco:', updatedService);
+      console.log('✅ [TECH] Serviço atualizado no banco!');
 
-      // Forçar re-render imediato
-      setRefreshKey(prev => prev + 1);
+      // 3. SINCRONIZAR COM BACKEND (em background)
+      setTimeout(async () => {
+        try {
+          await refreshEvents();
+          console.log('✅ [TECH] Dados sincronizados com backend');
+        } catch (syncError) {
+          console.warn('⚠️ [TECH] Erro na sincronização (interface já atualizada):', syncError);
+        }
+      }, 1000);
 
-      // Recarregar dados do backend
-      await refreshEvents();
-
-      // Segundo refresh para garantir sincronização
-      setTimeout(() => {
-        refreshEvents();
-        setRefreshKey(prev => prev + 1);
-      }, 500);
-
-      console.log('✅ TechnicianCalendar update completed - DADOS SALVOS NO BANCO!');
+      console.log('✅ [TECH] Update completed - INTERFACE E BANCO ATUALIZADOS!');
     } catch (error) {
-      console.error('❌ Erro ao atualizar agendamento:', error);
+      console.error('❌ [TECH] Erro ao atualizar agendamento:', error);
 
-      // Forçar refresh mesmo em caso de erro para sincronizar
-      await refreshEvents();
-      setRefreshKey(prev => prev + 1);
+      // 4. REVERTER ATUALIZAÇÃO OTIMISTA EM CASO DE ERRO
+      console.log('🔄 [TECH] Revertendo mudança na interface...');
+      await refreshEvents(); // Recarregar dados originais
 
       // Mostrar toast de erro
       toast.error('❌ Erro ao atualizar agendamento no banco de dados');
       throw error; // Re-throw para que o DragDropCalendar saiba que houve erro
     }
-  }, [refreshEvents]);
+  }, [refreshEvents, updateEvent]);
 
   // Abrir modal de evento e buscar ordem de serviço completa
   const handleEventClick = async (event: CalendarEvent) => {
@@ -397,6 +404,16 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => setIsDragDropEnabled(prev => !prev)}
+                    className={`${isDragDropEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'} flex items-center gap-2`}
+                  >
+                    <Move className="h-4 w-4" />
+                    {isDragDropEnabled ? 'Drag ON' : 'Drag OFF'}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={refreshEvents}
                     disabled={isLoading}
                     className="flex items-center gap-2"
@@ -470,34 +487,76 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
             transition={{ duration: 0.3 }}
           >
             {viewMode === 'month' && (
-              <MonthView
-                currentDate={currentDate}
-                events={events}
-                onEventClick={handleEventClick}
-                onDateClick={handleDateClick}
-              />
+              <>
+                {isDragDropEnabled ? (
+                  <DragDropCalendar
+                    key={`drag-drop-month-${refreshKey}`}
+                    events={events}
+                    weekDays={weekDays}
+                    workHours={workHours}
+                    onEventUpdate={handleEventUpdate}
+                    onEventClick={handleEventClick}
+                    getEventsByTimeSlot={getEventsByTimeSlot}
+                  />
+                ) : (
+                  <MonthView
+                    currentDate={currentDate}
+                    events={events}
+                    onEventClick={handleEventClick}
+                    onDateClick={handleDateClick}
+                  />
+                )}
+              </>
             )}
 
             {viewMode === 'day' && (
-              <DayView
-                currentDate={currentDate}
-                events={events}
-                onEventClick={handleEventClick}
-              />
+              <>
+                {isDragDropEnabled ? (
+                  <DragDropCalendar
+                    key={`drag-drop-day-${refreshKey}`}
+                    events={events}
+                    weekDays={weekDays}
+                    workHours={workHours}
+                    onEventUpdate={handleEventUpdate}
+                    onEventClick={handleEventClick}
+                    getEventsByTimeSlot={getEventsByTimeSlot}
+                  />
+                ) : (
+                  <DayView
+                    currentDate={currentDate}
+                    events={events}
+                    onEventClick={handleEventClick}
+                  />
+                )}
+              </>
             )}
 
             {viewMode === 'list' && (
-              <ListView
-                events={events}
-                onEventClick={handleEventClick}
-              />
+              <>
+                {isDragDropEnabled ? (
+                  <DragDropCalendar
+                    key={`drag-drop-list-${refreshKey}`}
+                    events={events}
+                    weekDays={weekDays}
+                    workHours={workHours}
+                    onEventUpdate={handleEventUpdate}
+                    onEventClick={handleEventClick}
+                    getEventsByTimeSlot={getEventsByTimeSlot}
+                  />
+                ) : (
+                  <ListView
+                    events={events}
+                    onEventClick={handleEventClick}
+                  />
+                )}
+              </>
             )}
 
             {viewMode === 'week' && (
               <>
                 {isDragDropEnabled ? (
                   <DragDropCalendar
-                    key={`drag-drop-${refreshKey}`}
+                    key={`drag-drop-week-${refreshKey}`}
                     events={events}
                     weekDays={weekDays}
                     workHours={workHours}

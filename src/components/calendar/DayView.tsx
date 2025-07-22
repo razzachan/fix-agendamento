@@ -5,7 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, MapPin, User, Wrench } from 'lucide-react';
+import { Clock, MapPin, User, Wrench, DollarSign, Phone } from 'lucide-react';
 
 interface DayViewProps {
   currentDate: Date;
@@ -157,6 +157,22 @@ const DayView: React.FC<DayViewProps> = ({
                                 {event.technicianName && (
                                   <div className="text-sm text-blue-600">
                                     <strong>Técnico:</strong> {event.technicianName}
+                                  </div>
+                                )}
+
+                                {/* ✅ Telefone do Cliente */}
+                                {event.clientPhone && (
+                                  <div className="flex items-center gap-2">
+                                    <Phone className="h-4 w-4 text-blue-500" />
+                                    <span className="text-sm font-medium text-blue-600">{event.clientPhone}</span>
+                                  </div>
+                                )}
+
+                                {/* ✅ Valor da OS - Design Elegante */}
+                                {event.finalCost && event.finalCost > 0 && (
+                                  <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 p-2 rounded-lg border border-emerald-200">
+                                    <DollarSign className="h-4 w-4" />
+                                    <span className="font-semibold">R$ {event.finalCost.toFixed(2)}</span>
                                   </div>
                                 )}
                               </div>

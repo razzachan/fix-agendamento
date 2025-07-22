@@ -21,7 +21,8 @@ import {
   closestCenter
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Clock, User, Wrench, Save, X } from 'lucide-react';
+import { Clock, User, Wrench, Save, X, Bug, DollarSign, Phone } from 'lucide-react';
+import { testSupabaseConnection } from '@/utils/supabaseTest';
 
 interface DragDropCalendarProps {
   events: CalendarEvent[];
@@ -79,7 +80,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, onEventClick }) 
   };
 
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
       style={style}
       {...listeners}
@@ -95,9 +96,9 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, onEventClick }) 
           onEventClick(event);
         }
       }}
-      initial={{ scale: 1 }}
-      whileHover={!isDragging ? { scale: 1.02 } : {}}
-      whileTap={!isDragging ? { scale: 0.98 } : {}}
+      onMouseDown={(e) => {
+        console.warn(`🎯 [MOUSE DOWN] ${event.clientName}`);
+      }}
     >
       <div className="space-y-0.5">
         <div className="flex items-center justify-between">
@@ -123,8 +124,24 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, onEventClick }) 
             {event.technicianName}
           </div>
         )}
+
+        {/* ✅ Telefone do Cliente - Compacto */}
+        {event.clientPhone && (
+          <div className="flex items-center gap-1 text-xs text-blue-600 truncate">
+            <Phone className="h-2.5 w-2.5" />
+            <span>{event.clientPhone}</span>
+          </div>
+        )}
+
+        {/* ✅ Valor da OS - Design Minimalista */}
+        {event.finalCost && event.finalCost > 0 && (
+          <div className="flex items-center gap-1 bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-xs font-semibold">
+            <DollarSign className="h-2.5 w-2.5" />
+            <span>R$ {event.finalCost.toFixed(0)}</span>
+          </div>
+        )}
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -192,17 +209,23 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
   onEventClick,
   getEventsByTimeSlot
 }) => {
+  // console.warn(`🎯 [CALENDAR] Renderizado com ${events.length} eventos`);
+
   const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
   const [pendingChanges, setPendingChanges] = useState<Map<string, Date>>(new Map());
+  const [forceRender, setForceRender] = useState(0);
 
   // Configurar sensores para detecção precisa
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 3, // Distância mínima para iniciar drag
+        distance: 8, // Aumentar distância para evitar cliques acidentais
       },
     })
   );
+
+  // Debug: Log quando sensor detecta movimento
+  // console.warn('🎯 [CALENDAR] Sensores configurados com distância de ativação: 8px');
 
 
 
@@ -210,14 +233,39 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
   // A barra só deve sumir quando o usuário clicar em "Salvar" ou "Descartar"
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    const draggedEvent = event.active.data.current?.event as CalendarEvent;
-    setActiveEvent(draggedEvent);
+    console.warn(`🚀 [DRAG START] ===== INICIANDO DRAG =====`);
+    console.warn(`🚀 [DRAG START] ID do evento: ${event.active.id}`);
+    console.warn(`🚀 [DRAG START] event:`, event);
+
+    try {
+      const draggedEvent = event.active.data.current?.event as CalendarEvent;
+      console.warn(`🚀 [DRAG START] data.current:`, event.active.data.current);
+
+      if (draggedEvent) {
+        console.warn(`✅ [DRAG START] Evento encontrado: ${draggedEvent.clientName}`);
+        console.warn(`✅ [DRAG START] Data/hora: ${draggedEvent.startTime.toISOString()}`);
+        setActiveEvent(draggedEvent);
+
+        // Adicionar classe ao body para indicar que está em modo de drag
+        document.body.classList.add('dragging-active');
+      } else {
+        console.error(`❌ [DRAG START] Evento não encontrado no data.current`);
+        console.warn(`🔍 [DRAG START] event.active:`, event.active);
+      }
+    } catch (error) {
+      console.error(`❌ [DRAG START] Erro ao processar drag start:`, error);
+    }
   }, []);
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    console.warn(`🏁 [DRAG END] ===== FINALIZANDO DRAG =====`);
     const { active, over } = event;
+    console.warn(`🏁 [DRAG END] active: ${active?.id}`);
+    console.warn(`🏁 [DRAG END] over: ${over?.id}`);
+    console.warn(`🏁 [DRAG END] activeEvent: ${activeEvent?.id}`);
 
     if (!over || !activeEvent) {
+      console.warn(`❌ [DRAG END] Drag cancelado - over: ${!!over}, activeEvent: ${!!activeEvent}`);
       setActiveEvent(null);
       return;
     }
@@ -256,9 +304,11 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
     }
 
     // Adicionar à lista de mudanças pendentes
+    console.warn(`📝 [DRAG END] Adicionando pending change: ${activeEvent.id} → ${newStartTime.toISOString()}`);
     const newPendingChanges = new Map(pendingChanges);
     newPendingChanges.set(activeEvent.id, newStartTime);
     setPendingChanges(newPendingChanges);
+    console.warn(`📝 [DRAG END] Total pending changes: ${newPendingChanges.size}`);
 
     // Apenas mostrar toast informativo simples
     toast.info(
@@ -272,41 +322,44 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
   }, [activeEvent, pendingChanges, getEventsByTimeSlot]);
 
   const handleSaveChanges = useCallback(async () => {
-    console.log('🔄 handleSaveChanges called, pending changes:', pendingChanges.size);
-
     if (pendingChanges.size === 0) {
-      console.log('❌ No pending changes to save');
       return;
     }
 
     const changeCount = pendingChanges.size;
-    console.log(`💾 Saving ${changeCount} changes...`);
+    console.log(`🔄 [DRAG&DROP] Salvando ${changeCount} mudança(s)...`);
 
-    // Limpar mudanças pendentes PRIMEIRO para evitar duplicação
+    // Manter mudanças pendentes para mostrar na interface durante o salvamento
     const changesToSave = new Map(pendingChanges);
-    setPendingChanges(new Map());
 
     try {
       // Salvar mudanças uma por uma para melhor controle
       for (const [eventId, newStartTime] of changesToSave.entries()) {
-        console.log(`📝 Updating event ${eventId} to ${newStartTime}`);
+        console.warn(`📝 [SAVE] Salvando ${eventId} -> ${format(newStartTime, 'dd/MM HH:mm')}`);
         await onEventUpdate(eventId, newStartTime);
-        console.log(`✅ Event ${eventId} updated successfully`);
       }
 
-      console.log('🧹 All changes saved successfully');
+      console.warn('✅ [SAVE] Todas as mudanças salvas!');
+
+      // Aguardar um pouco para garantir que a atualização otimista seja processada
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // AGORA limpar pending changes E forçar re-render
+      setPendingChanges(new Map());
+      setForceRender(prev => prev + 1);
+      console.warn('🧹 [SAVE] Pending changes limpos + forceRender - grid deve atualizar agora');
 
       // Toast de sucesso simples
       toast.success(`✅ ${changeCount} agendamento(s) salvo(s)!`, {
         duration: 3000
       });
     } catch (error) {
-      console.error('❌ Erro ao salvar mudanças:', error);
+      console.error('❌ [DRAG&DROP] Erro ao salvar:', error);
 
-      // Em caso de erro, restaurar as mudanças pendentes
-      setPendingChanges(changesToSave);
+      // Em caso de erro, manter as mudanças pendentes
+      // (não precisa restaurar pois nunca limpamos)
 
-      toast.error('❌ Erro ao salvar. Tente novamente.', {
+      toast.error('❌ Erro ao atualizar agendamento no banco de dados', {
         duration: 4000
       });
     }
@@ -320,28 +373,52 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
 
   // Log quando pendingChanges muda
   useEffect(() => {
-    console.log('📊 Pending changes updated:', pendingChanges.size);
+    console.warn('📊 [PENDING] Atualizado:', pendingChanges.size);
+    if (pendingChanges.size > 0) {
+      console.warn('📊 [PENDING] Detalhes:', Array.from(pendingChanges.entries()).map(([id, date]) =>
+        `${id} → ${format(date, 'dd/MM HH:mm')}`
+      ));
+    }
   }, [pendingChanges]);
 
   const getDisplayEvents = (date: Date, hour: number) => {
     const slotEvents = getEventsByTimeSlot(date, hour);
-    
-    return slotEvents.map(event => {
+
+    // Debug: Log detalhado para entender o que está acontecendo
+    const dateStr = format(date, 'dd/MM');
+    const hasSlotEvents = slotEvents.length > 0;
+    const hasPendingChanges = pendingChanges.size > 0;
+
+    if (hasSlotEvents || hasPendingChanges) {
+      console.log(`🔍 [getDisplayEvents] ${dateStr} ${hour}h: ${slotEvents.length} eventos, ${pendingChanges.size} pending`);
+    }
+
+    const result = slotEvents.map(event => {
       const pendingChange = pendingChanges.get(event.id);
+
       if (pendingChange) {
-        // Se há mudança pendente, mostrar o evento na nova posição
         const pendingHour = pendingChange.getHours();
         const pendingDate = pendingChange;
-        
+
+        console.warn(`🔄 [PENDING] Evento ${event.id} tem pending: ${format(pendingDate, 'dd/MM')} ${pendingHour}h`);
+
         if (isSameDay(pendingDate, date) && pendingHour === hour) {
+          console.warn(`✅ [PENDING] Mostrando ${event.id} na NOVA posição: ${dateStr} ${hour}h`);
           return { ...event, startTime: pendingChange, isPending: true };
         } else if (isSameDay(event.startTime, date) && event.startTime.getHours() === hour) {
-          // Não mostrar na posição original se há mudança pendente
+          console.warn(`❌ [PENDING] Ocultando ${event.id} da posição ORIGINAL: ${dateStr} ${hour}h`);
           return null;
         }
       }
+
       return event;
     }).filter(Boolean) as CalendarEvent[];
+
+    if (result.length !== slotEvents.length && (hasSlotEvents || hasPendingChanges)) {
+      console.warn(`🔄 [DISPLAY] ${dateStr} ${hour}h: ${slotEvents.length} → ${result.length} eventos após pending`);
+    }
+
+    return result;
   };
 
   return (
@@ -372,6 +449,23 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        console.log('🧪 Executando teste de diagnóstico...');
+                        const result = await testSupabaseConnection();
+                        if (result) {
+                          toast.success('✅ Conexão com Supabase OK!');
+                        } else {
+                          toast.error('❌ Problema na conexão com Supabase');
+                        }
+                      }}
+                      className="text-orange-600 hover:text-orange-900 border-orange-300"
+                    >
+                      <Bug className="h-4 w-4 mr-1" />
+                      Testar
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"

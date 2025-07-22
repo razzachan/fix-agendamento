@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Verificação de Tabelas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { border-left: 4px solid #28a745; }
+        .error { border-left: 4px solid #dc3545; }
+        .warning { border-left: 4px solid #ffc107; }
+        .info { border-left: 4px solid #17a2b8; }
+        h1 { color: #333; text-align: center; }
+        h2 { color: #007bff; }
+        .step {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .code {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        .command {
+            background: #343a40;
+            color: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        .result {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .checklist li:before {
+            content: "☐ ";
+            color: #007bff;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .checklist li.done:before {
+            content: "✅ ";
+            color: #28a745;
+        }
+        .priority-high { border-left: 4px solid #dc3545; }
+        .priority-medium { border-left: 4px solid #ffc107; }
+        .priority-low { border-left: 4px solid #28a745; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Verificação e Sincronização de Tabelas</h1>
+    
+    <div class="card info">
+        <h2>🎯 Objetivo</h2>
+        <p>Verificar e corrigir inconsistências entre as tabelas <code>service_orders</code> e <code>scheduled_services</code>.</p>
+        
+        <h3>Problemas a Resolver:</h3>
+        <ul>
+            <li>📦 <strong>OS órfãs</strong>: Ordens com agendamento mas sem registro em scheduled_services</li>
+            <li>👻 <strong>Agendamentos órfãos</strong>: Agendamentos sem OS vinculada</li>
+            <li>⚠️ <strong>Dados inconsistentes</strong>: Informações diferentes entre as tabelas</li>
+        </ul>
+    </div>
+
+    <div class="card warning">
+        <h2>⚠️ IMPORTANTE - Leia Antes de Executar</h2>
+        <div class="step">
+            <h3>1. 🛡️ Faça Backup</h3>
+            <div class="code">
+-- Execute no SQL Editor do Supabase:
+CREATE TABLE service_orders_backup AS SELECT * FROM service_orders;
+CREATE TABLE scheduled_services_backup AS SELECT * FROM scheduled_services;
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>2. 🧪 Teste em Desenvolvimento</h3>
+            <p>Execute primeiro em ambiente de teste antes de aplicar em produção.</p>
+        </div>
+
+        <div class="step">
+            <h3>3. 🔍 Modo DRY RUN</h3>
+            <p>Sempre execute primeiro em modo de análise (DRY RUN) antes de aplicar correções.</p>
+        </div>
+    </div>
+
+    <div class="card success">
+        <h2>📋 Passo a Passo</h2>
+
+        <div class="step priority-high">
+            <h3>ETAPA 1: Análise SQL (Recomendado)</h3>
+            <p><strong>Arquivo:</strong> <code>verificar-sincronizar-tabelas.sql</code></p>
+            
+            <ol>
+                <li>Abra o <strong>SQL Editor</strong> do Supabase</li>
+                <li>Copie e cole o conteúdo do arquivo SQL</li>
+                <li>Execute <strong>seção por seção</strong> para análise</li>
+                <li>Analise os resultados antes de prosseguir</li>
+            </ol>
+
+            <div class="result">
+                <strong>Resultados esperados:</strong><br>
+                • Estrutura das tabelas<br>
+                • Contagem de registros<br>
+                • Lista de OS órfãs<br>
+                • Lista de agendamentos órfãos<br>
+                • Verificação de duplicações<br>
+                • Inconsistências de dados
+            </div>
+        </div>
+
+        <div class="step priority-medium">
+            <h3>ETAPA 2: Análise Programática (Opcional)</h3>
+            <p><strong>Arquivo:</strong> <code>src/scripts/sincronizar-tabelas.ts</code></p>
+            
+            <div class="command">
+# Análise (DRY RUN)
+npx tsx src/scripts/sincronizar-tabelas.ts
+            </div>
+
+            <div class="result">
+                <strong>Saída esperada:</strong><br>
+                📊 ANÁLISE DAS TABELAS<br>
+                📦 service_orders com agendamento: 45<br>
+                📅 scheduled_services: 38<br>
+                🔍 OS órfãs: 7<br>
+                👻 Agendamentos órfãos: 2
+            </div>
+        </div>
+
+        <div class="step priority-high">
+            <h3>ETAPA 3: Correção (Escolha UMA opção)</h3>
+            
+            <h4>Opção A: Correção Manual (SQL) - RECOMENDADO</h4>
+            <ol>
+                <li>No arquivo SQL, <strong>descomente</strong> os comandos de correção</li>
+                <li>Execute <strong>um comando por vez</strong></li>
+                <li>Verifique os resultados após cada comando</li>
+            </ol>
+
+            <h4>Opção B: Correção Automática (TypeScript)</h4>
+            <div class="command">
+# ATENÇÃO: Fará alterações reais no banco!
+npx tsx src/scripts/sincronizar-tabelas.ts --execute
+            </div>
+        </div>
+
+        <div class="step priority-low">
+            <h3>ETAPA 4: Verificação Final</h3>
+            <ol>
+                <li>Execute novamente a análise</li>
+                <li>Verifique se OS órfãs = 0</li>
+                <li>Verifique se agendamentos órfãos = 0</li>
+                <li>Teste o calendário no sistema</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="card info">
+        <h2>🔧 Arquivos Criados</h2>
+        
+        <table>
+            <tr>
+                <th>Arquivo</th>
+                <th>Tipo</th>
+                <th>Descrição</th>
+                <th>Uso</th>
+            </tr>
+            <tr>
+                <td>verificar-sincronizar-tabelas.sql</td>
+                <td>SQL</td>
+                <td>Análise completa + comandos de correção</td>
+                <td>SQL Editor do Supabase</td>
+            </tr>
+            <tr>
+                <td>src/scripts/sincronizar-tabelas.ts</td>
+                <td>TypeScript</td>
+                <td>Script programático de sincronização</td>
+                <td>Terminal (npx tsx)</td>
+            </tr>
+            <tr>
+                <td>guia-sincronizacao-tabelas.md</td>
+                <td>Documentação</td>
+                <td>Guia completo do processo</td>
+                <td>Referência</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="card warning">
+        <h2>🔍 Comandos de Verificação Rápida</h2>
+        
+        <h3>Verificar Situação Atual:</h3>
+        <div class="code">
+-- Contar registros
+SELECT 
+    (SELECT COUNT(*) FROM service_orders WHERE scheduled_date IS NOT NULL) as os_agendadas,
+    (SELECT COUNT(*) FROM scheduled_services) as agendamentos_total;
+
+-- OS sem agendamento específico
+SELECT COUNT(*) as os_sem_agendamento
+FROM service_orders so
+LEFT JOIN scheduled_services ss ON ss.service_order_id = so.id
+WHERE so.scheduled_date IS NOT NULL 
+  AND so.technician_id IS NOT NULL
+  AND ss.id IS NULL
+  AND so.status NOT IN ('cancelled', 'completed');
+
+-- Agendamentos órfãos
+SELECT COUNT(*) as agendamentos_orfaos
+FROM scheduled_services ss
+LEFT JOIN service_orders so ON so.id = ss.service_order_id
+WHERE ss.service_order_id IS NULL 
+   OR so.id IS NULL 
+   OR so.status IN ('cancelled', 'completed');
+        </div>
+    </div>
+
+    <div class="card success">
+        <h2>✅ Checklist de Verificação</h2>
+        
+        <ul class="checklist">
+            <li>Backup das tabelas criado</li>
+            <li>Análise SQL executada</li>
+            <li>Problemas identificados</li>
+            <li>Correções aplicadas</li>
+            <li>Verificação final realizada</li>
+            <li>Calendário testado</li>
+            <li>Sistema funcionando corretamente</li>
+        </ul>
+    </div>
+
+    <div class="card info">
+        <h2>📊 Resultados Esperados</h2>
+        
+        <h3>Antes da Sincronização:</h3>
+        <div class="result">
+            📦 service_orders com agendamento: 45<br>
+            📅 scheduled_services: 38<br>
+            🔍 OS órfãs: 7<br>
+            👻 Agendamentos órfãos: 2<br>
+            ⚠️ Inconsistências: 3
+        </div>
+
+        <h3>Depois da Sincronização:</h3>
+        <div class="result">
+            📦 service_orders com agendamento: 45<br>
+            📅 scheduled_services: 45<br>
+            🔍 OS órfãs: 0<br>
+            👻 Agendamentos órfãos: 0<br>
+            ⚠️ Inconsistências: 0
+        </div>
+    </div>
+
+    <div class="card success">
+        <h2>🎯 Benefícios da Sincronização</h2>
+        
+        <ul>
+            <li>✅ <strong>Calendário consistente</strong> - Todos os agendamentos aparecem</li>
+            <li>✅ <strong>Sem duplicação</strong> - Eventos únicos no calendário</li>
+            <li>✅ <strong>Performance melhorada</strong> - Consultas mais eficientes</li>
+            <li>✅ <strong>Dados organizados</strong> - Relacionamentos corretos</li>
+            <li>✅ <strong>Sistema confiável</strong> - Experiência do usuário melhorada</li>
+        </ul>
+    </div>
+
+    <script>
+        console.log('🔍 Guia de verificação de tabelas carregado');
+        console.log('📋 Siga o passo a passo para sincronizar as tabelas');
+        console.log('⚠️ Lembre-se: sempre faça backup antes de executar correções!');
+        
+        // Simular checklist interativo
+        document.querySelectorAll('.checklist li').forEach((item, index) => {
+            item.addEventListener('click', function() {
+                this.classList.toggle('done');
+                console.log(`${this.classList.contains('done') ? '✅' : '☐'} ${this.textContent}`);
+            });
+        });
+    </script>
+</body>
+</html>

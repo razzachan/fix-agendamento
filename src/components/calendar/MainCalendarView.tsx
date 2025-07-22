@@ -20,7 +20,11 @@ import {
   Settings,
   Maximize2,
   Minimize2,
-  Search
+  Search,
+  Move,
+  DollarSign,
+  Phone,
+  Edit
 } from 'lucide-react';
 import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, addMonths, subMonths, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -38,6 +42,7 @@ import ListView from './ListView';
 import CalendarAnalytics from './CalendarAnalytics';
 import CalendarNotifications from './CalendarNotifications';
 import DragDropCalendar from './DragDropCalendar';
+import { EditOrderValueModal } from './EditOrderValueModal';
 import { scheduledServiceService } from '@/services/scheduledService';
 
 interface MainCalendarViewProps {
@@ -51,6 +56,7 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('all');
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [isEditValueModalOpen, setIsEditValueModalOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDragDropEnabled, setIsDragDropEnabled] = useState(true);
@@ -94,6 +100,7 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
     technicians,
     isLoading,
     refreshEvents,
+    updateEvent,
     getEventsForDay,
     getEventsByTimeSlot
   } = useMainCalendar({
@@ -155,50 +162,76 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
 
   // Função para atualizar evento (drag & drop)
   const handleEventUpdate = useCallback(async (eventId: string, newStartTime: Date) => {
-    console.log('🔄 MainCalendar handleEventUpdate:', { eventId, newStartTime });
+    console.warn(`🔄 [MAIN UPDATE] Atualizando ${eventId} para ${newStartTime.toISOString()}`);
+
+    // 1. ATUALIZAÇÃO OTIMISTA - Atualizar interface imediatamente
+    const newEndTime = new Date(newStartTime.getTime() + 60 * 60 * 1000); // +1 hora
+    updateEvent(eventId, {
+      startTime: newStartTime,
+      endTime: newEndTime
+    });
+    console.warn(`🔄 [MAIN UPDATE] Interface atualizada otimisticamente`);
+
+    // Forçar re-render do calendário
+    setRefreshKey(prev => prev + 1);
 
     try {
-      // AGORA VAMOS REALMENTE ATUALIZAR NO BANCO DE DADOS!
-      console.log('💾 Atualizando no Supabase...');
-
+      // 2. SALVAR NO BANCO DE DADOS
       const updatedService = await scheduledServiceService.updateServiceDateTime(eventId, newStartTime);
 
       if (!updatedService) {
         throw new Error('Falha ao atualizar serviço no banco de dados');
       }
 
-      console.log('✅ Serviço atualizado no banco:', updatedService);
+      console.warn('✅ [MAIN UPDATE] Serviço atualizado no banco!');
 
-      // Forçar re-render imediato
-      setRefreshKey(prev => prev + 1);
+      // 3. SINCRONIZAR COM BACKEND (em background)
+      setTimeout(async () => {
+        try {
+          await refreshEvents();
+          console.warn('✅ [MAIN UPDATE] Dados sincronizados com backend');
+        } catch (syncError) {
+          console.warn('⚠️ [MAIN UPDATE] Erro na sincronização (interface já atualizada):', syncError);
+        }
+      }, 1000);
 
-      // Recarregar dados do backend
-      await refreshEvents();
-
-      // Segundo refresh para garantir sincronização
-      setTimeout(() => {
-        refreshEvents();
-        setRefreshKey(prev => prev + 1);
-      }, 500);
-
-      console.log('✅ MainCalendar update completed - DADOS SALVOS NO BANCO!');
+      console.warn('✅ [MAIN UPDATE] Update completed - INTERFACE E BANCO ATUALIZADOS!');
     } catch (error) {
-      console.error('❌ Erro ao atualizar agendamento:', error);
+      console.error('❌ [MAIN UPDATE] Erro ao atualizar agendamento:', error);
 
-      // Forçar refresh mesmo em caso de erro para sincronizar
-      await refreshEvents();
-      setRefreshKey(prev => prev + 1);
+      // 4. REVERTER ATUALIZAÇÃO OTIMISTA EM CASO DE ERRO
+      console.warn('🔄 [MAIN UPDATE] Revertendo mudança na interface...');
+      await refreshEvents(); // Recarregar dados originais
 
       // Mostrar toast de erro
       toast.error('❌ Erro ao atualizar agendamento no banco de dados');
       throw error; // Re-throw para que o DragDropCalendar saiba que houve erro
     }
-  }, [refreshEvents]);
+  }, [refreshEvents, updateEvent]);
 
   // Abrir modal de evento
   const handleEventClick = (event: CalendarEvent) => {
     setSelectedEvent(event);
     setIsEventModalOpen(true);
+  };
+
+  const handleEditValue = () => {
+    if (selectedEvent?.serviceOrderId) {
+      setIsEditValueModalOpen(true);
+    }
+  };
+
+  const handleValueUpdated = (newValue: number) => {
+    if (selectedEvent) {
+      // Atualizar o evento selecionado com o novo valor
+      setSelectedEvent({
+        ...selectedEvent,
+        finalCost: newValue
+      });
+
+      // Forçar refresh dos dados
+      setRefreshKey(prev => prev + 1);
+    }
   };
 
   // Atalhos de teclado
@@ -306,6 +339,26 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
                 {event.technicianName}
               </span>
             </div>
+
+            {/* ✅ Valor da OS - Design Limpo */}
+            {(event.finalCost && event.finalCost > 0) && (
+              <div className="flex items-center gap-1 mt-1">
+                <DollarSign className="h-3 w-3 text-emerald-600" />
+                <span className="text-xs font-semibold text-emerald-700">
+                  R$ {event.finalCost.toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            {/* ✅ Telefone do Cliente - Design Limpo */}
+            {event.clientPhone && (
+              <div className="flex items-center gap-1 mt-1">
+                <Phone className="h-3 w-3 text-blue-600" />
+                <span className="text-xs font-medium text-blue-700">
+                  {event.clientPhone}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -357,14 +410,28 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
                   </Select>
                 )}
 
-                {/* Notificações */}
-                <CalendarNotifications
+                {/* Notificações - ✅ TEMPORARIAMENTE DESABILITADO PARA CORRIGIR SPAM */}
+                {/* <CalendarNotifications
                   events={events}
                   onEventClick={handleEventClick}
-                />
+                /> */}
 
                 {/* Controles adicionais */}
                 <div className="flex items-center gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsDragDropEnabled(prev => !prev)}
+                        className={isDragDropEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}
+                      >
+                        <Move className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{isDragDropEnabled ? 'Desabilitar Drag & Drop' : 'Habilitar Drag & Drop'}</TooltipContent>
+                  </Tooltip>
+
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -503,34 +570,76 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
             transition={{ duration: 0.3 }}
           >
             {viewMode === 'month' && (
-              <MonthView
-                currentDate={currentDate}
-                events={events}
-                onEventClick={handleEventClick}
-                onDateClick={handleDateClick}
-              />
+              <>
+                {isDragDropEnabled ? (
+                  <DragDropCalendar
+                    key={`drag-drop-month-${refreshKey}`}
+                    events={events}
+                    weekDays={weekDays}
+                    workHours={workHours}
+                    onEventUpdate={handleEventUpdate}
+                    onEventClick={handleEventClick}
+                    getEventsByTimeSlot={getEventsByTimeSlot}
+                  />
+                ) : (
+                  <MonthView
+                    currentDate={currentDate}
+                    events={events}
+                    onEventClick={handleEventClick}
+                    onDateClick={handleDateClick}
+                  />
+                )}
+              </>
             )}
 
             {viewMode === 'day' && (
-              <DayView
-                currentDate={currentDate}
-                events={events}
-                onEventClick={handleEventClick}
-              />
+              <>
+                {isDragDropEnabled ? (
+                  <DragDropCalendar
+                    key={`drag-drop-day-${refreshKey}`}
+                    events={events}
+                    weekDays={weekDays}
+                    workHours={workHours}
+                    onEventUpdate={handleEventUpdate}
+                    onEventClick={handleEventClick}
+                    getEventsByTimeSlot={getEventsByTimeSlot}
+                  />
+                ) : (
+                  <DayView
+                    currentDate={currentDate}
+                    events={events}
+                    onEventClick={handleEventClick}
+                  />
+                )}
+              </>
             )}
 
             {viewMode === 'list' && (
-              <ListView
-                events={events}
-                onEventClick={handleEventClick}
-              />
+              <>
+                {isDragDropEnabled ? (
+                  <DragDropCalendar
+                    key={`drag-drop-list-${refreshKey}`}
+                    events={events}
+                    weekDays={weekDays}
+                    workHours={workHours}
+                    onEventUpdate={handleEventUpdate}
+                    onEventClick={handleEventClick}
+                    getEventsByTimeSlot={getEventsByTimeSlot}
+                  />
+                ) : (
+                  <ListView
+                    events={events}
+                    onEventClick={handleEventClick}
+                  />
+                )}
+              </>
             )}
 
             {viewMode === 'week' && (
               <>
                 {isDragDropEnabled ? (
                   <DragDropCalendar
-                    key={`drag-drop-${refreshKey}`}
+                    key={`drag-drop-week-${refreshKey}`}
                     events={events}
                     weekDays={weekDays}
                     workHours={workHours}
@@ -674,6 +783,17 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
                 </div>
               </div>
 
+              {/* ✅ Telefone do Cliente no Modal */}
+              {selectedEvent.clientPhone && (
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Telefone</label>
+                  <p className="font-medium flex items-center gap-2 text-blue-600">
+                    <Phone className="h-4 w-4" />
+                    {selectedEvent.clientPhone}
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="text-sm font-medium text-gray-600">Equipamento</label>
                 <p className="font-medium">{selectedEvent.equipment}</p>
@@ -707,6 +827,33 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
                   </p>
                 </div>
               </div>
+
+              {/* ✅ Valor da OS no Modal - Design Elegante com Edição */}
+              {selectedEvent.serviceOrderId && (
+                <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-emerald-800">Valor do Serviço</label>
+                    {user?.role === 'admin' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleEditValue}
+                        className="h-8 px-2 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100"
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
+                        Editar
+                      </Button>
+                    )}
+                  </div>
+                  <p className="font-bold text-2xl flex items-center gap-2 text-emerald-700">
+                    <DollarSign className="h-6 w-6" />
+                    {selectedEvent.finalCost && selectedEvent.finalCost > 0
+                      ? `R$ ${selectedEvent.finalCost.toFixed(2)}`
+                      : 'R$ 0,00'
+                    }
+                  </p>
+                </div>
+              )}
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <Badge
@@ -752,6 +899,18 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Edição de Valor */}
+      {selectedEvent?.serviceOrderId && (
+        <EditOrderValueModal
+          isOpen={isEditValueModalOpen}
+          onClose={() => setIsEditValueModalOpen(false)}
+          serviceOrderId={selectedEvent.serviceOrderId}
+          currentValue={selectedEvent.finalCost || null}
+          clientName={selectedEvent.clientName}
+          onValueUpdated={handleValueUpdated}
+        />
+      )}
       </div>
     </TooltipProvider>
   );

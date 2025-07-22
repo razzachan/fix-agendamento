@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Editar Valor da OS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { border-left: 4px solid #28a745; }
+        .error { border-left: 4px solid #dc3545; }
+        .info { border-left: 4px solid #17a2b8; }
+        h1 { color: #333; text-align: center; }
+        h2 { color: #007bff; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .feature-list li:before {
+            content: "✅ ";
+            color: #28a745;
+            font-weight: bold;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Funcionalidade: Editar Valor da OS</h1>
+    
+    <div class="test-section info">
+        <h2>📋 Funcionalidades Implementadas</h2>
+        <ul class="feature-list">
+            <li>Modal para editar valor da OS no calendário</li>
+            <li>Histórico completo de mudanças de valor</li>
+            <li>Validação de entrada de dados</li>
+            <li>Controle de permissões (apenas admin)</li>
+            <li>Observações obrigatórias para mudanças</li>
+            <li>Formatação monetária brasileira</li>
+            <li>Atualização em tempo real</li>
+            <li>Persistência no banco de dados</li>
+        </ul>
+    </div>
+
+    <div class="test-section success">
+        <h2>🎯 Como Usar</h2>
+        <ol>
+            <li><strong>Acesse o calendário</strong> como administrador</li>
+            <li><strong>Clique em um agendamento</strong> que tenha OS associada</li>
+            <li><strong>No modal de detalhes</strong>, clique no botão "Editar" ao lado do valor</li>
+            <li><strong>Digite o novo valor</strong> e o motivo da alteração</li>
+            <li><strong>Clique em "Salvar Alteração"</strong></li>
+            <li><strong>Visualize o histórico</strong> de mudanças no mesmo modal</li>
+        </ol>
+    </div>
+
+    <div class="test-section info">
+        <h2>🗄️ Estrutura do Banco de Dados</h2>
+        <div class="code-block">
+CREATE TABLE order_value_history (
+  id UUID PRIMARY KEY,
+  service_order_id UUID REFERENCES service_orders(id),
+  previous_value DECIMAL(10,2),
+  new_value DECIMAL(10,2) NOT NULL,
+  change_reason TEXT NOT NULL,
+  changed_by VARCHAR(255) NOT NULL,
+  changed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+        </div>
+    </div>
+
+    <div class="test-section success">
+        <h2>🔒 Controles de Segurança</h2>
+        <ul class="feature-list">
+            <li>Apenas administradores podem editar valores</li>
+            <li>Motivo da alteração é obrigatório</li>
+            <li>Histórico completo é mantido</li>
+            <li>Validação de valores numéricos</li>
+            <li>RLS (Row Level Security) habilitado</li>
+            <li>Auditoria completa das mudanças</li>
+        </ul>
+    </div>
+
+    <div class="test-section info">
+        <h2>📊 Informações do Histórico</h2>
+        <p>Cada mudança de valor registra:</p>
+        <ul class="feature-list">
+            <li>Valor anterior e novo valor</li>
+            <li>Motivo da alteração</li>
+            <li>Usuário que fez a alteração</li>
+            <li>Data e hora da mudança</li>
+            <li>Indicador visual de aumento/diminuição</li>
+        </ul>
+    </div>
+
+    <div class="test-section success">
+        <h2>🎨 Interface do Usuário</h2>
+        <ul class="feature-list">
+            <li>Modal responsivo e intuitivo</li>
+            <li>Formatação monetária automática</li>
+            <li>Histórico com scroll independente</li>
+            <li>Ícones indicativos de mudanças</li>
+            <li>Validação em tempo real</li>
+            <li>Feedback visual de sucesso/erro</li>
+        </ul>
+    </div>
+
+    <div class="test-section error">
+        <h2>⚠️ Requisitos</h2>
+        <ul class="feature-list">
+            <li>Usuário deve ter role 'admin'</li>
+            <li>Agendamento deve ter OS associada</li>
+            <li>Tabela order_value_history deve existir</li>
+            <li>Permissões do Supabase configuradas</li>
+        </ul>
+    </div>
+
+    <div class="test-section info">
+        <h2>🔄 Fluxo de Funcionamento</h2>
+        <ol>
+            <li><strong>Usuário clica "Editar"</strong> → Modal de edição abre</li>
+            <li><strong>Sistema carrega histórico</strong> → Exibe mudanças anteriores</li>
+            <li><strong>Usuário digita novo valor</strong> → Validação em tempo real</li>
+            <li><strong>Usuário digita motivo</strong> → Campo obrigatório</li>
+            <li><strong>Usuário clica "Salvar"</strong> → Atualiza OS e cria histórico</li>
+            <li><strong>Sistema confirma</strong> → Toast de sucesso e refresh</li>
+        </ol>
+    </div>
+
+    <div class="test-section success">
+        <h2>✅ Status da Implementação</h2>
+        <p><strong>🎉 FUNCIONALIDADE COMPLETA!</strong></p>
+        <p>Todos os componentes foram implementados e estão prontos para uso:</p>
+        <ul class="feature-list">
+            <li>Serviço de histórico de valores</li>
+            <li>Modal de edição de valor</li>
+            <li>Integração com o calendário</li>
+            <li>Estrutura do banco de dados</li>
+            <li>Controles de segurança</li>
+            <li>Interface de usuário completa</li>
+        </ul>
+    </div>
+
+    <script>
+        console.log('🔧 Funcionalidade de Editar Valor da OS implementada!');
+        console.log('📁 Arquivos criados:');
+        console.log('- src/services/orderValueHistory/types.ts');
+        console.log('- src/services/orderValueHistory/orderValueHistoryService.ts');
+        console.log('- src/services/orderValueHistory/index.ts');
+        console.log('- src/components/calendar/EditOrderValueModal.tsx');
+        console.log('- supabase/migrations/create_order_value_history.sql');
+        console.log('📝 Arquivos modificados:');
+        console.log('- src/components/calendar/MainCalendarView.tsx');
+        console.log('✅ Pronto para uso!');
+    </script>
+</body>
+</html>

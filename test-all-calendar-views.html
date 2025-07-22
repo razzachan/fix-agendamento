@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Todas as Visualizações do Calendário</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-title {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .view-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .indicator {
+            background: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .success { background: #28a745; }
+        .warning { background: #ffc107; color: #000; }
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .checklist li:before {
+            content: "☐ ";
+            font-weight: bold;
+            color: #007bff;
+        }
+        .code {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste - Todas as Visualizações do Calendário</h1>
+    
+    <div class="test-section">
+        <h2 class="test-title">📋 Modificações Implementadas</h2>
+        <p>Adicionei o valor de teste em <strong>TODAS</strong> as visualizações do calendário:</p>
+        
+        <div class="view-card">
+            <h3>1. 📅 MainCalendarView (Visualização Semana)</h3>
+            <div class="indicator">🧪 João Silva</div>
+            <div class="indicator">TESTE: R$ 150,00 (FORÇADO)</div>
+            <p><strong>Localização:</strong> Cards pequenos na grade semanal</p>
+        </div>
+        
+        <div class="view-card">
+            <h3>2. 📋 EventsList (Lista de Eventos)</h3>
+            <div class="indicator warning">🧪 COMPONENTE DE TESTE ATIVO</div>
+            <div class="indicator">TESTE: R$ 150,00 (FORÇADO)</div>
+            <p><strong>Localização:</strong> Cards grandes na lista lateral</p>
+        </div>
+        
+        <div class="view-card">
+            <h3>3. 📄 ListView (Visualização Lista)</h3>
+            <div class="indicator">TESTE: R$ 150,00 (FORÇADO)</div>
+            <p><strong>Localização:</strong> Cards detalhados na visualização de lista</p>
+        </div>
+        
+        <div class="view-card">
+            <h3>4. 📆 DayView (Visualização Dia)</h3>
+            <div class="indicator">TESTE: R$ 150,00 (FORÇADO)</div>
+            <p><strong>Localização:</strong> Cards na visualização de um dia específico</p>
+        </div>
+        
+        <div class="view-card">
+            <h3>5. 🎯 DragDropCalendar (Semana com Drag & Drop)</h3>
+            <div class="indicator">R$ 150</div>
+            <p><strong>Localização:</strong> Cards pequenos arrastáveis na grade</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">✅ Checklist de Teste</h2>
+        <ul class="checklist">
+            <li>Abrir o calendário no sistema</li>
+            <li>Testar visualização <strong>Semana</strong> - procurar por 🧪 antes dos nomes</li>
+            <li>Testar visualização <strong>Dia</strong> - procurar indicador vermelho</li>
+            <li>Testar visualização <strong>Lista</strong> - procurar indicador vermelho</li>
+            <li>Verificar se há eventos na lista lateral (EventsList)</li>
+            <li>Clicar em um evento para ver o modal de detalhes</li>
+            <li>Verificar se o valor aparece no modal</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">🔍 O Que Procurar</h2>
+        
+        <div class="view-card">
+            <h3>Indicadores Visuais:</h3>
+            <div class="indicator">🧪 COMPONENTE DE TESTE ATIVO</div>
+            <div class="indicator">🧪 João Silva</div>
+            <div class="indicator">TESTE: R$ 150,00 (FORÇADO)</div>
+            <div class="indicator">R$ 150</div>
+        </div>
+        
+        <div class="view-card">
+            <h3>Se NÃO aparecer nenhum indicador:</h3>
+            <p>❌ Pode ser que não há eventos no calendário</p>
+            <p>❌ Pode ser que você está em uma data sem agendamentos</p>
+            <p>❌ Pode ser que há um erro de JavaScript</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">🐛 Debug</h2>
+        <p>Se ainda não aparecer, abra o DevTools (F12) e procure por:</p>
+        <div class="code">🧪 [TestEventItem] Testando com valor forçado:
+🔍 [mapScheduledService] Dados recebidos:
+💰 [mapScheduledService] Final cost calculado:</div>
+        
+        <p>Também verifique se há erros no console que possam estar impedindo a renderização.</p>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-title">📱 Navegação</h2>
+        <p>Para testar todas as visualizações:</p>
+        <ol>
+            <li><strong>Semana:</strong> Botão "Semana" no topo do calendário</li>
+            <li><strong>Dia:</strong> Botão "Dia" no topo do calendário</li>
+            <li><strong>Lista:</strong> Botão "Lista" no topo do calendário</li>
+            <li><strong>Mês:</strong> Botão "Mês" no topo do calendário (usa MainCalendarView)</li>
+        </ol>
+    </div>
+
+    <script>
+        console.log('🧪 Página de teste carregada');
+        console.log('📋 Verificar todas as visualizações do calendário');
+        console.log('🔍 Procurar por indicadores vermelhos e emojis 🧪');
+    </script>
+</body>
+</html>

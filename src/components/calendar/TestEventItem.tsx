@@ -1,13 +1,11 @@
-
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { CalendarClock, Wrench, MapPin, UserCheck, DollarSign, Phone } from 'lucide-react';
+import { CalendarClock, Wrench, MapPin, UserCheck, DollarSign } from 'lucide-react';
 import { ScheduledService } from '@/types';
 import { useNavigate } from 'react-router-dom';
 import { DisplayNumber } from '@/components/common/DisplayNumber';
-import { supabase } from '@/integrations/supabase/client';
 
-interface EventItemProps {
+interface TestEventItemProps {
   service: ScheduledService;
   getStatusBadge: (status: string) => { label: string; className: string };
   formatTime: (isoString: string) => string;
@@ -15,7 +13,11 @@ interface EventItemProps {
   user: any;
 }
 
-const EventItem: React.FC<EventItemProps> = ({
+/**
+ * Componente de teste para verificar se o valor da OS aparece
+ * Este componente força a exibição do valor para debug
+ */
+const TestEventItem: React.FC<TestEventItemProps> = ({
   service,
   getStatusBadge,
   formatTime,
@@ -24,32 +26,16 @@ const EventItem: React.FC<EventItemProps> = ({
 }) => {
   const navigate = useNavigate();
   const badgeData = getStatusBadge(service.status);
-  const [finalCost, setFinalCost] = useState<number | null>(service.finalCost || null);
-
-  // ✅ Buscar valor da OS se não estiver disponível
-  useEffect(() => {
-    const fetchServiceOrderValue = async () => {
-      if (!service.serviceOrderId || service.finalCost) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('service_orders')
-          .select('final_cost')
-          .eq('id', service.serviceOrderId)
-          .single();
-
-        if (error) return;
-
-        if (data?.final_cost) {
-          setFinalCost(data.final_cost);
-        }
-      } catch (error) {
-        // Silencioso - não é crítico
-      }
-    };
-
-    fetchServiceOrderValue();
-  }, [service.serviceOrderId, service.finalCost]);
+  
+  // ✅ FORÇAR VALOR PARA TESTE
+  const testFinalCost = service.finalCost || 150.00; // Valor de teste
+  
+  console.log('🧪 [TestEventItem] Testando com valor forçado:', {
+    id: service.id,
+    clientName: service.clientName,
+    originalFinalCost: service.finalCost,
+    testFinalCost: testFinalCost
+  });
   
   const handleClick = () => {
     if (user?.role === 'technician') {
@@ -67,7 +53,11 @@ const EventItem: React.FC<EventItemProps> = ({
     >
       <div className="flex justify-between items-start">
         <div className="space-y-2">
-          <h3 className="font-semibold text-lg">{service.description}</h3>
+          {/* ✅ INDICADOR DE TESTE */}
+          <div className="bg-yellow-400 text-black px-2 py-1 rounded text-xs font-bold">
+            🧪 COMPONENTE DE TESTE ATIVO
+          </div>
+          <h3 className="font-semibold text-lg">{service.clientName}</h3>
           
           <div className="flex items-center gap-1.5 text-sm text-gray-600">
             <UserCheck className="h-4 w-4 text-gray-500" />
@@ -85,14 +75,6 @@ const EventItem: React.FC<EventItemProps> = ({
             <MapPin className="h-4 w-4 text-red-500" />
             <span className="truncate max-w-[250px]">{service.address}</span>
           </div>
-
-          {/* ✅ Telefone do Cliente */}
-          {service.clientPhone && (
-            <div className="flex items-center gap-1.5 text-sm text-gray-600">
-              <Phone className="h-4 w-4 text-blue-500" />
-              <span className="font-medium">{service.clientPhone}</span>
-            </div>
-          )}
           
           {service.serviceOrderId && (
             <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
@@ -100,14 +82,15 @@ const EventItem: React.FC<EventItemProps> = ({
               <DisplayNumber item={{id: service.serviceOrderId}} variant="inline" size="sm" showIcon={true} />
             </div>
           )}
-
-          {/* ✅ Valor da OS - Design Elegante */}
-          {finalCost && finalCost > 0 && (
-            <div className="flex items-center gap-2 text-sm font-semibold mt-3 bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg border border-emerald-200">
-              <DollarSign className="h-4 w-4" />
-              <span>R$ {finalCost.toFixed(2)}</span>
-            </div>
-          )}
+          
+          {/* ✅ SEMPRE EXIBIR VALOR PARA TESTE - SUPER VISÍVEL */}
+          <div className="flex items-center gap-2 text-lg text-white font-bold mt-3 bg-red-500 p-3 rounded-lg border-2 border-red-600 shadow-lg">
+            <DollarSign className="h-6 w-6" />
+            <span>TESTE: R$ {testFinalCost.toFixed(2)}</span>
+            <span className="text-sm">
+              {service.finalCost ? '(REAL)' : '(FORÇADO)'}
+            </span>
+          </div>
         </div>
         
         <div className="flex flex-col items-end gap-3">
@@ -125,4 +108,4 @@ const EventItem: React.FC<EventItemProps> = ({
   );
 };
 
-export default EventItem;
+export default TestEventItem;

@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CalendarEvent } from '@/types/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { 
-  Bell, 
-  Clock, 
-  AlertTriangle, 
-  CheckCircle, 
-  X, 
+import {
+  Bell,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  X,
   Calendar,
   User,
   MapPin
@@ -41,10 +41,11 @@ const CalendarNotifications: React.FC<CalendarNotificationsProps> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
+  const [shownToasts, setShownToasts] = useState<Set<string>>(new Set()); // ✅ Controle de toasts já exibidos
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // ✅ Debounce para evitar spam
 
-  // Gerar notificações baseadas nos eventos
-  useEffect(() => {
-    const generateNotifications = () => {
+  // ✅ Função debounced para gerar notificações
+  const generateNotifications = useCallback(() => {
       const now = new Date();
       const newNotifications: Notification[] = [];
 
@@ -52,8 +53,8 @@ const CalendarNotifications: React.FC<CalendarNotificationsProps> = ({
         const eventTime = event.startTime;
         const minutesUntilEvent = differenceInMinutes(eventTime, now);
 
-        // Notificação de evento próximo (15 minutos antes)
-        if (minutesUntilEvent > 0 && minutesUntilEvent <= 15 && event.status === 'confirmed') {
+        // Notificação de evento próximo (15 minutos antes) - ✅ Mais restritiva
+        if (minutesUntilEvent > 0 && minutesUntilEvent <= 15 && minutesUntilEvent >= 10 && event.status === 'confirmed') {
           newNotifications.push({
             id: `upcoming-${event.id}`,
             type: 'upcoming',
@@ -119,37 +120,81 @@ const CalendarNotifications: React.FC<CalendarNotificationsProps> = ({
         const newOnes = uniqueNotifications.filter(n => !existingIds.includes(n.id));
         return [...prev, ...newOnes].slice(-20); // Manter apenas as 20 mais recentes
       });
-    };
+    }, [events]);
 
-    generateNotifications();
-    
-    // Atualizar notificações a cada minuto
-    const interval = setInterval(generateNotifications, 60000);
-    return () => clearInterval(interval);
-  }, [events]);
+  // ✅ useEffect com debounce para evitar spam
+  useEffect(() => {
+    // Limpar timeout anterior
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Executar com debounce de 2 segundos
+    debounceTimeoutRef.current = setTimeout(() => {
+      generateNotifications();
+    }, 2000);
+
+    // Cleanup
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [generateNotifications]);
+
+  // ✅ Interval separado para atualizações periódicas
+  useEffect(() => {
+    // Atualizar notificações a cada 2 minutos (menos frequente)
+    const interval = setInterval(generateNotifications, 120000);
+
+    // ✅ Limpar toasts antigos a cada 5 minutos
+    const cleanupInterval = setInterval(() => {
+      setShownToasts(prev => {
+        // Manter apenas toasts de notificações que ainda existem
+        const currentNotificationIds = new Set(notifications.map(n => n.id));
+        const filteredToasts = new Set([...prev].filter(id => currentNotificationIds.has(id)));
+        return filteredToasts;
+      });
+    }, 300000); // 5 minutos
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(cleanupInterval);
+    };
+  }, [generateNotifications, notifications]);
 
   // Contar notificações não lidas
   useEffect(() => {
     setUnreadCount(notifications.filter(n => !n.read).length);
   }, [notifications]);
 
-  // Mostrar toast para notificações de alta prioridade
+  // Mostrar toast para notificações de alta prioridade (sem duplicatas)
   useEffect(() => {
-    notifications
-      .filter(n => !n.read && n.priority === 'high')
-      .forEach(notification => {
-        toast(notification.title, {
-          description: notification.message,
-          action: notification.event ? {
-            label: 'Ver',
-            onClick: () => {
-              onEventClick(notification.event!);
-              markAsRead(notification.id);
-            }
-          } : undefined
-        });
+    const highPriorityNotifications = notifications
+      .filter(n => !n.read && n.priority === 'high' && !shownToasts.has(n.id));
+
+    // ✅ Evitar spam - máximo 1 toast por vez
+    if (highPriorityNotifications.length > 0) {
+      const notification = highPriorityNotifications[0]; // Pegar apenas o primeiro
+
+      // Marcar como exibido antes de mostrar o toast
+      setShownToasts(prev => new Set([...prev, notification.id]));
+
+      console.log(`🔔 Exibindo toast: ${notification.title} - ${notification.message}`);
+
+      toast(notification.title, {
+        description: notification.message,
+        duration: 5000, // ✅ Duração específica
+        action: notification.event ? {
+          label: 'Ver',
+          onClick: () => {
+            onEventClick(notification.event!);
+            markAsRead(notification.id);
+          }
+        } : undefined
       });
-  }, [notifications, onEventClick]);
+    }
+  }, [notifications, onEventClick, shownToasts]);
 
   const markAsRead = (notificationId: string) => {
     setNotifications(prev =>
@@ -160,6 +205,21 @@ const CalendarNotifications: React.FC<CalendarNotificationsProps> = ({
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
+
+  // ✅ Limpar toasts exibidos quando as notificações são lidas
+  useEffect(() => {
+    const readNotificationIds = notifications
+      .filter(n => n.read)
+      .map(n => n.id);
+
+    if (readNotificationIds.length > 0) {
+      setShownToasts(prev => {
+        const newSet = new Set(prev);
+        readNotificationIds.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+    }
+  }, [notifications]);
 
   const removeNotification = (notificationId: string) => {
     setNotifications(prev => prev.filter(n => n.id !== notificationId));

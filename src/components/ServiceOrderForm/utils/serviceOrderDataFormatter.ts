@@ -102,7 +102,7 @@ export const formatServiceOrderData = (values: FormValues): Partial<ServiceOrder
     description: itemsDescription,
     status: (values.status as any) || 'pending_collection',
     needsPickup: needsPickup,
-    currentLocation: needsPickup ? 'client' : 'workshop',
+    currentLocation: 'client', // ✅ SEMPRE INICIA NO CLIENTE (igual ao middleware)
     technicianId: values.technicianId,
     technicianName: technicianName,
     pickupAddress: fullAddress,
@@ -112,5 +112,11 @@ export const formatServiceOrderData = (values: FormValues): Partial<ServiceOrder
     pickupCity: values.clientCity || null,
     pickupState: values.clientState || null,
     pickupZipCode: values.clientZipCode || null,
+
+  // ✅ Calcular valor final da OS a partir dos serviceItems
+  finalCost: values.serviceItems.reduce((total, item) => {
+    const itemValue = parseFloat(item.serviceValue || '0') / 100; // Converter de centavos para reais
+    return total + itemValue;
+  }, 0),
   };
 };

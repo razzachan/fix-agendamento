@@ -150,6 +150,8 @@ export interface ScheduledService {
   technicianId: string | null;
   technicianName: string;
   clientId: string | null;
+  finalCost?: number; // ✅ Valor da OS relacionada
+  clientPhone?: string; // ✅ Telefone do cliente
 }
 
 export interface FinancialTransaction {

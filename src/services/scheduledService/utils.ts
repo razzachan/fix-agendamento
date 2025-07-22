@@ -7,6 +7,9 @@ import { ScheduledService } from '@/types';
  * @returns Serviço agendado no formato do frontend
  */
 export const mapScheduledService = (rawData: any): ScheduledService => {
+  const finalCost = rawData.final_cost || rawData.service_orders?.final_cost || null;
+  const clientPhone = rawData.client_phone || rawData.service_orders?.client_phone || null;
+
   return {
     id: rawData.id,
     createdAt: rawData.created_at || new Date().toISOString(), // Mapeia created_at para createdAt
@@ -14,6 +17,8 @@ export const mapScheduledService = (rawData: any): ScheduledService => {
     technicianId: rawData.technician_id, // Mapeia technician_id para technicianId
     technicianName: rawData.technician_name, // Mapeia technician_name para technicianName
     clientId: rawData.client_id, // Mapeia client_id para clientId
+    finalCost: finalCost, // ✅ Mapear valor da OS
+    clientPhone: clientPhone, // ✅ Mapear telefone do cliente
     clientName: rawData.client_name, // Mapeia client_name para clientName
     scheduledStartTime: rawData.scheduled_start_time, // Mapeia scheduled_start_time para scheduledStartTime
     scheduledEndTime: rawData.scheduled_end_time, // Mapeia scheduled_end_time para scheduledEndTime

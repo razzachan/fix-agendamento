@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Tipos de Atendimento</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { border-left: 4px solid #28a745; }
+        .error { border-left: 4px solid #dc3545; }
+        .warning { border-left: 4px solid #ffc107; }
+        .info { border-left: 4px solid #17a2b8; }
+        h1 { color: #333; text-align: center; }
+        h2 { color: #007bff; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste - Tipos de Atendimento</h1>
+    
+    <div class="test-section">
+        <h2>📋 Objetivo do Teste</h2>
+        <p>Verificar se o middleware diferencia corretamente os tipos de atendimento:</p>
+        <ul>
+            <li><strong>coleta_diagnostico</strong> - Coleta para diagnóstico (R$ 350,00)</li>
+            <li><strong>coleta_conserto</strong> - Coleta para conserto (preço variável)</li>
+            <li><strong>em_domicilio</strong> - Atendimento em domicílio</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Testes Disponíveis</h2>
+        <button class="test-button" onclick="testColetaDiagnostico()">1️⃣ Coleta Diagnóstico</button>
+        <button class="test-button" onclick="testColetaConserto()">2️⃣ Coleta Conserto</button>
+        <button class="test-button" onclick="testEmDomicilio()">3️⃣ Em Domicílio</button>
+        <button class="test-button" onclick="testSemTipo()">❓ Sem Tipo (Padrão)</button>
+        <button class="test-button" onclick="testTodos()" style="background: #28a745;">🚀 Executar Todos</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Resultados dos Testes</h2>
+        <div id="resultados"></div>
+    </div>
+
+    <script>
+        const BASE_URL = "https://fix-agendamento-production.up.railway.app";
+        const ENDPOINT = "/agendamento-inteligente";
+
+        async function fazerRequisicao(dados, testName) {
+            try {
+                console.log(`🚀 Executando ${testName}:`, dados);
+                
+                const response = await fetch(`${BASE_URL}${ENDPOINT}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dados)
+                });
+
+                const result = await response.json();
+                
+                const resultDiv = document.createElement('div');
+                resultDiv.className = `result-box ${response.ok ? 'success' : 'error'}`;
+                
+                let html = `<strong>${testName}</strong><br>`;
+                html += `Status: ${response.status}<br>`;
+                
+                if (response.ok) {
+                    html += `✅ Sucesso!<br>`;
+                    html += `Mensagem: ${result.message || 'OK'}<br>`;
+                    if (result.opcoes) {
+                        html += `📅 Opções de horário: ${result.opcoes.length}<br>`;
+                    }
+                    if (result.tipo_detectado) {
+                        html += `🎯 Tipo detectado: ${result.tipo_detectado}<br>`;
+                    }
+                } else {
+                    html += `❌ Erro!<br>`;
+                    html += `Detalhes: ${JSON.stringify(result, null, 2)}<br>`;
+                }
+                
+                html += `<br>Dados enviados:<br>${JSON.stringify(dados, null, 2)}`;
+                html += `<br><br>Resposta completa:<br>${JSON.stringify(result, null, 2)}`;
+                
+                resultDiv.innerHTML = html;
+                document.getElementById('resultados').appendChild(resultDiv);
+                
+                return { success: response.ok, data: result };
+                
+            } catch (error) {
+                console.error(`❌ Erro em ${testName}:`, error);
+                
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `<strong>${testName}</strong><br>❌ Erro de conexão: ${error.message}`;
+                document.getElementById('resultados').appendChild(resultDiv);
+                
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function testColetaDiagnostico() {
+            const dados = {
+                "nome": "Cliente Teste Diagnóstico",
+                "endereco": "Rua Teste Diagnóstico, 123, Centro, Florianópolis, SC",
+                "equipamento": "Fogão",
+                "problema": "Não sei o que está acontecendo, precisa de diagnóstico",
+                "telefone": "48999111001",
+                "urgente": "não",
+                "cpf": "111.222.333-44",
+                "email": "diagnostico@teste.com",
+                "tipo_atendimento_1": "coleta_diagnostico"
+            };
+            
+            return await fazerRequisicao(dados, "🔍 TESTE 1: Coleta Diagnóstico");
+        }
+
+        async function testColetaConserto() {
+            const dados = {
+                "nome": "Cliente Teste Conserto",
+                "endereco": "Rua Teste Conserto, 456, Centro, Florianópolis, SC",
+                "equipamento": "Micro-ondas",
+                "problema": "Precisa trocar a resistência",
+                "telefone": "48999222002",
+                "urgente": "não",
+                "cpf": "222.333.444-55",
+                "email": "conserto@teste.com",
+                "tipo_atendimento_1": "coleta_conserto"
+            };
+            
+            return await fazerRequisicao(dados, "🔧 TESTE 2: Coleta Conserto");
+        }
+
+        async function testEmDomicilio() {
+            const dados = {
+                "nome": "Cliente Teste Domicílio",
+                "endereco": "Rua Teste Domicílio, 789, Centro, Florianópolis, SC",
+                "equipamento": "Cooktop",
+                "problema": "Não está funcionando",
+                "telefone": "48999333003",
+                "urgente": "não",
+                "cpf": "333.444.555-66",
+                "email": "domicilio@teste.com",
+                "tipo_atendimento_1": "em_domicilio"
+            };
+            
+            return await fazerRequisicao(dados, "🏠 TESTE 3: Em Domicílio");
+        }
+
+        async function testSemTipo() {
+            const dados = {
+                "nome": "Cliente Teste Padrão",
+                "endereco": "Rua Teste Padrão, 999, Centro, Florianópolis, SC",
+                "equipamento": "Forno",
+                "problema": "Não está aquecendo",
+                "telefone": "48999444004",
+                "urgente": "não",
+                "cpf": "444.555.666-77",
+                "email": "padrao@teste.com"
+                // SEM tipo_atendimento_1 - deve usar "em_domicilio" como padrão
+            };
+            
+            return await fazerRequisicao(dados, "❓ TESTE 4: Sem Tipo (Padrão)");
+        }
+
+        async function testTodos() {
+            document.getElementById('resultados').innerHTML = '<div class="result-box info"><strong>🚀 Executando todos os testes...</strong></div>';
+            
+            const resultados = [];
+            
+            resultados.push(await testColetaDiagnostico());
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            resultados.push(await testColetaConserto());
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            resultados.push(await testEmDomicilio());
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            resultados.push(await testSemTipo());
+            
+            // Resumo
+            const resumoDiv = document.createElement('div');
+            resumoDiv.className = 'result-box info';
+            
+            let html = '<strong>📊 RESUMO DOS TESTES:</strong><br><br>';
+            const testes = [
+                'Coleta Diagnóstico',
+                'Coleta Conserto', 
+                'Em Domicílio',
+                'Sem Tipo (Padrão)'
+            ];
+            
+            resultados.forEach((resultado, index) => {
+                const status = resultado.success ? '✅ PASSOU' : '❌ FALHOU';
+                html += `${testes[index]}: ${status}<br>`;
+            });
+            
+            html += '<br><strong>🎯 CONCLUSÃO:</strong><br>';
+            const todosSucesso = resultados.every(r => r.success);
+            if (todosSucesso) {
+                html += '✅ Todos os testes passaram! O middleware está diferenciando corretamente os tipos de atendimento.<br>';
+            } else {
+                html += '❌ Alguns testes falharam. Pode haver problema na lógica do middleware.<br>';
+            }
+            
+            html += '<br><strong>📋 PRÓXIMO PASSO:</strong><br>';
+            html += 'Verificar se o ClienteChat está enviando o parâmetro "tipo_atendimento_1" corretamente.';
+            
+            resumoDiv.innerHTML = html;
+            document.getElementById('resultados').appendChild(resumoDiv);
+        }
+
+        // Limpar resultados
+        function limparResultados() {
+            document.getElementById('resultados').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
