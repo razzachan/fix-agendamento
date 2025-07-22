@@ -60,56 +60,43 @@ def verificar_horario_real_sistema() -> dict:
     Sempre verifica e loga o horário atual antes de fazer pesquisas
     """
     try:
-        # Horário UTC
-        agora_utc = datetime.now(pytz.UTC)
-
-        # Horário Brasil (São Paulo)
+        # Horário Brasil (São Paulo) - principal
         agora_brasil = datetime.now(pytz.timezone('America/Sao_Paulo'))
 
-        # Horário local do sistema
-        agora_local = datetime.now()
-
-        # Informações detalhadas
+        # Informações básicas e seguras
         info_horario = {
-            "utc": {
-                "datetime": agora_utc.isoformat(),
-                "formatted": agora_utc.strftime('%d/%m/%Y %H:%M:%S UTC'),
-                "timestamp": agora_utc.timestamp()
-            },
             "brasil": {
                 "datetime": agora_brasil.isoformat(),
                 "formatted": agora_brasil.strftime('%d/%m/%Y %H:%M:%S (Brasília)'),
-                "timezone": str(agora_brasil.tzinfo),
-                "weekday": agora_brasil.strftime('%A'),
-                "weekday_pt": ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'][agora_brasil.weekday() % 7]
-            },
-            "local": {
-                "datetime": agora_local.isoformat(),
-                "formatted": agora_local.strftime('%d/%m/%Y %H:%M:%S (Local)'),
-                "timezone": "Local System"
-            },
-            "diferenca_utc_brasil": (agora_brasil.utcoffset().total_seconds() / 3600) if agora_brasil.utcoffset() else -3
+                "date": agora_brasil.strftime('%d/%m/%Y'),
+                "time": agora_brasil.strftime('%H:%M:%S'),
+                "weekday_num": agora_brasil.weekday()
+            }
         }
 
-        # Log detalhado do horário atual
+        # Log simplificado mas informativo
         logger.info("🕐 ═══════════════════════════════════════════════════════════")
         logger.info("🕐 VERIFICAÇÃO DE HORÁRIO REAL DO SISTEMA")
-        logger.info("🕐 ═══════════════════════════════════════════════════════════")
-        logger.info(f"🌍 UTC:     {info_horario['utc']['formatted']}")
         logger.info(f"🇧🇷 BRASIL: {info_horario['brasil']['formatted']}")
-        logger.info(f"💻 LOCAL:   {info_horario['local']['formatted']}")
-        logger.info(f"📅 DIA:     {info_horario['brasil']['weekday_pt']} ({info_horario['brasil']['weekday']})")
-        logger.info(f"⏰ FUSO:    UTC{info_horario['diferenca_utc_brasil']:+.0f}h")
+        logger.info(f"📅 DATA:   {info_horario['brasil']['date']}")
+        logger.info(f"⏰ HORA:   {info_horario['brasil']['time']}")
         logger.info("🕐 ═══════════════════════════════════════════════════════════")
 
         return info_horario
 
     except Exception as e:
         logger.error(f"❌ Erro na verificação de horário: {e}")
+        # Fallback simples e seguro
+        agora_fallback = datetime.now(pytz.timezone('America/Sao_Paulo'))
         return {
-            "erro": str(e),
-            "fallback_utc": datetime.now(pytz.UTC).isoformat(),
-            "fallback_brasil": datetime.now(pytz.timezone('America/Sao_Paulo')).isoformat()
+            "brasil": {
+                "datetime": agora_fallback.isoformat(),
+                "formatted": agora_fallback.strftime('%d/%m/%Y %H:%M:%S (Brasília)'),
+                "date": agora_fallback.strftime('%d/%m/%Y'),
+                "time": agora_fallback.strftime('%H:%M:%S'),
+                "weekday_num": agora_fallback.weekday()
+            },
+            "erro": str(e)
         }
 
 def validar_data_pesquisa(data_inicio: datetime, contexto: str = "pesquisa") -> datetime:
