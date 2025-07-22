@@ -3095,12 +3095,10 @@ Por favor, aguarde alguns instantes e evite clicar novamente.
             logger.info(f"🎯 ETAPA 1 DETECTADA: Primeira consulta - gerando opções de horário")
             resultado_consulta = await consultar_disponibilidade_interna(data)
 
-            # Criar pré-agendamento SEMPRE após consulta (se não houve erro)
-            if resultado_consulta and hasattr(resultado_consulta, 'status_code') and resultado_consulta.status_code == 200:
+            # Criar pré-agendamento
+            if hasattr(resultado_consulta, 'status_code') and resultado_consulta.status_code == 200:
                 logger.info("💾 ETAPA 1: Criando pré-agendamento após consulta bem-sucedida")
                 await criar_pre_agendamento_etapa1(data, telefone)
-            else:
-                logger.warning(f"⚠️ ETAPA 1: Não foi possível criar pré-agendamento. Status: {getattr(resultado_consulta, 'status_code', 'N/A')}")
 
             return resultado_consulta
 
@@ -3501,6 +3499,7 @@ async def criar_os_completa(dados: dict):
 
                 agendamento_data = {
                     "service_order_id": os_id,
+                    "client_id": cliente_id,  # 🔧 CORREÇÃO: Adicionar client_id que estava faltando
                     "technician_id": tecnico_id,
                     "technician_name": tecnico_nome_real,
                     "client_name": dados["nome"],

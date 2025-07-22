@@ -52,7 +52,8 @@ export const scheduledServiceMutationService = {
     address: string,
     technicianId: string,
     technicianName: string,
-    scheduledDate: Date
+    scheduledDate: Date,
+    clientId?: string | null  // 🔧 CORREÇÃO: Adicionar clientId como parâmetro
   ) {
     try {
       console.log(`🔍 [mutationService] Criando agendamento a partir da ordem de serviço ${serviceOrderId}`);
@@ -74,6 +75,7 @@ export const scheduledServiceMutationService = {
         .from('scheduled_services')
         .insert({
           description,
+          client_id: clientId,  // 🔧 CORREÇÃO: Incluir client_id que estava faltando
           client_name: clientName,
           address,
           technician_id: technicianId,

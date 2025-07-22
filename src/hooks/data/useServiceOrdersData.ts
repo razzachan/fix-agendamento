@@ -176,7 +176,8 @@ export function useServiceOrdersData() {
           serviceOrder.pickupAddress || '',
           serviceOrder.technicianId,
           serviceOrder.technicianName,
-          new Date(serviceOrder.scheduledDate)
+          new Date(serviceOrder.scheduledDate),
+          serviceOrder.clientId  // 🔧 CORREÇÃO: Adicionar clientId que estava faltando
         );
 
         console.log('🔍 [useServiceOrdersData] Resultado da criação do agendamento:', result);

@@ -84,7 +84,8 @@ export const useServiceOrdersSync = (selectedTechnicianId: string) => {
               order.pickupAddress || '',
               selectedTechnicianId,
               order.technicianName || 'Technician',
-              scheduledDate
+              scheduledDate,
+              order.clientId  // 🔧 CORREÇÃO: Adicionar clientId que estava faltando
             );
             
             if (result) {
