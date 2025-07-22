@@ -3141,7 +3141,7 @@ async def criar_pre_agendamento_etapa1(data: dict, telefone: str):
             "urgente": data.get("urgente", "não").lower() == "sim",
             "tipo_atendimento_1": data.get("tipo_atendimento_1", "em_domicilio"),  # Salvar tipo de atendimento
             "tipos_atendimento": [data.get("tipo_atendimento_1", "em_domicilio")],  # Array para compatibilidade
-            "valor_servico": data.get("valor_servico")  # 💰 SALVAR VALOR DO CLIENTECHAT
+            "valor_os_1": data.get("valor_servico")  # 💰 SALVAR VALOR DO CLIENTECHAT na coluna correta
         }
 
         # Inserir no banco
