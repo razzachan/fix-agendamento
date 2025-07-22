@@ -4877,6 +4877,183 @@ def interpretar_opcao_flexivel(opcao_escolhida: str) -> Optional[str]:
     logger.debug(f"❌ interpretar_opcao_flexivel: Nenhuma interpretação encontrada para '{opcao_lower}'")
     return None
 
+@app.post("/fix-missing-client-ids")
+async def fix_missing_client_ids():
+    """
+    🔧 Endpoint para corrigir client_id faltantes na tabela scheduled_services
+    """
+    try:
+        logger.info("🚀 Iniciando correção de client_ids faltantes...")
+
+        supabase = get_supabase_client()
+
+        # 1. Buscar registros sem client_id
+        logger.info("🔍 Buscando registros sem client_id...")
+        response = supabase.table("scheduled_services").select(
+            "id, client_id, client_name, service_order_id"
+        ).is_("client_id", "null").limit(100).execute()  # Limitar a 100 por execução
+
+        missing_records = response.data
+        logger.info(f"📊 Encontrados {len(missing_records)} registros sem client_id")
+
+        if not missing_records:
+            return {
+                "success": True,
+                "message": "✅ Nenhum registro sem client_id encontrado!",
+                "processed": 0,
+                "fixed": 0,
+                "created": 0
+            }
+
+        fixed_count = 0
+        created_count = 0
+        results = []
+
+        for record in missing_records:
+            record_id = record["id"]
+            client_name = record.get("client_name", "")
+            service_order_id = record.get("service_order_id")
+
+            logger.info(f"🔧 Processando: {record_id} - {client_name}")
+
+            client_id = None
+            method_used = ""
+
+            # Método 1: Buscar via service_order
+            if service_order_id:
+                try:
+                    so_response = supabase.table("service_orders").select(
+                        "client_id"
+                    ).eq("id", service_order_id).execute()
+
+                    if so_response.data and len(so_response.data) > 0:
+                        client_id = so_response.data[0].get("client_id")
+                        if client_id:
+                            method_used = "service_order"
+                            logger.info(f"  📋 Client_id encontrado via service_order: {client_id}")
+                except Exception as e:
+                    logger.warning(f"  ⚠️ Erro ao buscar via service_order: {e}")
+
+            # Método 2: Buscar cliente por nome
+            if not client_id and client_name and client_name.strip():
+                try:
+                    client_response = supabase.table("clients").select(
+                        "id"
+                    ).eq("name", client_name.strip()).execute()
+
+                    if client_response.data and len(client_response.data) > 0:
+                        client_id = client_response.data[0]["id"]
+                        method_used = "exact_name"
+                        logger.info(f"  👤 Client_id encontrado por nome: {client_id}")
+                    else:
+                        # Buscar similar
+                        similar_response = supabase.table("clients").select(
+                            "id, name"
+                        ).ilike("name", f"%{client_name.strip()}%").execute()
+
+                        if similar_response.data and len(similar_response.data) > 0:
+                            client_id = similar_response.data[0]["id"]
+                            method_used = "similar_name"
+                            logger.info(f"  👤 Client_id encontrado por similaridade: {client_id}")
+                except Exception as e:
+                    logger.warning(f"  ⚠️ Erro ao buscar cliente: {e}")
+
+            # Método 3: Criar cliente se necessário
+            if not client_id and client_name and client_name.strip():
+                try:
+                    new_client_data = {
+                        "name": client_name.strip(),
+                        "email": f"{client_name.lower().replace(' ', '.')}@cliente.com",
+                        "phone": "",
+                        "address": "",
+                        "created_at": datetime.now().isoformat()
+                    }
+
+                    create_response = supabase.table("clients").insert(new_client_data).execute()
+
+                    if create_response.data and len(create_response.data) > 0:
+                        client_id = create_response.data[0]["id"]
+                        method_used = "created_new"
+                        created_count += 1
+                        logger.info(f"  🆕 Novo cliente criado: {client_id}")
+                except Exception as e:
+                    logger.error(f"  ❌ Erro ao criar cliente: {e}")
+
+            # Atualizar scheduled_service
+            if client_id:
+                try:
+                    update_response = supabase.table("scheduled_services").update({
+                        "client_id": client_id
+                    }).eq("id", record_id).execute()
+
+                    if update_response.data:
+                        logger.info(f"  ✅ Atualizado com client_id: {client_id}")
+                        fixed_count += 1
+                        results.append({
+                            "scheduled_service_id": record_id,
+                            "client_name": client_name,
+                            "client_id": client_id,
+                            "method": method_used,
+                            "status": "fixed"
+                        })
+                    else:
+                        logger.error(f"  ❌ Falha ao atualizar")
+                        results.append({
+                            "scheduled_service_id": record_id,
+                            "client_name": client_name,
+                            "client_id": None,
+                            "method": method_used,
+                            "status": "update_failed"
+                        })
+                except Exception as e:
+                    logger.error(f"  ❌ Erro ao atualizar: {e}")
+                    results.append({
+                        "scheduled_service_id": record_id,
+                        "client_name": client_name,
+                        "client_id": None,
+                        "method": method_used,
+                        "status": "error",
+                        "error": str(e)
+                    })
+            else:
+                logger.warning(f"  ⚠️ Não foi possível determinar client_id")
+                results.append({
+                    "scheduled_service_id": record_id,
+                    "client_name": client_name,
+                    "client_id": None,
+                    "method": "none",
+                    "status": "no_client_found"
+                })
+
+        logger.info("📊 ═══════════════════════════════════════")
+        logger.info("📊 RELATÓRIO FINAL DA CORREÇÃO")
+        logger.info("📊 ═══════════════════════════════════════")
+        logger.info(f"📋 Total processados: {len(missing_records)}")
+        logger.info(f"✅ Corrigidos: {fixed_count}")
+        logger.info(f"🆕 Novos clientes criados: {created_count}")
+        logger.info(f"❌ Não corrigidos: {len(missing_records) - fixed_count}")
+        logger.info("📊 ═══════════════════════════════════════")
+
+        return {
+            "success": True,
+            "message": f"✅ Correção concluída! {fixed_count}/{len(missing_records)} registros corrigidos",
+            "processed": len(missing_records),
+            "fixed": fixed_count,
+            "created": created_count,
+            "failed": len(missing_records) - fixed_count,
+            "results": results
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Erro geral na correção: {e}")
+        return {
+            "success": False,
+            "message": f"❌ Erro na correção: {str(e)}",
+            "processed": 0,
+            "fixed": 0,
+            "created": 0
+        }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
