@@ -3120,12 +3120,19 @@ async def criar_pre_agendamento_etapa1(data: dict, telefone: str):
         nome = data.get("nome", "").strip()
         endereco = data.get("endereco", "").strip()
         equipamentos = []
+        problemas = []
+        tipos_atendimento = []
 
-        # Coletar equipamentos
+        # Coletar dados de múltiplos equipamentos
         for i in range(1, 4):
             equip = data.get(f"equipamento_{i}" if i > 1 else "equipamento", "").strip()
+            problema = data.get(f"problema_{i}" if i > 1 else "problema", "").strip()
+            tipo_atend = data.get(f"tipo_atendimento_{i}", "em_domicilio").strip()
+
             if equip:
                 equipamentos.append(equip)
+                problemas.append(problema)
+                tipos_atendimento.append(tipo_atend)
 
         # Dados do pré-agendamento
         pre_agendamento_data = {
@@ -3134,15 +3141,35 @@ async def criar_pre_agendamento_etapa1(data: dict, telefone: str):
             "telefone": telefone,
             "cpf": data.get("cpf", ""),
             "email": data.get("email", ""),
-            "equipamento": equipamentos[0] if equipamentos else "",  # Primeiro equipamento como string
+            # Equipamentos individuais
+            "equipamento": equipamentos[0] if equipamentos else "",
+            "equipamento_2": equipamentos[1] if len(equipamentos) > 1 else "",
+            "equipamento_3": equipamentos[2] if len(equipamentos) > 2 else "",
             "equipamentos": equipamentos,  # Array completo
-            "problema": data.get("problema", ""),  # Campo problema obrigatório
+            # Problemas individuais
+            "problema": problemas[0] if problemas else "",
+            "problema_2": problemas[1] if len(problemas) > 1 else "",
+            "problema_3": problemas[2] if len(problemas) > 2 else "",
+            "problemas": problemas,  # Array completo
+            # Tipos de atendimento individuais
+            "tipo_atendimento_1": tipos_atendimento[0] if tipos_atendimento else "em_domicilio",
+            "tipo_atendimento_2": tipos_atendimento[1] if len(tipos_atendimento) > 1 else "",
+            "tipo_atendimento_3": tipos_atendimento[2] if len(tipos_atendimento) > 2 else "",
+            # 💰 SALVAR TODOS OS VALORES DO CLIENTECHAT nas colunas corretas
+            "valor_os_1": float(data.get("valor_os_1") or data.get("valor_servico") or 0),
+            "valor_os_2": float(data.get("valor_os_2") or 0),
+            "valor_os_3": float(data.get("valor_os_3") or 0),
+            # Status e outros campos
             "status": "pendente",
-            "urgente": data.get("urgente", "não").lower() == "sim",
-            "tipo_atendimento_1": data.get("tipo_atendimento_1", "em_domicilio"),  # Salvar tipo de atendimento
-            "tipos_atendimento": [data.get("tipo_atendimento_1", "em_domicilio")],  # Array para compatibilidade
-            "valor_os_1": data.get("valor_servico")  # 💰 SALVAR VALOR DO CLIENTECHAT na coluna correta
+            "urgente": data.get("urgente", "não").lower() == "sim"
         }
+
+        # Debug: Log dos dados antes de inserir
+        logger.info(f"💾 ETAPA 1: Dados do pré-agendamento:")
+        logger.info(f"   - Equipamentos: {equipamentos}")
+        logger.info(f"   - Problemas: {problemas}")
+        logger.info(f"   - Tipos atendimento: {tipos_atendimento}")
+        logger.info(f"   - Valores: valor_os_1={pre_agendamento_data.get('valor_os_1')}, valor_os_2={pre_agendamento_data.get('valor_os_2')}, valor_os_3={pre_agendamento_data.get('valor_os_3')}")
 
         # Inserir no banco
         response = supabase.table("agendamentos_ai").insert(pre_agendamento_data).execute()
