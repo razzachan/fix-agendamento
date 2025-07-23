@@ -406,6 +406,7 @@ async def criar_cliente_com_auth_supabase(dados: Dict) -> str:
                 "name": dados["nome"],
                 "phone": dados["telefone"],
                 "address": dados["endereco"],
+                "address_complement": dados.get("complemento", ""),  # 🏠 NOVO: Complemento do endereço
                 "cpf_cnpj": dados.get("cpf", ""),
                 "email": email
             }
@@ -3119,6 +3120,7 @@ async def criar_pre_agendamento_etapa1(data: dict, telefone: str):
         # Extrair dados básicos
         nome = data.get("nome", "").strip()
         endereco = data.get("endereco", "").strip()
+        complemento = data.get("complemento", "").strip()  # 🏠 NOVO: Complemento do endereço
         equipamentos = []
         problemas = []
         tipos_atendimento = []
@@ -3138,6 +3140,7 @@ async def criar_pre_agendamento_etapa1(data: dict, telefone: str):
         pre_agendamento_data = {
             "nome": nome,
             "endereco": endereco,
+            "complemento": complemento,  # 🏠 NOVO: Complemento do endereço
             "telefone": telefone,
             "cpf": data.get("cpf", ""),
             "email": data.get("email", ""),
@@ -3166,6 +3169,9 @@ async def criar_pre_agendamento_etapa1(data: dict, telefone: str):
 
         # Debug: Log dos dados antes de inserir
         logger.info(f"💾 ETAPA 1: Dados do pré-agendamento:")
+        logger.info(f"   - Nome: {nome}")
+        logger.info(f"   - Endereço: {endereco}")
+        logger.info(f"   - Complemento: {complemento}")
         logger.info(f"   - Equipamentos: {equipamentos}")
         logger.info(f"   - Problemas: {problemas}")
         logger.info(f"   - Tipos atendimento: {tipos_atendimento}")
@@ -3313,6 +3319,7 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
             "nome": pre_agendamento.get("nome", "Cliente"),
             "telefone": pre_agendamento.get("telefone", ""),
             "endereco": pre_agendamento.get("endereco", ""),
+            "complemento": pre_agendamento.get("complemento", ""),  # 🏠 NOVO: Complemento do endereço
             "equipamento": pre_agendamento.get("equipamento", ""),
             "problema": pre_agendamento.get("problema", ""),  # ✅ PROBLEMA REAL DO CLIENTE
             "cpf": pre_agendamento.get("cpf", ""),
@@ -3329,6 +3336,8 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
 
         logger.info(f"✅ ETAPA 2: Usando dados reais do pré-agendamento:")
         logger.info(f"   - Nome: {dados_reais['nome']}")
+        logger.info(f"   - Endereço: {dados_reais['endereco']}")
+        logger.info(f"   - Complemento: {dados_reais['complemento']}")
         logger.info(f"   - Problema: {dados_reais['problema']}")
         logger.info(f"   - Equipamento: {dados_reais['equipamento']}")
         logger.info(f"   - Tipo Atendimento: {dados_reais['tipo_atendimento']}")
@@ -3508,7 +3517,8 @@ async def criar_os_completa(dados: dict):
                 dados.get("valor_os")
             ),
             "order_number": os_numero,
-            "pickup_address": dados["endereco"]
+            "pickup_address": dados["endereco"],
+            "pickup_address_complement": dados.get("complemento", "")  # 🏠 NOVO: Complemento do endereço
         }
 
         response_os = supabase.table("service_orders").insert(os_data).execute()
@@ -3533,6 +3543,7 @@ async def criar_os_completa(dados: dict):
                     "scheduled_start_time": horario_inicio.isoformat(),
                     "scheduled_end_time": horario_fim.isoformat(),
                     "address": dados["endereco"],
+                    "address_complement": dados.get("complemento", ""),  # 🏠 NOVO: Complemento do endereço
                     "description": dados["problema"],
                     "status": "scheduled"
                 }
