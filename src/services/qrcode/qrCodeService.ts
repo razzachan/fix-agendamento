@@ -20,30 +20,34 @@ export class QRCodeService {
    */
   static async generateQRCode(request: QRCodeGenerationRequest): Promise<EquipmentQRCode> {
     try {
+      // 🔧 PRODUÇÃO: Log reduzido
       console.log('🏷️ [QRCodeService] Gerando QR Code para OS:', request.serviceOrderId);
 
       // Verificar se já existe QR Code ativo para esta OS (opcional)
       try {
         const existingQR = await this.getActiveQRCodeByServiceOrder(request.serviceOrderId);
         if (existingQR) {
-          console.log('⚠️ [QRCodeService] QR Code já existe para esta OS:', existingQR.qrCode);
+          console.log('⚠️ [QRCodeService] QR Code já existe, retornando existente');
           return existingQR;
         }
       } catch (error) {
-        console.log('ℹ️ [QRCodeService] Erro ao verificar QR existente (continuando):', error);
         // Continuar com a geração mesmo se houver erro na verificação
+        console.warn('⚠️ [QRCodeService] Erro ao verificar QR existente, continuando...');
       }
 
       // Gerar código único
       const uniqueCode = await this.generateUniqueCode();
 
-      // Criar URL de rastreamento para o QR Code
+      // 🔧 PRODUÇÃO: URL base corrigida para produção
       const baseUrl = typeof window !== 'undefined'
         ? window.location.origin
-        : 'http://192.168.0.10:8081'; // URL do sistema em produção
+        : 'https://app.fixfogoes.com.br'; // 🔧 URL correta de produção
       const trackingUrl = `${baseUrl}/track/${uniqueCode}`;
 
-      console.log('🔗 [QRCodeService] URL de rastreamento gerada:', trackingUrl);
+      // 🔧 PRODUÇÃO: Log apenas em desenvolvimento
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔗 [QRCodeService] URL de rastreamento gerada:', trackingUrl);
+      }
 
       // Criar dados do QR Code (para validação interna)
       const qrData: QRCodeData = {
@@ -294,13 +298,16 @@ export class QRCodeService {
       const { data, error } = await supabase.rpc('generate_unique_qr_code');
 
       if (!error && data) {
-        console.log('✅ [QRCodeService] Código gerado via RPC:', data);
+        // 🔧 PRODUÇÃO: Log apenas em desenvolvimento
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ [QRCodeService] Código gerado via RPC:', data);
+        }
         return data;
       } else {
-        console.warn('⚠️ [QRCodeService] RPC falhou, usando geração local:', error);
+        console.warn('⚠️ [QRCodeService] RPC falhou, usando geração local');
       }
     } catch (error) {
-      console.warn('⚠️ [QRCodeService] Erro na RPC, usando geração local:', error);
+      console.warn('⚠️ [QRCodeService] Erro na RPC, usando geração local');
     }
 
     // Fallback: gerar código único localmente com verificação

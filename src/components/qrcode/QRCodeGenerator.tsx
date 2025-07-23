@@ -71,7 +71,9 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
       await handleGenerateLabel(qrCode.qrCode);
 
     } catch (error) {
-      console.error('Erro ao gerar QR Code:', error);
+      console.error('❌ [QRCodeGenerator] Erro ao gerar QR Code:', error);
+      // 🔧 PRODUÇÃO: Não quebrar a interface, apenas mostrar erro
+      toast.error('Erro ao gerar QR Code. Tente novamente.');
     }
   };
 
@@ -92,11 +94,13 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
       if (label) {
         setGeneratedLabel(label);
       } else {
+        console.warn('⚠️ [QRCodeGenerator] Etiqueta não gerada');
         toast.error('Erro ao gerar etiqueta - resultado nulo');
       }
     } catch (error) {
       console.error('❌ [QRCodeGenerator] Erro ao gerar etiqueta:', error);
-      toast.error(`Erro ao gerar etiqueta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      // 🔧 PRODUÇÃO: Erro mais genérico para não quebrar a interface
+      toast.error('Erro ao gerar etiqueta. Tente novamente.');
     }
   };
 

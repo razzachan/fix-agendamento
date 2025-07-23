@@ -83,12 +83,12 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
 
   const generateQRCodeImage = async (qrCodeText: string) => {
     try {
-      // Gerar URL de rastreamento
-      const baseUrl = typeof window !== 'undefined' 
-        ? window.location.origin 
-        : 'http://192.168.0.10:8081';
+      // 🔧 PRODUÇÃO: URL base corrigida para produção
+      const baseUrl = typeof window !== 'undefined'
+        ? window.location.origin
+        : 'https://app.fixfogoes.com.br'; // 🔧 URL correta de produção
       const trackingUrl = `${baseUrl}/track/${qrCodeText}`;
-      
+
       const qrCodeDataURL = await QRCodeLib.toDataURL(trackingUrl, {
         width: 200,
         margin: 2,
@@ -97,10 +97,12 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
           light: '#FFFFFF'
         }
       });
-      
+
       setQRCodeImage(qrCodeDataURL);
     } catch (error) {
       console.error('❌ [QRCodeDisplay] Erro ao gerar imagem do QR Code:', error);
+      // 🔧 PRODUÇÃO: Não quebrar a interface em caso de erro
+      setQRCodeImage('');
     }
   };
 

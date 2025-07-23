@@ -191,13 +191,13 @@ export const useMainCalendar = ({
 
             if (!inRange) return false;
 
-            // 🔧 ANTI-DUPLICAÇÃO: Verificar se já existe agendamento específico
+            // 🔧 ANTI-DUPLICAÇÃO MELHORADA: Verificar se já existe agendamento específico
             const hasScheduledService = allScheduledServices.some(service =>
               service.serviceOrderId === order.id
             );
 
             if (hasScheduledService) {
-              console.log(`🚫 [ANTI-DUPLICAÇÃO] Ordem ${order.id} já tem agendamento específico - ignorando`);
+              console.log(`🚫 [ANTI-DUPLICAÇÃO] Ordem ${order.id} já tem agendamento específico em scheduled_services - ignorando da service_orders`);
               return false;
             }
 
@@ -243,6 +243,7 @@ export const useMainCalendar = ({
           // 4. Combinar ambas as fontes
           scheduledServices = [...allScheduledServices, ...ordersAsServices];
           console.log(`✅ [useMainCalendar] Total de ${scheduledServices.length} itens para todos os técnicos`);
+          console.log(`📊 [RESUMO] scheduled_services: ${allScheduledServices.length}, service_orders órfãs: ${ordersAsServices.length}`);
         } else {
           // Admin vendo um técnico específico
           console.log(`🔍 [useMainCalendar] Admin buscando dados do técnico: ${technicianId}`);
@@ -285,13 +286,13 @@ export const useMainCalendar = ({
 
             if (!inRange) return false;
 
-            // 🔧 ANTI-DUPLICAÇÃO: Verificar se já existe agendamento específico
+            // 🔧 ANTI-DUPLICAÇÃO MELHORADA: Verificar se já existe agendamento específico
             const hasScheduledService = filteredServices.some(service =>
               service.serviceOrderId === order.id
             );
 
             if (hasScheduledService) {
-              console.log(`🚫 [ANTI-DUPLICAÇÃO] Ordem ${order.id} já tem agendamento específico - ignorando`);
+              console.log(`🚫 [ANTI-DUPLICAÇÃO] Ordem ${order.id} já tem agendamento específico em scheduled_services - ignorando da service_orders`);
               return false;
             }
 
@@ -372,13 +373,13 @@ export const useMainCalendar = ({
 
             if (!inRange) return false;
 
-            // 🔧 ANTI-DUPLICAÇÃO: Verificar se já existe agendamento específico
+            // 🔧 ANTI-DUPLICAÇÃO MELHORADA: Verificar se já existe agendamento específico
             const hasScheduledService = filteredServices.some(service =>
               service.serviceOrderId === order.id
             );
 
             if (hasScheduledService) {
-              console.log(`🚫 [ANTI-DUPLICAÇÃO] Ordem ${order.id} já tem agendamento específico - ignorando`);
+              console.log(`🚫 [ANTI-DUPLICAÇÃO] Ordem ${order.id} já tem agendamento específico em scheduled_services - ignorando da service_orders`);
               return false;
             }
 
@@ -420,6 +421,7 @@ export const useMainCalendar = ({
         scheduledServices = [...filteredServices, ...ordersAsServices];
 
         console.log(`✅ [useMainCalendar] Total de ${scheduledServices.length} itens para o técnico`);
+        console.log(`📊 [RESUMO] scheduled_services: ${filteredServices.length}, service_orders órfãs: ${ordersAsServices.length}`);
       }
 
       console.log(`📋 [useMainCalendar] Encontrados ${scheduledServices.length} serviços agendados`);
@@ -438,8 +440,44 @@ export const useMainCalendar = ({
         id: e.id,
         clientName: e.clientName,
         status: e.status,
-        scheduledStartTime: e.scheduledStartTime
+        scheduledStartTime: e.scheduledStartTime,
+        serviceOrderId: e.serviceOrderId
       })));
+
+      // 🔍 VERIFICAÇÃO DE DUPLICATAS: Detectar possíveis duplicatas por serviceOrderId
+      const serviceOrderIds = calendarEvents
+        .filter(e => e.serviceOrderId)
+        .map(e => e.serviceOrderId);
+
+      const duplicateServiceOrderIds = serviceOrderIds.filter((id, index) =>
+        serviceOrderIds.indexOf(id) !== index
+      );
+
+      if (duplicateServiceOrderIds.length > 0) {
+        console.error(`🚨 [DUPLICATAS DETECTADAS] ServiceOrderIds duplicados:`, duplicateServiceOrderIds);
+        duplicateServiceOrderIds.forEach(duplicateId => {
+          const duplicateEvents = calendarEvents.filter(e => e.serviceOrderId === duplicateId);
+          console.error(`🔍 [DUPLICATA] ServiceOrder ${duplicateId}:`, duplicateEvents.map(e => ({
+            id: e.id,
+            clientName: e.clientName,
+            scheduledStartTime: e.scheduledStartTime,
+            source: e.id.startsWith('order-') ? 'service_orders' : 'scheduled_services'
+          })));
+
+          // 🔧 CORREÇÃO AUTOMÁTICA: Remover duplicatas, mantendo apenas o scheduled_services
+          const scheduledServiceEvent = duplicateEvents.find(e => !e.id.startsWith('order-'));
+          const serviceOrderEvent = duplicateEvents.find(e => e.id.startsWith('order-'));
+
+          if (scheduledServiceEvent && serviceOrderEvent) {
+            console.warn(`🔧 [AUTO-CORREÇÃO] Removendo duplicata da service_orders para ${duplicateId}`);
+            // Remover o evento da service_orders do array
+            const indexToRemove = calendarEvents.findIndex(e => e.id === serviceOrderEvent.id);
+            if (indexToRemove !== -1) {
+              calendarEvents.splice(indexToRemove, 1);
+            }
+          }
+        });
+      }
 
       // Filtrar eventos relevantes para o calendário principal (excluir sugeridos e cancelados)
       // IMPORTANTE: Eventos cancelados NÃO devem aparecer no calendário

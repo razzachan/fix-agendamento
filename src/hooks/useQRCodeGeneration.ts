@@ -34,13 +34,20 @@ export function useQRCodeGeneration(): UseQRCodeGenerationReturn & {
     setError(null);
 
     try {
-      console.log('🏷️ [useQRCodeGeneration] Iniciando geração de QR Code');
-      
+      // 🔧 PRODUÇÃO: Log apenas em desenvolvimento
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🏷️ [useQRCodeGeneration] Iniciando geração de QR Code');
+      }
+
       const qrCode = await QRCodeService.generateQRCode(request);
-      
+
       toast.success('QR Code gerado com sucesso!');
-      console.log('✅ [useQRCodeGeneration] QR Code gerado:', qrCode.qrCode);
-      
+
+      // 🔧 PRODUÇÃO: Log apenas em desenvolvimento
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ [useQRCodeGeneration] QR Code gerado:', qrCode.qrCode);
+      }
+
       return qrCode;
 
     } catch (err) {

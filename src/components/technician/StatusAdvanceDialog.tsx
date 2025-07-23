@@ -633,27 +633,21 @@ export function StatusAdvanceDialog({
           serviceOrder={{
             id: serviceOrder.id,
             orderNumber: (() => {
-              console.log('🔍 [StatusAdvanceDialog] Debug COMPLETO serviceOrder:', serviceOrder);
-              console.log('🔍 [StatusAdvanceDialog] Debug order_number específico:', {
-                raw_order_number: serviceOrder.order_number,
-                typeof_order_number: typeof serviceOrder.order_number,
-                id: serviceOrder.id,
-                client_name: serviceOrder.client_name,
-                all_keys: Object.keys(serviceOrder)
-              });
+              // 🔧 PRODUÇÃO: Logs reduzidos para evitar problemas de performance
+              try {
+                const possibleOrderNumber =
+                  serviceOrder.order_number ||
+                  serviceOrder.orderNumber ||
+                  serviceOrder['order-number'] ||
+                  serviceOrder.os_number ||
+                  null;
 
-              // Tentar diferentes variações do campo
-              const possibleOrderNumber =
-                serviceOrder.order_number ||
-                serviceOrder.orderNumber ||
-                serviceOrder['order-number'] ||
-                serviceOrder.os_number ||
-                null;
-
-              console.log('🔍 [StatusAdvanceDialog] Possible order number:', possibleOrderNumber);
-
-              return possibleOrderNumber || `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
-            })(), // ✅ Debug completo para identificar o problema
+                return possibleOrderNumber || `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
+              } catch (error) {
+                console.error('❌ [StatusAdvanceDialog] Erro ao processar orderNumber:', error);
+                return `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
+              }
+            })()
             clientName: serviceOrder.client_name,
             clientEmail: '', // Não disponível neste contexto
             clientPhone: '', // Não disponível neste contexto

@@ -158,11 +158,14 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
       return 0;
     });
 
-  // Agrupar ordens por endereço (apenas as não atrasadas)
+  // Separar ordens atrasadas das atuais (para indicação visual)
   const currentOrders = sortedOrders.filter(order => !isOrderOverdue(order));
   const overdueOrders = sortedOrders.filter(order => isOrderOverdue(order));
 
-  const groupedOrders = currentOrders.reduce((acc, order) => {
+  // 🔧 CORREÇÃO: Incluir TODAS as ordens ativas (atuais + atrasadas) no agrupamento
+  const allActiveOrders = [...currentOrders, ...overdueOrders];
+
+  const groupedOrders = allActiveOrders.reduce((acc, order) => {
     const key = `${order.clientName}-${order.pickupAddress || 'Sem endereço'}`;
     if (!acc[key]) {
       acc[key] = [];
@@ -171,12 +174,12 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
     return acc;
   }, {} as Record<string, ServiceOrder[]>);
 
-  // Pegar a primeira ordem não atrasada como principal
-  const primaryOrder = currentOrders[0] || sortedOrders[0];
+  // 🔧 CORREÇÃO: Pegar a primeira ordem de TODAS as ativas (incluindo atrasadas)
+  const primaryOrder = sortedOrders[0]; // Usar a primeira da lista ordenada por prioridade
   const primaryGroup = primaryOrder ? groupedOrders[`${primaryOrder.clientName}-${primaryOrder.pickupAddress || 'Sem endereço'}`] || [primaryOrder] : [];
 
   const hasMultipleGroups = Object.keys(groupedOrders).length > 1;
-  const hasMultipleOrders = currentOrders.length > 1;
+  const hasMultipleOrders = allActiveOrders.length > 1; // 🔧 Usar todas as ordens ativas
   const hasOverdueOrders = overdueOrders.length > 0;
 
   // Calcular progresso geral (apenas ordens atuais, não atrasadas)
@@ -209,19 +212,19 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
           <div className="flex items-center gap-2">
             <Wrench className="w-5 h-5" />
             <span>
-              {hasMultipleOrders ? `${currentOrders.length} Ordens Ativas` : 'Ordem Ativa'}
+              {hasMultipleOrders ? `${allActiveOrders.length} Ordens Ativas` : 'Ordem Ativa'}
             </span>
             {/* Indicador de filtro do dia atual */}
             <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
               Hoje
             </Badge>
-{(hasMultipleOrders || currentOrders.length > 0) && (
+{(hasMultipleOrders || allActiveOrders.length > 0) && (
               <div className="flex gap-1">
                 <Badge variant="secondary" className="bg-[#e5b034]/20 text-[#e5b034] border-[#e5b034]/30">
                   <Package className="w-3 h-3 mr-1" />
-                  {currentOrders.length} equipamento{currentOrders.length > 1 ? 's' : ''}
+                  {allActiveOrders.length} equipamento{allActiveOrders.length > 1 ? 's' : ''}
                 </Badge>
-                {(hasMultipleOrders || currentOrders.length > 0) && (
+                {(hasMultipleOrders || allActiveOrders.length > 0) && (
                   <Badge
                     variant="outline"
                     className="cursor-pointer hover:bg-blue-50 border-blue-200 text-blue-700"
@@ -342,7 +345,7 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
             {/* Se múltiplos equipamentos, mostrar resumo */}
             {hasMultipleOrders && (
               <div className="text-xs text-muted-foreground">
-                + {currentOrders.length - 1} equipamento{currentOrders.length > 2 ? 's' : ''} adicional{currentOrders.length > 2 ? 'is' : ''}
+                + {allActiveOrders.length - 1} equipamento{allActiveOrders.length > 2 ? 's' : ''} adicional{allActiveOrders.length > 2 ? 'is' : ''}
                 {hasOverdueOrders && ` (${overdueOrders.length} atrasado${overdueOrders.length > 1 ? 's' : ''})`}
               </div>
             )}
@@ -379,7 +382,7 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
 
           {hasMultipleOrders && (
             <div className="text-xs text-muted-foreground text-center">
-              {currentOrders.length} equipamentos ativos
+              {allActiveOrders.length} equipamentos ativos
               {hasOverdueOrders && ` • ${overdueOrders.length} atrasado${overdueOrders.length > 1 ? 's' : ''}`}
             </div>
           )}
@@ -402,7 +405,7 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
           <div className="bg-muted/50 rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">
-                Outros Equipamentos ({currentOrders.length - 1})
+                Outros Equipamentos ({allActiveOrders.length - 1})
               </span>
               <Button
                 variant="ghost"
@@ -416,7 +419,7 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
 
             {/* Lista Compacta dos Equipamentos Adicionais */}
             <div className="grid grid-cols-1 gap-2">
-              {currentOrders.slice(1, 4).map((order, index) => {
+              {allActiveOrders.slice(1, 4).map((order, index) => {
                 const attendanceType = order.serviceAttendanceType || "em_domicilio";
                 const validType = ["em_domicilio", "coleta_conserto", "coleta_diagnostico"].includes(attendanceType)
                   ? attendanceType as "em_domicilio" | "coleta_conserto" | "coleta_diagnostico"
@@ -475,10 +478,10 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
                 );
               })}
 
-              {currentOrders.length > 4 && (
+              {allActiveOrders.length > 4 && (
                 <div className="text-xs text-muted-foreground text-center pt-1 cursor-pointer hover:text-blue-600"
                      onClick={() => setIsExpanded(true)}>
-                  +{currentOrders.length - 4} equipamentos (clique para ver todos)
+                  +{allActiveOrders.length - 4} equipamentos (clique para ver todos)
                 </div>
               )}
             </div>
@@ -492,7 +495,7 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
             >
               <Package className="w-4 h-4 mr-2" />
               {hasMultipleOrders
-                ? `Ver Todos os ${currentOrders.length + overdueOrders.length} Equipamentos`
+                ? `Ver Todos os ${allActiveOrders.length} Equipamentos`
                 : 'Ver Detalhes Completos'
               }
             </Button>
@@ -832,7 +835,7 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
                 <>
                   <ChevronDown className="w-3 h-3 mr-1" />
                   {hasMultipleOrders
-                    ? `Ver Detalhes (${currentOrders.length + overdueOrders.length})`
+                    ? `Ver Detalhes (${allActiveOrders.length})`
                     : 'Ver Detalhes'
                   }
                 </>
