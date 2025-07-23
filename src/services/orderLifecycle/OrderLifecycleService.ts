@@ -709,45 +709,7 @@ export class OrderLifecycleService {
     return result;
   }
 
-  /**
-   * Sugere agrupamentos inteligentes para criação de múltiplas OS
-   */
-  suggestEquipmentGrouping(agendamento: any): Array<{
-    equipments: string[];
-    problems: string[];
-    attendanceType: 'em_domicilio' | 'coleta_conserto' | 'coleta_diagnostico';
-    reasoning: string;
-  }> {
-    const equipamentos = Array.isArray(agendamento.equipamentos)
-      ? agendamento.equipamentos
-      : (typeof agendamento.equipamentos === 'string' && agendamento.equipamentos.startsWith('['))
-        ? JSON.parse(agendamento.equipamentos)
-        : [agendamento.equipamento].filter(Boolean);
 
-    const problemas = Array.isArray(agendamento.problemas)
-      ? agendamento.problemas
-      : (typeof agendamento.problemas === 'string' && agendamento.problemas.startsWith('['))
-        ? JSON.parse(agendamento.problemas)
-        : [agendamento.problema].filter(Boolean);
-
-    // Se não há múltiplos equipamentos, retornar agrupamento único
-    if (equipamentos.length <= 1) {
-      return [{
-        equipments: equipamentos,
-        problems: problemas,
-        attendanceType: agendamento.tipo_servico === 'in-home' ? 'em_domicilio' : 'coleta_diagnostico',
-        reasoning: 'Equipamento único'
-      }];
-    }
-
-    // Criar um grupo para cada equipamento (estratégia padrão)
-    return equipamentos.map((equipment, index) => ({
-      equipments: [equipment],
-      problems: [problemas[index] || problemas[0] || 'Problema não especificado'],
-      attendanceType: agendamento.tipo_servico === 'in-home' ? 'em_domicilio' : 'coleta_diagnostico' as const,
-      reasoning: `Equipamento individual: ${equipment}`
-    }));
-  }
 }
 
 // Instância singleton

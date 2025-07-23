@@ -647,7 +647,7 @@ export function StatusAdvanceDialog({
                 console.error('❌ [StatusAdvanceDialog] Erro ao processar orderNumber:', error);
                 return `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
               }
-            })()
+            })(),
             clientName: serviceOrder.client_name,
             clientEmail: '', // Não disponível neste contexto
             clientPhone: '', // Não disponível neste contexto
