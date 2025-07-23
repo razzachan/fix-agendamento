@@ -57,12 +57,39 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
     }
 
     try {
-      const qrCode = await generateQRCode({
+      // 🔧 CALENDÁRIO: Debug detalhado para identificar diferenças entre contextos
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [QRCodeGenerator] serviceOrder recebido:', serviceOrder);
+        console.log('🔍 [QRCodeGenerator] user:', user);
+      }
+
+      // 🔧 CALENDÁRIO: Tratamento robusto dos dados
+      const qrCodeRequest = {
         serviceOrderId: serviceOrder.id,
         equipmentSerial: serviceOrder.equipmentSerial || undefined,
         generatedBy: user.id,
-        location: serviceOrder.pickupAddress || 'Cliente'
-      });
+        location: (() => {
+          // Tentar diferentes formatos de endereço
+          const possibleLocation =
+            serviceOrder.pickupAddress ||
+            serviceOrder.pickup_address ||
+            serviceOrder.address ||
+            serviceOrder.endereco ||
+            'Cliente';
+
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 [QRCodeGenerator] location determinada:', possibleLocation);
+          }
+
+          return possibleLocation;
+        })()
+      };
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [QRCodeGenerator] qrCodeRequest:', qrCodeRequest);
+      }
+
+      const qrCode = await generateQRCode(qrCodeRequest);
 
       setGeneratedQRCode(qrCode);
       onQRCodeGenerated?.(qrCode);
@@ -72,8 +99,10 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
 
     } catch (error) {
       console.error('❌ [QRCodeGenerator] Erro ao gerar QR Code:', error);
-      // 🔧 PRODUÇÃO: Não quebrar a interface, apenas mostrar erro
-      toast.error('Erro ao gerar QR Code. Tente novamente.');
+      // 🔧 PRODUÇÃO: Erro mais detalhado para debug
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('❌ [QRCodeGenerator] Detalhes do erro:', errorMessage);
+      toast.error(`Erro ao gerar QR Code: ${errorMessage}`);
     }
   };
 

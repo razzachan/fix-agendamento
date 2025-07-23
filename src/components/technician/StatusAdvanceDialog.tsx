@@ -633,8 +633,19 @@ export function StatusAdvanceDialog({
           serviceOrder={{
             id: serviceOrder.id,
             orderNumber: (() => {
-              // 🔧 PRODUÇÃO: Logs reduzidos para evitar problemas de performance
+              // 🔧 CALENDÁRIO: Tratamento robusto para diferentes contextos (dashboard vs calendário)
               try {
+                // Debug: Log da estrutura completa apenas em desenvolvimento
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('🔍 [StatusAdvanceDialog] serviceOrder completo:', serviceOrder);
+                  console.log('🔍 [StatusAdvanceDialog] Campos de número:', {
+                    order_number: serviceOrder.order_number,
+                    orderNumber: serviceOrder.orderNumber,
+                    os_number: serviceOrder.os_number,
+                    id: serviceOrder.id
+                  });
+                }
+
                 const possibleOrderNumber =
                   serviceOrder.order_number ||
                   serviceOrder.orderNumber ||
@@ -642,7 +653,14 @@ export function StatusAdvanceDialog({
                   serviceOrder.os_number ||
                   null;
 
-                return possibleOrderNumber || `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
+                const finalOrderNumber = possibleOrderNumber || `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
+
+                // Debug: Log do resultado final
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('🔍 [StatusAdvanceDialog] orderNumber final:', finalOrderNumber);
+                }
+
+                return finalOrderNumber;
               } catch (error) {
                 console.error('❌ [StatusAdvanceDialog] Erro ao processar orderNumber:', error);
                 return `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
@@ -662,11 +680,60 @@ export function StatusAdvanceDialog({
             scheduledTime: '',
             completedDate: null,
             description: '',
-            equipmentType: serviceOrder.equipment_type,
-            equipmentModel: serviceOrder.equipment_model || null,
-            equipmentSerial: serviceOrder.equipment_serial || null,
+            equipmentType: (() => {
+              // 🔧 CALENDÁRIO: Tratamento robusto para diferentes formatos de equipamento
+              try {
+                const possibleType =
+                  serviceOrder.equipment_type ||
+                  serviceOrder.equipmentType ||
+                  serviceOrder.tipo_equipamento ||
+                  'Equipamento';
+
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('🔍 [StatusAdvanceDialog] equipmentType:', possibleType);
+                }
+
+                return possibleType;
+              } catch (error) {
+                console.error('❌ [StatusAdvanceDialog] Erro ao processar equipmentType:', error);
+                return 'Equipamento';
+              }
+            })(),
+            equipmentModel: (() => {
+              try {
+                return serviceOrder.equipment_model || serviceOrder.equipmentModel || null;
+              } catch (error) {
+                return null;
+              }
+            })(),
+            equipmentSerial: (() => {
+              try {
+                return serviceOrder.equipment_serial || serviceOrder.equipmentSerial || null;
+              } catch (error) {
+                return null;
+              }
+            })(),
             needsPickup: true,
-            pickupAddress: serviceOrder.pickup_address || null,
+            pickupAddress: (() => {
+              // 🔧 CALENDÁRIO: Tratamento robusto para diferentes formatos de endereço
+              try {
+                const possibleAddress =
+                  serviceOrder.pickup_address ||
+                  serviceOrder.pickupAddress ||
+                  serviceOrder.address ||
+                  serviceOrder.endereco ||
+                  null;
+
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('🔍 [StatusAdvanceDialog] pickupAddress:', possibleAddress);
+                }
+
+                return possibleAddress;
+              } catch (error) {
+                console.error('❌ [StatusAdvanceDialog] Erro ao processar pickupAddress:', error);
+                return null;
+              }
+            })(),
             pickupCity: null,
             pickupState: null,
             pickupZipCode: null,
