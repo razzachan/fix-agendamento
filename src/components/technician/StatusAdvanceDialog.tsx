@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -878,69 +879,103 @@ export function StatusAdvanceDialog({
 
   if (!serviceOrder) return null;
 
+  // 🔧 MODAL SOBREPOSIÇÃO: Modal customizado com z-index mais alto para QR Code
+  const renderModalContent = () => (
+    <DialogContent
+      className="max-w-2xl"
+      style={{
+        // 🔧 MODAL SOBREPOSIÇÃO: Z-index mais alto para o step QR Code
+        zIndex: step === 'qrcode' ? 9999 : undefined
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <CheckCircle className="h-5 w-5 text-green-500" />
+          Avançar para: {nextStatusLabel}
+          {step === 'payment' && (
+            <span className="text-sm text-muted-foreground ml-2">
+              - Etapa {paymentStep}/2
+            </span>
+          )}
+        </DialogTitle>
+      </DialogHeader>
+
+      <div className="space-y-4">
+        {/* Informações da ordem */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Informações da Ordem</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-medium">Cliente:</span> {serviceOrder.client_name}
+              </div>
+              <div>
+                <span className="font-medium">Equipamento:</span> {serviceOrder.equipment_type}
+              </div>
+              <div>
+                <span className="font-medium">Tipo:</span> {
+                  serviceOrder.service_attendance_type === 'coleta_diagnostico' ? 'Coleta Diagnóstico' :
+                  serviceOrder.service_attendance_type === 'coleta_conserto' ? 'Coleta Conserto' :
+                  serviceOrder.service_attendance_type === 'em_domicilio' ? 'Em Domicílio' :
+                  serviceOrder.service_attendance_type
+                }
+              </div>
+              <div>
+                <span className="font-medium">Status Atual:</span> {
+                  serviceOrder.status === 'on_the_way' ? 'A Caminho' :
+                  serviceOrder.status === 'scheduled' ? 'Agendado' :
+                  serviceOrder.status === 'in_progress' ? 'Em Andamento' :
+                  serviceOrder.status === 'collected' ? 'Coletado' :
+                  serviceOrder.status === 'at_workshop' ? 'Na Oficina' :
+                  serviceOrder.status === 'completed' ? 'Concluído' :
+                  serviceOrder.status
+                }
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        {/* Renderizar step atual */}
+        {step === 'requirements' && renderRequirementsStep()}
+        {step === 'qrcode' && renderQRCodeStep()}
+        {step === 'payment' && renderPaymentStep()}
+        {step === 'confirm' && renderConfirmStep()}
+      </div>
+    </DialogContent>
+  );
+
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              Avançar para: {nextStatusLabel}
-              {step === 'payment' && (
-                <span className="text-sm text-muted-foreground ml-2">
-                  - Etapa {paymentStep}/2
-                </span>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Informações da ordem */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Informações da Ordem</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Cliente:</span> {serviceOrder.client_name}
-                  </div>
-                  <div>
-                    <span className="font-medium">Equipamento:</span> {serviceOrder.equipment_type}
-                  </div>
-                  <div>
-                    <span className="font-medium">Tipo:</span> {
-                      serviceOrder.service_attendance_type === 'coleta_diagnostico' ? 'Coleta Diagnóstico' :
-                      serviceOrder.service_attendance_type === 'coleta_conserto' ? 'Coleta Conserto' :
-                      serviceOrder.service_attendance_type === 'em_domicilio' ? 'Em Domicílio' :
-                      serviceOrder.service_attendance_type
-                    }
-                  </div>
-                  <div>
-                    <span className="font-medium">Status Atual:</span> {
-                      serviceOrder.status === 'on_the_way' ? 'A Caminho' :
-                      serviceOrder.status === 'scheduled' ? 'Agendado' :
-                      serviceOrder.status === 'in_progress' ? 'Em Andamento' :
-                      serviceOrder.status === 'collected' ? 'Coletado' :
-                      serviceOrder.status === 'at_workshop' ? 'Na Oficina' :
-                      serviceOrder.status === 'completed' ? 'Concluído' :
-                      serviceOrder.status
-                    }
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Separator />
-
-            {/* Renderizar step atual */}
-            {step === 'requirements' && renderRequirementsStep()}
-            {step === 'qrcode' && renderQRCodeStep()}
-            {step === 'payment' && renderPaymentStep()}
-            {step === 'confirm' && renderConfirmStep()}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* 🔧 MODAL SOBREPOSIÇÃO: Portal com z-index mais alto para QR Code */}
+      {step === 'qrcode' ? (
+        createPortal(
+          <div
+            className="fixed inset-0 bg-black/80 flex items-center justify-center"
+            style={{ zIndex: 9999 }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                onOpenChange(false);
+              }
+            }}
+          >
+            <div
+              className="bg-background rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {renderModalContent()}
+            </div>
+          </div>,
+          document.body
+        )
+      ) : (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          {renderModalContent()}
+        </Dialog>
+      )}
 
       {/* Dialog de foto reutilizado */}
       <PhotoCaptureDialog
