@@ -617,55 +617,76 @@ export function StatusAdvanceDialog({
     </div>
   );
 
-  const renderQRCodeStep = () => (
-    <div className="space-y-4">
-      <div className="text-center">
-        <QrCode className="h-12 w-12 mx-auto text-purple-500 mb-3" />
-        <h3 className="text-lg font-semibold mb-2">Gerar QR Code de Rastreamento</h3>
-        <p className="text-muted-foreground">
-          Gere e imprima a etiqueta QR Code para rastrear este equipamento
-        </p>
-      </div>
+  const renderQRCodeStep = () => {
+    // 🔧 MODAL CALENDÁRIO: Debug detalhado para identificar problemas
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [StatusAdvanceDialog] renderQRCodeStep - serviceOrder:', serviceOrder);
+      console.log('🔍 [StatusAdvanceDialog] renderQRCodeStep - technicianId:', technicianId);
+      console.log('🔍 [StatusAdvanceDialog] renderQRCodeStep - technicianName:', technicianName);
+    }
 
-      {/* Converter serviceOrder para o formato esperado pelo QRCodeGenerator */}
-      {serviceOrder && (
-        <QRCodeGenerator
-          serviceOrder={{
-            id: serviceOrder.id,
-            orderNumber: (() => {
-              // 🔧 CALENDÁRIO: Tratamento robusto para diferentes contextos (dashboard vs calendário)
-              try {
-                // Debug: Log da estrutura completa apenas em desenvolvimento
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('🔍 [StatusAdvanceDialog] serviceOrder completo:', serviceOrder);
-                  console.log('🔍 [StatusAdvanceDialog] Campos de número:', {
-                    order_number: serviceOrder.order_number,
-                    orderNumber: serviceOrder.orderNumber,
-                    os_number: serviceOrder.os_number,
-                    id: serviceOrder.id
-                  });
-                }
+    return (
+      <div className="space-y-4">
+        <div className="text-center">
+          <QrCode className="h-12 w-12 mx-auto text-purple-500 mb-3" />
+          <h3 className="text-lg font-semibold mb-2">Gerar QR Code de Rastreamento</h3>
+          <p className="text-muted-foreground">
+            Gere e imprima a etiqueta QR Code para rastrear este equipamento
+          </p>
+        </div>
 
-                const possibleOrderNumber =
-                  serviceOrder.order_number ||
-                  serviceOrder.orderNumber ||
-                  serviceOrder['order-number'] ||
-                  serviceOrder.os_number ||
-                  null;
+        {/* 🔧 MODAL CALENDÁRIO: Wrapper de erro robusto */}
+        {serviceOrder ? (
+          <div className="border rounded-lg p-4">
+            <div className="text-sm text-muted-foreground mb-4">
+              <p><strong>OS:</strong> {serviceOrder.id}</p>
+              <p><strong>Cliente:</strong> {serviceOrder.client_name}</p>
+              <p><strong>Equipamento:</strong> {serviceOrder.equipment_type || serviceOrder.equipmentType || 'N/A'}</p>
+            </div>
+            {/* 🔧 MODAL CALENDÁRIO: QRCodeGenerator com tratamento de erro robusto */}
+            <div className="qr-generator-wrapper"
+              onError={(error) => {
+                console.error('❌ [StatusAdvanceDialog] Erro no QRCodeGenerator:', error);
+                toast.error('Erro ao carregar gerador de QR Code');
+              }}
+            >
+              <QRCodeGenerator
+                serviceOrder={{
+                  id: serviceOrder.id,
+                  orderNumber: (() => {
+                    // 🔧 CALENDÁRIO: Tratamento robusto para diferentes contextos (dashboard vs calendário)
+                    try {
+                      // Debug: Log da estrutura completa apenas em desenvolvimento
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log('🔍 [StatusAdvanceDialog] serviceOrder completo:', serviceOrder);
+                        console.log('🔍 [StatusAdvanceDialog] Campos de número:', {
+                          order_number: serviceOrder.order_number,
+                          orderNumber: serviceOrder.orderNumber,
+                          os_number: serviceOrder.os_number,
+                          id: serviceOrder.id
+                        });
+                      }
 
-                const finalOrderNumber = possibleOrderNumber || `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
+                      const possibleOrderNumber =
+                        serviceOrder.order_number ||
+                        serviceOrder.orderNumber ||
+                        serviceOrder['order-number'] ||
+                        serviceOrder.os_number ||
+                        null;
 
-                // Debug: Log do resultado final
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('🔍 [StatusAdvanceDialog] orderNumber final:', finalOrderNumber);
-                }
+                      const finalOrderNumber = possibleOrderNumber || `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
 
-                return finalOrderNumber;
-              } catch (error) {
-                console.error('❌ [StatusAdvanceDialog] Erro ao processar orderNumber:', error);
-                return `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
-              }
-            })(),
+                      // Debug: Log do resultado final
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log('🔍 [StatusAdvanceDialog] orderNumber final:', finalOrderNumber);
+                      }
+
+                      return finalOrderNumber;
+                    } catch (error) {
+                      console.error('❌ [StatusAdvanceDialog] Erro ao processar orderNumber:', error);
+                      return `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
+                    }
+                  })(),
             clientName: serviceOrder.client_name,
             clientEmail: '', // Não disponível neste contexto
             clientPhone: '', // Não disponível neste contexto
@@ -745,32 +766,48 @@ export function StatusAdvanceDialog({
             finalCost: serviceOrder.final_cost,
             workshopId: null,
             workshopName: null
-          }}
-          onQRCodeGenerated={handleQRCodeGenerated}
-        />
-      )}
-
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={() => setStep('requirements')}>
-          Voltar
-        </Button>
-        {qrCodeCompleted && (
-          <Button onClick={() => {
-            if (requiresPhoto && !photoCompleted) {
-              setShowPhotoDialog(true);
-            } else if (requiresPayment && !paymentCompleted) {
-              setStep('payment');
-            } else {
-              setStep('confirm');
-            }
-          }}>
-            <ArrowRight className="h-4 w-4 mr-2" />
-            Continuar
-          </Button>
+                }}
+                onQRCodeGenerated={(() => {
+                  // 🔧 MODAL CALENDÁRIO: Callback com tratamento de erro robusto
+                  try {
+                    console.log('✅ [StatusAdvanceDialog] QR Code gerado com sucesso no modal do calendário');
+                    handleQRCodeGenerated();
+                  } catch (error) {
+                    console.error('❌ [StatusAdvanceDialog] Erro no callback QR Code:', error);
+                    toast.error('Erro ao processar QR Code gerado');
+                  }
+                })}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="text-center p-4 border border-amber-200 rounded-lg bg-amber-50">
+            <p className="text-amber-600">⚠️ Dados da ordem de serviço não disponíveis</p>
+          </div>
         )}
+
+        <div className="flex justify-between">
+          <Button variant="outline" onClick={() => setStep('requirements')}>
+            Voltar
+          </Button>
+          {qrCodeCompleted && (
+            <Button onClick={() => {
+              if (requiresPhoto && !photoCompleted) {
+                setShowPhotoDialog(true);
+              } else if (requiresPayment && !paymentCompleted) {
+                setStep('payment');
+              } else {
+                setStep('confirm');
+              }
+            }}>
+              <ArrowRight className="h-4 w-4 mr-2" />
+              Continuar
+            </Button>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderPaymentStep = () => (
     paymentStep === 1 ? renderPaymentStep1() : renderPaymentStep2()
