@@ -4915,6 +4915,540 @@ def interpretar_opcao_flexivel(opcao_escolhida: str) -> Optional[str]:
     logger.debug(f"❌ interpretar_opcao_flexivel: Nenhuma interpretação encontrada para '{opcao_lower}'")
     return None
 
+# 🔍 FUNÇÕES AUXILIARES PARA CONSULTA DE STATUS OS
+
+async def buscar_ordem_servico(supabase, nome_cliente: str, telefone_cliente: str, numero_os: str, endereco: str) -> Optional[Dict]:
+    """
+    Busca ordem de serviço na tabela scheduled_services usando múltiplos critérios
+    """
+    try:
+        logger.info(f"🔍 Buscando OS em scheduled_services: nome='{nome_cliente}', telefone='{telefone_cliente}', numero='{numero_os}'")
+
+        # Estratégia 1: Buscar por número da OS (mais preciso)
+        if numero_os:
+            # Normalizar número da OS (remover prefixos, espaços, etc.)
+            numero_normalizado = numero_os.replace("#", "").replace("OS", "").replace("os", "").strip()
+
+            # Buscar por número exato na tabela scheduled_services
+            response = supabase.table("scheduled_services").select("*").eq("order_number", f"#{numero_normalizado.zfill(3)}").execute()
+
+            if response.data:
+                logger.info(f"✅ OS encontrada por número: #{numero_normalizado.zfill(3)}")
+                return response.data[0]
+
+            # Buscar por número sem formatação
+            response = supabase.table("scheduled_services").select("*").ilike("order_number", f"%{numero_normalizado}%").execute()
+
+            if response.data:
+                logger.info(f"✅ OS encontrada por número similar: {numero_normalizado}")
+                return response.data[0]
+
+        # Estratégia 2: Buscar por nome do cliente diretamente na scheduled_services
+        if nome_cliente:
+            # Buscar por nome exato
+            response = supabase.table("scheduled_services").select("*").eq("client_name", nome_cliente).order("created_at", desc=True).limit(1).execute()
+
+            if response.data:
+                logger.info(f"✅ OS encontrada por nome exato: {nome_cliente}")
+                return response.data[0]
+
+            # Buscar por nome similar
+            response = supabase.table("scheduled_services").select("*").ilike("client_name", f"%{nome_cliente}%").order("created_at", desc=True).limit(1).execute()
+
+            if response.data:
+                logger.info(f"✅ OS encontrada por nome similar: {nome_cliente}")
+                return response.data[0]
+
+        # Estratégia 3: Buscar por telefone via tabela clients
+        if telefone_cliente:
+            # Primeiro buscar o cliente por telefone
+            client_response = supabase.table("clients").select("id, name").eq("phone", telefone_cliente).execute()
+
+            if client_response.data:
+                client_name = client_response.data[0]["name"]
+                logger.info(f"✅ Cliente encontrado por telefone: {client_name}")
+
+                # Buscar OS do cliente na scheduled_services
+                response = supabase.table("scheduled_services").select("*").eq("client_name", client_name).order("created_at", desc=True).limit(1).execute()
+
+                if response.data:
+                    logger.info(f"✅ OS encontrada por telefone do cliente: {response.data[0].get('order_number')}")
+                    return response.data[0]
+
+        # Estratégia 4: Buscar em agendamentos_ai (pré-agendamentos) como fallback
+        if telefone_cliente:
+            agend_response = supabase.table("agendamentos_ai").select("*").eq("telefone", telefone_cliente).order("created_at", desc=True).limit(1).execute()
+
+            if agend_response.data:
+                logger.info(f"✅ Pré-agendamento encontrado por telefone")
+                # Converter dados do pré-agendamento para formato compatível
+                agendamento = agend_response.data[0]
+                return {
+                    "id": agendamento.get("id"),
+                    "order_number": "Pré-agendamento",
+                    "client_name": agendamento.get("nome"),
+                    "scheduled_date": agendamento.get("data_agendada"),
+                    "equipment_type": agendamento.get("equipamento", ""),
+                    "description": agendamento.get("problema", ""),
+                    "status": agendamento.get("status", "pendente"),
+                    "current_location": "Aguardando confirmação",
+                    "is_pre_agendamento": True
+                }
+
+        logger.info(f"❌ Nenhuma OS encontrada com os critérios fornecidos")
+        return None
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao buscar ordem de serviço: {e}")
+        return None
+
+async def processar_status_os(os_data: Dict, supabase) -> Dict:
+    """
+    Processa dados da OS da tabela scheduled_services e busca histórico em service_order_progress
+    """
+    try:
+        # Verificar se é pré-agendamento
+        is_pre_agendamento = os_data.get("is_pre_agendamento", False)
+
+        if is_pre_agendamento:
+            return processar_pre_agendamento(os_data)
+
+        # Extrair dados da scheduled_services
+        numero_os = os_data.get("order_number", "N/A")
+        client_name = os_data.get("client_name", "Cliente")
+        scheduled_date = os_data.get("scheduled_date")
+        equipment_type = os_data.get("equipment_type", "Não especificado")
+        description = os_data.get("description", "")
+        status_raw = os_data.get("status", "").lower()
+        current_location = os_data.get("current_location", "")
+
+        logger.info(f"🔍 Processando OS: {numero_os} - Status: {status_raw}")
+
+        # Buscar histórico de progresso na service_order_progress
+        historico_progresso = await buscar_historico_progresso(supabase, numero_os, os_data.get("id"))
+
+        # Mapear status para descrições em português
+        status_map = {
+            "scheduled": {"status": "agendado", "descricao": "Agendamento confirmado - técnico será enviado"},
+            "in_progress": {"status": "em_andamento", "descricao": "Técnico a caminho ou realizando o atendimento"},
+            "at_workshop": {"status": "na_oficina", "descricao": "Equipamento coletado e em análise na oficina"},
+            "awaiting_approval": {"status": "aguardando_aprovacao", "descricao": "Orçamento enviado - aguardando sua aprovação"},
+            "approved": {"status": "aprovado", "descricao": "Orçamento aprovado - serviço será executado"},
+            "completed": {"status": "concluido", "descricao": "Serviço concluído com sucesso"},
+            "delivered": {"status": "entregue", "descricao": "Equipamento entregue ao cliente"},
+            "paid": {"status": "pago", "descricao": "Pagamento realizado - serviço finalizado"},
+            "cancelled": {"status": "cancelado", "descricao": "Atendimento cancelado"}
+        }
+
+        status_info = status_map.get(status_raw, {"status": status_raw, "descricao": "Status em atualização"})
+
+        # Calcular previsão baseada no status e data agendada
+        previsao = calcular_previsao_status(status_raw, scheduled_date)
+
+        # Processar histórico para informações adicionais
+        diagnostico_info = processar_historico_diagnostico(historico_progresso)
+
+        return {
+            "numero_os": numero_os,
+            "client_name": client_name,
+            "scheduled_date": scheduled_date,
+            "equipment_type": equipment_type,
+            "description": description,
+            "status": status_info["status"],
+            "status_descricao": status_info["descricao"],
+            "current_location": current_location,
+            "previsao": previsao,
+            "historico_progresso": historico_progresso,
+            "diagnostico_realizado": diagnostico_info["diagnostico_realizado"],
+            "observacoes_diagnostico": diagnostico_info["observacoes"],
+            "valor_orcamento": diagnostico_info["valor_orcamento"]
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao processar status OS: {e}")
+        return {
+            "numero_os": "N/A",
+            "status": "erro",
+            "status_descricao": "Erro ao processar informações",
+            "equipment_type": "N/A",
+            "previsao": "Consulte nossa equipe",
+            "current_location": "N/A",
+            "historico_progresso": [],
+            "diagnostico_realizado": False,
+            "observacoes_diagnostico": None,
+            "valor_orcamento": None
+        }
+
+def processar_pre_agendamento(agendamento_data: Dict) -> Dict:
+    """
+    Processa dados de pré-agendamento
+    """
+    try:
+        status_raw = agendamento_data.get("status", "pendente").lower()
+
+        # Mapear status de pré-agendamento
+        if status_raw == "pendente":
+            status_descricao = "Agendamento recebido - nossa equipe entrará em contato para confirmar"
+            previsao = "Confirmação em até 2 horas úteis"
+        elif status_raw == "confirmado":
+            status_descricao = "Agendamento confirmado - técnico será enviado no horário marcado"
+            previsao = "Conforme horário agendado"
+        else:
+            status_descricao = "Agendamento em processamento"
+            previsao = "Aguarde contato da nossa equipe"
+
+        return {
+            "numero_os": "Pré-agendamento",
+            "status": status_raw,
+            "status_descricao": status_descricao,
+            "equipamento": agendamento_data.get("equipamento", "Não especificado"),
+            "previsao": previsao,
+            "valor_orcamento": agendamento_data.get("valor_os"),
+            "observacoes": agendamento_data.get("problema")
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao processar pré-agendamento: {e}")
+        return {
+            "numero_os": "Pré-agendamento",
+            "status": "erro",
+            "status_descricao": "Erro ao processar informações",
+            "equipamento": "N/A",
+            "previsao": "Consulte nossa equipe",
+            "valor_orcamento": None,
+            "observacoes": None
+        }
+
+def calcular_previsao_status(status: str, scheduled_date: str = None) -> str:
+    """
+    Calcula previsão baseada no status atual
+    """
+    try:
+        if status == "scheduled":
+            if scheduled_date:
+                try:
+                    dt = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
+                    data_formatada = dt.strftime('%d/%m/%Y às %H:%M')
+                    return f"Técnico será enviado em {data_formatada}"
+                except:
+                    return "Técnico será enviado conforme agendamento"
+            return "Técnico será enviado em breve"
+
+        elif status == "in_progress":
+            return "Técnico a caminho ou realizando atendimento"
+
+        elif status == "at_workshop":
+            return "Diagnóstico será concluído em até 7 dias úteis"
+
+        elif status == "awaiting_approval":
+            return "Aguardando sua resposta sobre o orçamento"
+
+        elif status == "approved":
+            return "Serviço será executado em até 7 dias úteis"
+
+        elif status == "completed":
+            return "Equipamento pronto para retirada"
+
+        elif status == "delivered":
+            return "Serviço finalizado com sucesso"
+
+        elif status == "paid":
+            return "Atendimento concluído"
+
+        else:
+            return "Consulte nossa equipe para mais detalhes"
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao calcular previsão: {e}")
+        return "Consulte nossa equipe"
+
+def formatar_mensagem_status(status_info: Dict) -> str:
+    """
+    Formata mensagem estruturada para o ClienteChat com dados das tabelas scheduled_services e service_order_progress
+    """
+    try:
+        numero_os = status_info.get("numero_os", "N/A")
+        client_name = status_info.get("client_name", "")
+        scheduled_date = status_info.get("scheduled_date", "")
+        equipment_type = status_info.get("equipment_type", "")
+        description = status_info.get("description", "")
+        status_desc = status_info.get("status_descricao", "")
+        current_location = status_info.get("current_location", "")
+        previsao = status_info.get("previsao", "")
+        diagnostico_realizado = status_info.get("diagnostico_realizado", False)
+        observacoes_diagnostico = status_info.get("observacoes_diagnostico")
+        valor_orcamento = status_info.get("valor_orcamento")
+        historico_progresso = status_info.get("historico_progresso", [])
+
+        # Construir mensagem
+        if numero_os == "Pré-agendamento":
+            mensagem = f"📋 *Pré-agendamento encontrado*\n\n"
+        else:
+            mensagem = f"📋 *Ordem de Serviço {numero_os}*\n\n"
+
+        # Informações básicas
+        mensagem += f"👤 *Cliente:* {client_name}\n"
+        mensagem += f"📊 *Status:* {status_desc}\n"
+
+        if equipment_type and equipment_type != "N/A":
+            mensagem += f"🔧 *Equipamento:* {equipment_type}\n"
+
+        if description:
+            mensagem += f"📝 *Descrição:* {description}\n"
+
+        if current_location:
+            mensagem += f"📍 *Localização atual:* {current_location}\n"
+
+        # Data agendada formatada
+        if scheduled_date:
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
+                data_formatada = dt.strftime('%d/%m/%Y às %H:%M')
+                mensagem += f"📅 *Data agendada:* {data_formatada}\n"
+            except:
+                mensagem += f"📅 *Data agendada:* {scheduled_date}\n"
+
+        if previsao:
+            mensagem += f"⏰ *Previsão:* {previsao}\n"
+
+        # Informações de diagnóstico
+        if diagnostico_realizado:
+            mensagem += f"🔍 *Diagnóstico:* ✅ Realizado\n"
+            if observacoes_diagnostico:
+                mensagem += f"📋 *Observações:* {observacoes_diagnostico}\n"
+        else:
+            mensagem += f"🔍 *Diagnóstico:* ⏳ Pendente\n"
+
+        if valor_orcamento:
+            mensagem += f"💰 *Valor orçamento:* R$ {valor_orcamento:.2f}\n"
+
+        # Histórico resumido (últimas 2 entradas)
+        if historico_progresso and len(historico_progresso) > 0:
+            mensagem += f"\n📈 *Últimas atualizações:*\n"
+            for entrada in historico_progresso[-2:]:  # Últimas 2 entradas
+                data_entrada = entrada.get("data", "")
+                if data_entrada:
+                    try:
+                        dt = datetime.fromisoformat(data_entrada.replace('Z', '+00:00'))
+                        data_formatada = dt.strftime('%d/%m %H:%M')
+                    except:
+                        data_formatada = data_entrada[:10]  # Apenas data
+                else:
+                    data_formatada = "Data N/A"
+
+                status_entrada = entrada.get("status", "")
+                descricao_entrada = entrada.get("descricao", "")
+
+                mensagem += f"• {data_formatada}: {status_entrada}"
+                if descricao_entrada:
+                    mensagem += f" - {descricao_entrada}"
+                mensagem += f"\n"
+
+        mensagem += f"\n💬 *Dúvidas?* Entre em contato: (48) 98833-2664"
+
+        return mensagem
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao formatar mensagem: {e}")
+        return "❌ Erro ao formatar informações. Entre em contato: (48) 98833-2664"
+
+async def buscar_historico_progresso(supabase, numero_os: str, scheduled_service_id: str = None) -> List[Dict]:
+    """
+    Busca histórico específico da OS na tabela service_order_progress
+    """
+    try:
+        logger.info(f"🔍 Buscando histórico para OS: {numero_os} (ID: {scheduled_service_id})")
+
+        historico = []
+
+        # Estratégia 1: Buscar por service_order_id se temos o ID da scheduled_service
+        if scheduled_service_id:
+            response = supabase.table("service_order_progress").select("*").eq(
+                "service_order_id", scheduled_service_id
+            ).order("created_at", desc=False).execute()
+
+            if response.data:
+                logger.info(f"✅ Encontrado histórico por service_order_id: {len(response.data)} registros")
+                historico = response.data
+
+        # Estratégia 2: Se não encontrou, buscar por referência ao número da OS
+        if not historico and numero_os and numero_os != "N/A":
+            # Buscar na tabela scheduled_services primeiro para pegar o ID
+            ss_response = supabase.table("scheduled_services").select("id").eq("order_number", numero_os).execute()
+
+            if ss_response.data:
+                service_id = ss_response.data[0]["id"]
+                response = supabase.table("service_order_progress").select("*").eq(
+                    "service_order_id", service_id
+                ).order("created_at", desc=False).execute()
+
+                if response.data:
+                    logger.info(f"✅ Encontrado histórico por número OS: {len(response.data)} registros")
+                    historico = response.data
+
+        # Processar e formatar histórico
+        historico_formatado = []
+        for item in historico:
+            historico_formatado.append({
+                "data": item.get("created_at"),
+                "status": item.get("status"),
+                "descricao": item.get("description", ""),
+                "observacoes": item.get("notes", ""),
+                "tecnico": item.get("technician_name", ""),
+                "localizacao": item.get("location", "")
+            })
+
+        logger.info(f"📋 Histórico processado: {len(historico_formatado)} entradas")
+        return historico_formatado
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao buscar histórico: {e}")
+        return []
+
+def processar_historico_diagnostico(historico: List[Dict]) -> Dict:
+    """
+    Analisa o histórico para determinar se diagnóstico foi realizado e extrair informações
+    """
+    try:
+        diagnostico_realizado = False
+        observacoes_diagnostico = None
+        valor_orcamento = None
+
+        # Analisar histórico em busca de diagnóstico
+        for entrada in historico:
+            status = entrada.get("status", "").lower()
+            descricao = entrada.get("descricao", "").lower()
+            observacoes = entrada.get("observacoes", "")
+
+            # Verificar se há diagnóstico
+            if any(palavra in status for palavra in ["diagnostic", "diagnos", "analise", "avaliacao"]):
+                diagnostico_realizado = True
+                if observacoes:
+                    observacoes_diagnostico = observacoes
+
+            if any(palavra in descricao for palavra in ["diagnostic", "diagnos", "analise", "avaliacao"]):
+                diagnostico_realizado = True
+                if observacoes:
+                    observacoes_diagnostico = observacoes
+
+            # Verificar se há orçamento
+            if any(palavra in status for palavra in ["orcamento", "budget", "aprovacao", "valor"]):
+                if observacoes and "r$" in observacoes.lower():
+                    # Tentar extrair valor do orçamento
+                    import re
+                    valores = re.findall(r'r\$\s*(\d+(?:,\d{2})?)', observacoes.lower())
+                    if valores:
+                        try:
+                            valor_orcamento = float(valores[0].replace(',', '.'))
+                        except:
+                            pass
+
+        return {
+            "diagnostico_realizado": diagnostico_realizado,
+            "observacoes": observacoes_diagnostico,
+            "valor_orcamento": valor_orcamento
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao processar histórico diagnóstico: {e}")
+        return {
+            "diagnostico_realizado": False,
+            "observacoes": None,
+            "valor_orcamento": None
+        }
+
+# 🔍 ENDPOINT PARA CONSULTA DE STATUS DA OS - CLIENTECHAT
+@app.post("/api/consultar-status-os")
+async def consultar_status_os(request: Request):
+    """
+    🔍 Endpoint para consultar status de ordem de serviço via ClienteChat
+
+    Parâmetros esperados:
+    - nome_cliente: Nome do cliente
+    - telefone_cliente: Telefone do cliente
+    - numero_os: Número da OS (opcional)
+    - endereco: Endereço do atendimento (opcional)
+
+    Retorna informações estruturadas para o ClienteChat processar
+    """
+    try:
+        data = await request.json()
+        logger.info(f"🔍 CONSULTA STATUS OS - Dados recebidos: {data}")
+
+        # Extrair e filtrar dados
+        nome_cliente = filtrar_placeholders(data.get("nome_cliente", "")).strip()
+        telefone_cliente = filtrar_placeholders(data.get("telefone_cliente", "")).strip()
+        numero_os = filtrar_placeholders(data.get("numero_os", "")).strip()
+        endereco = filtrar_placeholders(data.get("endereco", "")).strip()
+
+        logger.info(f"🔍 Dados filtrados: nome='{nome_cliente}', telefone='{telefone_cliente}', os='{numero_os}', endereco='{endereco}'")
+
+        # Validação básica
+        if not nome_cliente and not telefone_cliente and not numero_os:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "message": "❌ Para consultar o status, preciso de pelo menos uma informação: nome completo, telefone ou número da OS."
+                }
+            )
+
+        supabase = get_supabase_client()
+
+        # Buscar ordem de serviço
+        os_encontrada = await buscar_ordem_servico(supabase, nome_cliente, telefone_cliente, numero_os, endereco)
+
+        if not os_encontrada:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "os_encontrada": False,
+                    "message": "❌ Não encontrei nenhuma ordem de serviço com os dados informados.\n\n" +
+                              "📝 Verifique se:\n" +
+                              "• O número da OS está correto\n" +
+                              "• Nome e telefone estão exatos\n" +
+                              "• O atendimento foi realmente agendado\n\n" +
+                              "💬 Se precisar de ajuda, entre em contato: (48) 98833-2664"
+                }
+            )
+
+        # Processar informações da OS com histórico específico
+        status_info = await processar_status_os(os_encontrada, supabase)
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "os_encontrada": True,
+                "numero_os": status_info["numero_os"],
+                "client_name": status_info["client_name"],
+                "scheduled_date": status_info["scheduled_date"],
+                "equipment_type": status_info["equipment_type"],
+                "description": status_info["description"],
+                "status": status_info["status"],
+                "status_descricao": status_info["status_descricao"],
+                "current_location": status_info["current_location"],
+                "previsao": status_info["previsao"],
+                "diagnostico_realizado": status_info["diagnostico_realizado"],
+                "observacoes_diagnostico": status_info["observacoes_diagnostico"],
+                "valor_orcamento": status_info["valor_orcamento"],
+                "historico_progresso": status_info["historico_progresso"],
+                "message": formatar_mensagem_status(status_info)
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao consultar status OS: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "message": f"❌ Erro interno ao consultar status. Tente novamente em alguns instantes."
+            }
+        )
+
 @app.post("/fix-missing-client-ids")
 async def fix_missing_client_ids():
     """
