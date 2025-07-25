@@ -72,22 +72,7 @@
       "purpose": "maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshots/desktop-1.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "platform": "wide",
-      "label": "Dashboard principal do Fix Fogões"
-    },
-    {
-      "src": "/screenshots/mobile-1.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "platform": "narrow",
-      "label": "Interface mobile do Fix Fogões"
-    }
-  ],
+
   "shortcuts": [
     {
       "name": "Nova Ordem de Serviço",
