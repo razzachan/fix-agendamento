@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "whatsapp": {
+      "command": "C:\\Users\\akrom\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\uv.exe",
+      "args": [
+        "--directory",
+        "C:\\Users\\akrom\\OneDrive\\Área de Trabalho\\eletro-fix-hub-pro-main\\whatsapp-mcp\\whatsapp-mcp-server",
+        "run",
+        "main.py"
+      ]
+    }
+  }
+}

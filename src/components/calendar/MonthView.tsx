@@ -22,6 +22,17 @@ const MonthView: React.FC<MonthViewProps> = ({
 }) => {
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
+
+  // Debug: Log eventos do mês
+  console.log(`📅 [MonthView] Mês: ${format(currentDate, 'MM/yyyy')}, Total eventos: ${events.length}`);
+  if (events.length > 0) {
+    console.log('📋 [MonthView] Primeiros eventos:', events.slice(0, 3).map(e => ({
+      id: e.id,
+      clientName: e.clientName,
+      startTime: format(e.startTime, 'dd/MM HH:mm'),
+      status: e.status
+    })));
+  }
   
   // Gerar todas as datas do mês (incluindo dias da semana anterior/posterior para completar o grid)
   const startDate = new Date(monthStart);
@@ -52,16 +63,16 @@ const MonthView: React.FC<MonthViewProps> = ({
   return (
     <Card className="shadow-lg border-0 overflow-hidden">
       <CardContent className="p-0">
-        {/* Cabeçalho dos dias da semana */}
+        {/* Cabeçalho dos dias da semana - compacto no mobile */}
         <div className="grid grid-cols-7 border-b bg-gradient-to-r from-gray-50 to-gray-100">
           {weekDays.map(day => (
-            <div key={day} className="p-4 text-center font-semibold text-gray-700 border-r last:border-r-0">
+            <div key={day} className="p-2 sm:p-4 text-center font-semibold text-gray-700 border-r last:border-r-0 text-xs sm:text-sm">
               {day}
             </div>
           ))}
         </div>
 
-        {/* Grid do calendário */}
+        {/* Grid do calendário - otimizado para mobile */}
         <div className="grid grid-cols-7">
           <AnimatePresence mode="wait">
             {allDays.map((day, index) => {
@@ -77,31 +88,31 @@ const MonthView: React.FC<MonthViewProps> = ({
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ delay: index * 0.01 }}
                   className={`
-                    min-h-[120px] border-r border-b last:border-r-0 p-2 cursor-pointer transition-all duration-200
+                    min-h-[80px] sm:min-h-[120px] border-r border-b last:border-r-0 p-1 sm:p-2 cursor-pointer transition-all duration-200
                     ${isCurrentMonth ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-gray-100'}
-                    ${isTodayDate ? 'bg-blue-50 ring-2 ring-blue-200' : ''}
+                    ${isTodayDate ? 'bg-blue-50 ring-1 sm:ring-2 ring-blue-200' : ''}
                   `}
                   onClick={() => onDateClick?.(day)}
                 >
-                  {/* Número do dia */}
-                  <div className="flex items-center justify-between mb-2">
+                  {/* Número do dia - compacto no mobile */}
+                  <div className="flex items-center justify-between mb-1 sm:mb-2">
                     <span className={`
-                      text-sm font-medium
-                      ${isTodayDate ? 'bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center' : ''}
+                      text-xs sm:text-sm font-medium
+                      ${isTodayDate ? 'bg-blue-600 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs' : ''}
                       ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
                     `}>
                       {format(day, 'd')}
                     </span>
-                    
+
                     {dayEvents.length > 0 && (
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="secondary" className="text-xs px-1 py-0 h-4 sm:h-5">
                         {dayEvents.length}
                       </Badge>
                     )}
                   </div>
 
-                  {/* Eventos do dia */}
-                  <div className="space-y-1">
+                  {/* Eventos do dia - limitados no mobile */}
+                  <div className="space-y-0.5 sm:space-y-1">
                     {dayEvents.slice(0, 3).map((event, eventIndex) => (
                       <Tooltip key={event.id}>
                         <TooltipTrigger asChild>

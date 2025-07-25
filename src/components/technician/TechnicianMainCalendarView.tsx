@@ -19,7 +19,7 @@ import {
   Minimize2,
   Move
 } from 'lucide-react';
-import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, addMonths, subMonths, subDays } from 'date-fns';
+import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, addMonths, subMonths, subDays, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMainCalendar } from '@/hooks/calendar/useMainCalendar';
@@ -48,7 +48,7 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
 }) => {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
+  const [viewMode, setViewMode] = useState<CalendarViewMode>('day');
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedServiceOrder, setSelectedServiceOrder] = useState<ServiceOrder | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -72,8 +72,8 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
         };
       case 'day':
         return {
-          startDate: currentDate,
-          endDate: currentDate
+          startDate: startOfDay(currentDate),
+          endDate: endOfDay(currentDate)
         };
       case 'list':
         return {
@@ -108,6 +108,7 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
   // Efeito para garantir carregamento inicial quando o componente é montado
   useEffect(() => {
     console.log('🔄 [TechnicianMainCalendarView] Componente montado, verificando carregamento...');
+    console.log(`📊 [TechnicianMainCalendarView] Estado atual: events=${events.length}, isLoading=${isLoading}, viewMode=${viewMode}`);
 
     // Forçar carregamento após um pequeno delay para garantir que o hook foi inicializado
     const initTimer = setTimeout(() => {
@@ -119,6 +120,19 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
 
     return () => clearTimeout(initTimer);
   }, [user?.id, technicianId, events.length, isLoading, refreshEvents]);
+
+  // Debug: Log quando eventos mudam
+  useEffect(() => {
+    console.log(`📊 [TechnicianMainCalendarView] Eventos atualizados: ${events.length} eventos para viewMode=${viewMode}`);
+    if (events.length > 0) {
+      console.log('📋 [TechnicianMainCalendarView] Primeiros eventos:', events.slice(0, 3).map(e => ({
+        id: e.id,
+        clientName: e.clientName,
+        startTime: e.startTime.toISOString(),
+        status: e.status
+      })));
+    }
+  }, [events, viewMode]);
 
   // Horários de trabalho (6h às 18h, incluindo slot do almoço para separação visual)
   const workHours = [
@@ -342,34 +356,37 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
 
   return (
     <TooltipProvider>
-      <div className={`space-y-4 pb-20 ${className} ${isFullscreen ? 'fixed inset-0 z-50 bg-white p-4 overflow-auto' : ''}`}>
-        {/* Header simplificado para técnicos */}
+      <div className={`space-y-1 sm:space-y-4 pb-16 sm:pb-20 ${className} ${isFullscreen ? 'fixed inset-0 z-50 bg-white p-1 sm:p-4 overflow-auto' : ''}`}>
+        {/* Header otimizado para mobile */}
         <Card className="shadow-lg border-0">
-          <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-3 rounded-lg shadow-md">
-                  <CalendarIcon className="h-6 w-6 text-white" />
+          <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b p-3 sm:p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-2 sm:p-3 rounded-lg shadow-md">
+                  <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-700 to-emerald-700">
+                  <CardTitle className="text-lg sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-700 to-emerald-700">
                     Meu Calendário
                   </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                     {getViewTitle()}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* Seletor de visualização */}
-                <CalendarViewSelector
-                  currentView={viewMode}
-                  onViewChange={setViewMode}
-                />
+              <div className="flex items-center gap-1 sm:gap-3 flex-wrap w-full sm:w-auto">
+                {/* Seletor de visualização - compacto no mobile */}
+                <div className="w-full sm:w-auto">
+                  <CalendarViewSelector
+                    currentView={viewMode}
+                    onViewChange={setViewMode}
+                    className="w-full sm:w-auto"
+                  />
+                </div>
 
-                {/* Controles simplificados para técnicos */}
-                <div className="flex items-center gap-2">
+                {/* Controles simplificados - ocultos no mobile */}
+                <div className="hidden sm:flex items-center gap-2">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -427,44 +444,48 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
           </CardHeader>
         </Card>
 
-        {/* Navegação */}
+        {/* Navegação otimizada para mobile */}
         <Card className="shadow-md">
-          <CardContent className="p-4">
+          <CardContent className="p-2 sm:p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1 sm:gap-3">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={navigatePrevious}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3"
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  {viewMode === 'month' ? 'Mês Anterior' :
-                   viewMode === 'day' ? 'Dia Anterior' : 'Anterior'}
+                  <span className="hidden sm:inline">
+                    {viewMode === 'month' ? 'Mês Anterior' :
+                     viewMode === 'day' ? 'Dia Anterior' : 'Anterior'}
+                  </span>
                 </Button>
 
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={navigateToday}
-                  className="px-4"
+                  className="px-2 sm:px-4"
                 >
-                  Hoje
+                  <span className="text-xs sm:text-sm">Hoje</span>
                 </Button>
 
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={navigateNext}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3"
                 >
-                  {viewMode === 'month' ? 'Próximo Mês' :
-                   viewMode === 'day' ? 'Próximo Dia' : 'Próximo'}
+                  <span className="hidden sm:inline">
+                    {viewMode === 'month' ? 'Próximo Mês' :
+                     viewMode === 'day' ? 'Próximo Dia' : 'Próximo'}
+                  </span>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
 
-              <div className="text-lg font-semibold">
+              <div className="text-sm sm:text-lg font-semibold text-center flex-1 mx-2">
                 {getViewTitle()}
               </div>
 
@@ -487,69 +508,31 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
             transition={{ duration: 0.3 }}
           >
             {viewMode === 'month' && (
-              <>
-                {isDragDropEnabled ? (
-                  <DragDropCalendar
-                    key={`drag-drop-month-${refreshKey}`}
-                    events={events}
-                    weekDays={weekDays}
-                    workHours={workHours}
-                    onEventUpdate={handleEventUpdate}
-                    onEventClick={handleEventClick}
-                    getEventsByTimeSlot={getEventsByTimeSlot}
-                  />
-                ) : (
-                  <MonthView
-                    currentDate={currentDate}
-                    events={events}
-                    onEventClick={handleEventClick}
-                    onDateClick={handleDateClick}
-                  />
-                )}
-              </>
+              <MonthView
+                currentDate={currentDate}
+                events={events}
+                onEventClick={handleEventClick}
+                onDateClick={handleDateClick}
+              />
             )}
 
             {viewMode === 'day' && (
               <>
-                {isDragDropEnabled ? (
-                  <DragDropCalendar
-                    key={`drag-drop-day-${refreshKey}`}
-                    events={events}
-                    weekDays={weekDays}
-                    workHours={workHours}
-                    onEventUpdate={handleEventUpdate}
-                    onEventClick={handleEventClick}
-                    getEventsByTimeSlot={getEventsByTimeSlot}
-                  />
-                ) : (
-                  <DayView
-                    currentDate={currentDate}
-                    events={events}
-                    onEventClick={handleEventClick}
-                  />
-                )}
+                {/* Debug: Log específico para visualização dia */}
+                {console.log(`📅 [TechnicianMainCalendarView] Renderizando DayView para ${format(currentDate, 'dd/MM/yyyy')} com ${events.length} eventos`)}
+                <DayView
+                  currentDate={currentDate}
+                  events={events}
+                  onEventClick={handleEventClick}
+                />
               </>
             )}
 
             {viewMode === 'list' && (
-              <>
-                {isDragDropEnabled ? (
-                  <DragDropCalendar
-                    key={`drag-drop-list-${refreshKey}`}
-                    events={events}
-                    weekDays={weekDays}
-                    workHours={workHours}
-                    onEventUpdate={handleEventUpdate}
-                    onEventClick={handleEventClick}
-                    getEventsByTimeSlot={getEventsByTimeSlot}
-                  />
-                ) : (
-                  <ListView
-                    events={events}
-                    onEventClick={handleEventClick}
-                  />
-                )}
-              </>
+              <ListView
+                events={events}
+                onEventClick={handleEventClick}
+              />
             )}
 
             {viewMode === 'week' && (

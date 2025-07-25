@@ -43,15 +43,15 @@ const getStatusColor = (status: string) => {
 
 const getStatusBgColor = (status: string) => {
   const statusBgColors: Record<string, string> = {
-    'scheduled': 'bg-blue-50/80',
-    'on_the_way': 'bg-yellow-50/80',
-    'in_progress': 'bg-green-50/80',
-    'collected': 'bg-purple-50/80',
-    'at_workshop': 'bg-orange-50/80',
-    'completed': 'bg-emerald-50/80',
-    'cancelled': 'bg-red-50/80'
+    'scheduled': 'bg-blue-50/80 dark:bg-blue-950/20',
+    'on_the_way': 'bg-yellow-50/80 dark:bg-yellow-950/20',
+    'in_progress': 'bg-green-50/80 dark:bg-green-950/20',
+    'collected': 'bg-purple-50/80 dark:bg-purple-950/20',
+    'at_workshop': 'bg-orange-50/80 dark:bg-orange-950/20',
+    'completed': 'bg-emerald-50/80 dark:bg-emerald-950/20',
+    'cancelled': 'bg-red-50/80 dark:bg-red-950/20'
   };
-  return statusBgColors[status] || 'bg-gray-50/80';
+  return statusBgColors[status] || 'bg-gray-50/80 dark:bg-gray-950/20';
 };
 
 const getStatusLabel = (status: string) => {
@@ -127,7 +127,7 @@ export const ActiveOrderCard: React.FC<ActiveOrderCardProps> = ({
           </div>
           <Badge
             variant="secondary"
-            className="bg-white/70 text-gray-700 border border-gray-200"
+            className="bg-white/70 dark:bg-gray-800/70 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
           >
             {getStatusLabel(order.status)}
           </Badge>

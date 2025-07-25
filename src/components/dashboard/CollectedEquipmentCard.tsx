@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DisplayNumber } from '@/components/common/DisplayNumber';
 import NextStatusButton from '@/components/ServiceOrders/ProgressTracker/NextStatusButton';
+import { cardPresets, cardText, statusBadge, alertClasses } from '@/lib/cardStyles';
 
 interface CollectedEquipmentCardProps {
   collectedOrders: ServiceOrder[];
@@ -50,15 +51,15 @@ export const CollectedEquipmentCard: React.FC<CollectedEquipmentCardProps> = ({
 
   return (
     <>
-      <Card className={cn('border-orange-200 bg-orange-50/50', className)}>
+      <Card className={cn(cardPresets.statusOrange, className)}>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-orange-600" />
-              <span className="text-orange-800">
+              <Package className="w-5 h-5 status-orange-text" />
+              <span className={cardText.primary}>
                 Equipamentos para Oficina
               </span>
-              <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-200">
+              <Badge variant="secondary" className={statusBadge.orange}>
                 {collectedOrders.length} pendente{collectedOrders.length > 1 ? 's' : ''}
               </Badge>
             </div>
@@ -75,9 +76,9 @@ export const CollectedEquipmentCard: React.FC<CollectedEquipmentCardProps> = ({
         
         <CardContent className="space-y-3">
           {/* Alerta de Ação Necessária */}
-          <div className="flex items-center gap-2 p-2 bg-orange-100 border border-orange-200 rounded-lg">
-            <AlertTriangle className="w-4 h-4 text-orange-600" />
-            <div className="text-xs text-orange-700">
+          <div className={cn(alertClasses.warning, "flex items-center gap-2 p-2 rounded-lg")}>
+            <AlertTriangle className="w-4 h-4 status-orange-text" />
+            <div className="text-xs status-orange-text">
               <span className="font-medium">{collectedOrders.length} equipamento{collectedOrders.length > 1 ? 's' : ''}</span> aguardando definição de oficina responsável
             </div>
           </div>
@@ -91,7 +92,7 @@ export const CollectedEquipmentCard: React.FC<CollectedEquipmentCardProps> = ({
                 return (
                   <div
                     key={order.id}
-                    className="p-3 bg-white border border-orange-200 rounded-lg hover:shadow-sm transition-all duration-200"
+                    className={cn(cardSurface.elevated, "p-3 border rounded-lg hover:shadow-sm transition-all duration-200 status-orange-border")}
                   >
                     <div className="space-y-3">
                       {/* Informações do Cliente e Equipamento */}
@@ -99,17 +100,17 @@ export const CollectedEquipmentCard: React.FC<CollectedEquipmentCardProps> = ({
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <User className="w-4 h-4 text-muted-foreground" />
-                            <span className="font-semibold">{order.clientName}</span>
+                            <span className={cn("font-semibold", cardText.primary)}>{order.clientName}</span>
                           </div>
                           <div className="flex items-center gap-2 mb-1">
                             <Wrench className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm">
+                            <span className={cn("text-sm", cardText.secondary)}>
                               {order.equipmentType} {order.equipmentModel && `- ${order.equipmentModel}`}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-orange-600" />
-                            <span className="text-sm text-orange-700">
+                            <Clock className="w-4 h-4 status-orange-text" />
+                            <span className="text-sm status-orange-text">
                               Coletado às {collectionTime}
                             </span>
                           </div>

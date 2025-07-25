@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Client } from '@/types';
+import { formatAddressOneLine, extractAddressFromClient } from '@/utils/addressFormatter';
 import { User, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -37,14 +38,7 @@ const ClientRow: React.FC<ClientRowProps> = ({
         <TableCell>{client.email || '-'}</TableCell>
         <TableCell>{client.phone || '-'}</TableCell>
         <TableCell>
-          {client.address ? (
-            <>
-              {client.address}
-              {client.city && client.state ? `, ${client.city}/${client.state}` : ''}
-            </>
-          ) : (
-            '-'
-          )}
+          {formatAddressOneLine(extractAddressFromClient(client)) || '-'}
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-2">

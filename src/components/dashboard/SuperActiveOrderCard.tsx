@@ -24,12 +24,14 @@ import { ptBR } from 'date-fns/locale';
 import NextStatusButton from '@/components/ServiceOrders/ProgressTracker/NextStatusButton';
 import { DisplayNumber } from '@/components/common/DisplayNumber';
 import { translateStatus } from '@/utils/statusMapping';
+import { cardPresets, cardText, cardSurface, getOrderStatusClasses } from '@/lib/cardStyles';
 
 interface SuperActiveOrderCardProps {
   orders: ServiceOrder[];
   onViewOrder?: (orderId: string) => void;
   onNavigate?: (address: string) => void;
   onUpdateStatus?: (orderId: string, newStatus: ServiceOrderStatus, notes?: string) => Promise<void>;
+  onOpenProgressModal?: (order: ServiceOrder) => void;
   className?: string;
 }
 
@@ -48,15 +50,15 @@ const getStatusColor = (status: string) => {
 
 const getStatusBgColor = (status: string) => {
   const statusBgColors: Record<string, string> = {
-    'scheduled': 'bg-blue-50/80',
-    'on_the_way': 'bg-yellow-50/80',
-    'in_progress': 'bg-green-50/80',
-    'collected': 'bg-purple-50/80',
-    'at_workshop': 'bg-orange-50/80',
-    'completed': 'bg-emerald-50/80',
-    'cancelled': 'bg-red-50/80'
+    'scheduled': 'bg-blue-50/80 dark:bg-blue-950/20',
+    'on_the_way': 'bg-yellow-50/80 dark:bg-yellow-950/20',
+    'in_progress': 'bg-green-50/80 dark:bg-green-950/20',
+    'collected': 'bg-purple-50/80 dark:bg-purple-950/20',
+    'at_workshop': 'bg-orange-50/80 dark:bg-orange-950/20',
+    'completed': 'bg-emerald-50/80 dark:bg-emerald-950/20',
+    'cancelled': 'bg-red-50/80 dark:bg-red-950/20'
   };
-  return statusBgColors[status] || 'bg-gray-50/80';
+  return statusBgColors[status] || 'bg-gray-50/80 dark:bg-gray-950/20';
 };
 
 const getProgressColor = (progress: number) => {
@@ -111,6 +113,7 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
   onViewOrder,
   onNavigate,
   onUpdateStatus,
+  onOpenProgressModal,
   className
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -196,105 +199,163 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
 
   const averageProgress = currentOrders.length > 0 ? totalProgress / currentOrders.length : 0;
 
-  const scheduledTime = primaryOrder.scheduledDate 
+  const scheduledTime = primaryOrder.scheduledDate
     ? format(new Date(primaryOrder.scheduledDate), 'HH:mm', { locale: ptBR })
     : null;
 
+  // Função para gerar link do WhatsApp
+  const getWhatsAppLink = (phone: string) => {
+    // Remover caracteres não numéricos
+    const cleanPhone = phone.replace(/\D/g, '');
+    // Adicionar código do país se não tiver
+    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    return `https://wa.me/${formattedPhone}`;
+  };
+
   return (
-    <Card className={cn(
-      'transition-all duration-300 hover:shadow-lg border-l-4',
-      getStatusColor(primaryOrder.status),
-      getStatusBgColor(primaryOrder.status),
-      className
-    )}>
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Wrench className="w-5 h-5" />
-            <span>
-              {hasMultipleOrders ? `${allActiveOrders.length} Ordens Ativas` : 'Ordem Ativa'}
-            </span>
-            {/* Indicador de filtro do dia atual */}
-            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-              Hoje
-            </Badge>
-{(hasMultipleOrders || allActiveOrders.length > 0) && (
-              <div className="flex gap-1">
-                <Badge variant="secondary" className="bg-[#e5b034]/20 text-[#e5b034] border-[#e5b034]/30">
-                  <Package className="w-3 h-3 mr-1" />
-                  {allActiveOrders.length} equipamento{allActiveOrders.length > 1 ? 's' : ''}
-                </Badge>
-                {(hasMultipleOrders || allActiveOrders.length > 0) && (
-                  <Badge
-                    variant="outline"
-                    className="cursor-pointer hover:bg-blue-50 border-blue-200 text-blue-700"
-                    onClick={() => setIsExpanded(true)}
-                  >
-                    👁️ Ver Detalhes
-                  </Badge>
-                )}
-              </div>
-            )}
-            {hasOverdueOrders && (
-              <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-200">
-                <Clock className="w-3 h-3 mr-1" />
-                {overdueOrders.length} atrasada{overdueOrders.length > 1 ? 's' : ''}
+    <Card
+      className={cn(
+        'transition-all duration-300 hover:shadow-lg border-l-4 overflow-hidden cursor-pointer',
+        getStatusColor(primaryOrder.status),
+        className
+      )}
+      onClick={() => onOpenProgressModal?.(primaryOrder)}
+    >
+      {/* Header Responsivo */}
+      <div className={cn(
+        'px-4 sm:px-6 py-3 sm:py-4 border-b',
+        getStatusBgColor(primaryOrder.status)
+      )}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 flex-shrink-0" />
+              <span className="font-semibold text-sm sm:text-base text-gray-900">
+                {hasMultipleOrders ? `${allActiveOrders.length} Ordens Ativas` : 'Ordem Ativa'}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+              <Badge variant="outline" className="text-xs sm:text-sm bg-blue-50 text-blue-700 border-blue-200 mobile-badge">
+                Hoje
               </Badge>
-            )}
+
+              {allActiveOrders.length > 0 && (
+                <Badge variant="secondary" className="bg-[#e5b034]/20 text-[#e5b034] border-[#e5b034]/30 text-xs sm:text-sm mobile-badge">
+                  <Package className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                  <span className="hidden xs:inline">{allActiveOrders.length} equipamento{allActiveOrders.length > 1 ? 's' : ''}</span>
+                  <span className="xs:hidden">{allActiveOrders.length} equip.</span>
+                </Badge>
+              )}
+
+              {hasOverdueOrders && (
+                <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-200 text-xs sm:text-sm mobile-badge">
+                  <Clock className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                  <span className="hidden xs:inline">{overdueOrders.length} atrasada{overdueOrders.length > 1 ? 's' : ''}</span>
+                  <span className="xs:hidden">{overdueOrders.length} atr.</span>
+                </Badge>
+              )}
+            </div>
           </div>
+
           <Badge
             variant="secondary"
             className={cn(
-              "bg-white/70 border border-gray-200",
-              isOrderOverdue(primaryOrder) ? "text-red-700 border-red-200" : "text-gray-700"
+              "bg-white/70 border text-xs sm:text-sm mobile-badge self-start sm:self-auto",
+              isOrderOverdue(primaryOrder) ? "text-red-700 border-red-200" : "text-gray-700 border-gray-200"
             )}
           >
             {translateStatus(primaryOrder.status)}
-            {isOrderOverdue(primaryOrder) && " (Atrasada)"}
+            {isOrderOverdue(primaryOrder) && (
+              <span className="hidden sm:inline"> (Atrasada)</span>
+            )}
           </Badge>
-        </CardTitle>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
-        {/* Cliente, Telefone e Endereço Principal */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
-          {/* Nome do Cliente */}
-          <div className="flex items-center gap-2">
-            <User className="w-4 h-4 text-blue-600" />
-            <span className="font-semibold text-gray-900">{primaryOrder.clientName}</span>
+        </div>
+      </div>
+
+      {/* Conteúdo Principal Integrado */}
+      <div className="p-6 space-y-6">
+        {/* Informações do Cliente e Equipamento - Layout Responsivo */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          {/* Coluna 1: Cliente e Contato */}
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex items-start gap-3">
+              <User className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-base sm:text-lg text-gray-900 break-words">{primaryOrder.clientName}</div>
+                {primaryOrder.clientPhone && (
+                  <a
+                    href={getWhatsAppLink(primaryOrder.clientPhone)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm sm:text-base text-green-600 hover:text-green-700 hover:underline flex items-center gap-1 mt-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Phone className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                    <span className="break-all">{primaryOrder.clientPhone}</span>
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {primaryOrder.pickupAddress && (
+              <div className="flex items-start gap-3">
+                <MapPin className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <span className="text-sm sm:text-base text-gray-600 break-words">
+                  {primaryOrder.pickupAddress}
+                </span>
+              </div>
+            )}
+
+            {scheduledTime && (
+              <div className="flex items-center gap-3">
+                <Clock className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                <span className="text-sm sm:text-base font-medium">{scheduledTime}</span>
+              </div>
+            )}
           </div>
 
-          {/* Telefone do Cliente */}
-          {primaryOrder.clientPhone && (
-            <div className="flex items-center gap-2">
-              <Phone className="w-4 h-4 text-green-600" />
-              <a
-                href={`tel:${primaryOrder.clientPhone}`}
-                className="text-sm font-medium text-green-600 hover:text-green-700 hover:underline cursor-pointer"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {primaryOrder.clientPhone}
-              </a>
+          {/* Coluna 2: Equipamento e Problema */}
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex items-start gap-3">
+              <Wrench className="w-5 h-5 text-[#e5b034] flex-shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-base sm:text-lg text-gray-900 break-words">
+                  {primaryOrder.equipmentType}
+                  {primaryOrder.equipmentModel && ` - ${primaryOrder.equipmentModel}`}
+                </div>
+                <Badge variant="secondary" className="text-xs sm:text-sm mt-1 mobile-badge">
+                  {primaryOrder.serviceAttendanceType === 'em_domicilio' && '🏠 Em Domicílio'}
+                  {primaryOrder.serviceAttendanceType === 'coleta_diagnostico' && '🔍 Coleta p/ Diagnóstico'}
+                  {primaryOrder.serviceAttendanceType === 'coleta_conserto' && '🔧 Coleta p/ Conserto'}
+                </Badge>
+              </div>
             </div>
-          )}
 
-          {/* Endereço */}
-          {primaryOrder.pickupAddress && (
-            <div className="flex items-start gap-2">
-              <MapPin className="w-4 h-4 text-orange-600 mt-0.5" />
-              <span className="text-sm text-gray-600">
-                {primaryOrder.pickupAddress}
-              </span>
-            </div>
-          )}
+            {primaryOrder.description && (
+              <div className="bg-gray-50 p-3 rounded-lg border">
+                <div className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Problema Relatado:</div>
+                <div className="text-sm sm:text-base text-gray-800 break-words">{primaryOrder.description}</div>
+              </div>
+            )}
+
+            {hasMultipleOrders && (
+              <div className="text-xs sm:text-sm text-muted-foreground">
+                + {allActiveOrders.length - 1} equipamento{allActiveOrders.length > 2 ? 's' : ''} adicional{allActiveOrders.length > 2 ? 'is' : ''}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* 🔥 AÇÃO PRINCIPAL - POSIÇÃO PRIORITÁRIA */}
+        {/* Ação Principal */}
         {onUpdateStatus && (
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg p-4 shadow-sm">
-            <div className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
-              <Zap className="w-4 h-4" />
-              🚀 AÇÃO PRINCIPAL - {primaryOrder.equipmentType}
+          <div
+            className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-base font-semibold text-blue-800 mb-3 flex items-center gap-2">
+              <Zap className="w-5 h-5" />
+              Avançar para Próxima Etapa
             </div>
             <NextStatusButton
               serviceOrder={primaryOrder}
@@ -307,543 +368,155 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
           </div>
         )}
 
-        {/* INFORMAÇÕES DO EQUIPAMENTO E PROBLEMA - DESTAQUE PRINCIPAL */}
-        <div className="bg-[#e5b034]/10 border border-[#e5b034]/30 rounded-lg p-3 space-y-2">
-          <div className="flex items-center gap-2">
-            <Wrench className="w-4 h-4 text-[#e5b034]" />
-            <span className="font-semibold text-[#e5b034]">
-              {hasMultipleOrders ? 'Equipamentos Principais' : 'Equipamento'}
-            </span>
-          </div>
-
-          {/* Mostrar equipamento principal ou resumo */}
-          <div className="space-y-2">
-            <div className="font-medium text-sm">
-              {primaryOrder.equipmentType}
-              {primaryOrder.equipmentModel && ` - ${primaryOrder.equipmentModel}`}
-            </div>
-
-            {/* Tipo de Atendimento */}
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs">
-                {primaryOrder.serviceAttendanceType === 'em_domicilio' && '🏠 Em Domicílio'}
-                {primaryOrder.serviceAttendanceType === 'coleta_diagnostico' && '🔍 Coleta p/ Diagnóstico'}
-                {primaryOrder.serviceAttendanceType === 'coleta_conserto' && '🔧 Coleta p/ Conserto'}
-              </Badge>
-            </div>
-
-            {/* Problema/Descrição */}
-            {primaryOrder.description && (
-              <div className="bg-white/70 p-2 rounded border border-[#e5b034]/20">
-                <div className="text-xs font-medium text-[#e5b034] mb-1">Problema Relatado:</div>
-                <div className="text-sm text-gray-700">
-                  {primaryOrder.description}
-                </div>
-              </div>
-            )}
-
-            {/* Se múltiplos equipamentos, mostrar resumo */}
-            {hasMultipleOrders && (
-              <div className="text-xs text-muted-foreground">
-                + {allActiveOrders.length - 1} equipamento{allActiveOrders.length > 2 ? 's' : ''} adicional{allActiveOrders.length > 2 ? 'is' : ''}
-                {hasOverdueOrders && ` (${overdueOrders.length} atrasado${overdueOrders.length > 1 ? 's' : ''})`}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Horário agendado */}
-        {scheduledTime && (
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{scheduledTime}</span>
-          </div>
-        )}
-
-        {/* Progresso Geral Melhorado */}
+        {/* Progresso */}
         <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Progresso Geral</span>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-base font-medium">Progresso Geral</span>
+            <span className="text-base text-muted-foreground">
               {Math.round(averageProgress)}% concluído
             </span>
           </div>
-
           <div className="relative">
-            <Progress value={averageProgress} className="h-3" />
+            <Progress value={averageProgress} className="h-4" />
             <div
               className={cn(
-                "absolute top-0 left-0 h-3 rounded-full transition-all duration-500",
+                "absolute top-0 left-0 h-4 rounded-full transition-all duration-500",
                 getProgressColor(averageProgress)
               )}
               style={{ width: `${averageProgress}%` }}
             />
           </div>
-
-          {hasMultipleOrders && (
-            <div className="text-xs text-muted-foreground text-center">
-              {allActiveOrders.length} equipamentos ativos
-              {hasOverdueOrders && ` • ${overdueOrders.length} atrasado${overdueOrders.length > 1 ? 's' : ''}`}
-            </div>
-          )}
         </div>
 
-        {/* 🔹 DIVISÓRIA ELEGANTE - Separação Principal vs Outros */}
-        {hasMultipleOrders && (
-          <div className="flex items-center gap-3 py-4">
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-gray-300"></div>
-            <div className="flex items-center gap-2 px-3 py-1 bg-white border border-gray-200 rounded-full shadow-sm">
-              <Package className="w-3 h-3 text-gray-500" />
-              <span className="text-xs font-medium text-gray-600">Outros Equipamentos</span>
-            </div>
-            <div className="flex-1 h-px bg-gradient-to-l from-transparent via-gray-300 to-gray-300"></div>
-          </div>
-        )}
-
-        {/* Resumo dos Equipamentos Adicionais (apenas se múltiplos) */}
+        {/* Equipamentos Adicionais - Versão Simplificada */}
         {hasMultipleOrders && !isExpanded && (
-          <div className="bg-muted/50 rounded-lg p-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-base font-medium text-gray-700">
                 Outros Equipamentos ({allActiveOrders.length - 1})
               </span>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                onClick={() => setIsExpanded(true)}
-                className="h-auto p-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(true);
+                }}
+                className="text-sm"
               >
-                <ChevronDown className="w-4 h-4" />
+                <ChevronDown className="w-4 h-4 mr-1" />
+                Ver Todos
               </Button>
             </div>
 
-            {/* Lista Compacta dos Equipamentos Adicionais */}
             <div className="grid grid-cols-1 gap-2">
-              {allActiveOrders.slice(1, 4).map((order, index) => {
-                const attendanceType = order.serviceAttendanceType || "em_domicilio";
-                const validType = ["em_domicilio", "coleta_conserto", "coleta_diagnostico"].includes(attendanceType)
-                  ? attendanceType as "em_domicilio" | "coleta_conserto" | "coleta_diagnostico"
-                  : "em_domicilio";
-
-                const serviceFlow = getServiceFlow(validType);
-                const currentStepIndex = getCurrentStepIndex(order.status, validType);
-                const orderProgress = serviceFlow.length > 0 ? ((currentStepIndex + 1) / serviceFlow.length) * 100 : 0;
-
-                return (
-                  <div key={order.id} className="p-2 bg-white rounded border border-gray-200 hover:border-gray-300 cursor-pointer transition-all"
-                       onClick={() => setIsExpanded(true)}>
-                    {/* Cliente e Telefone */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1 min-w-0 flex-1">
-                        <User className="w-3 h-3 text-blue-600 flex-shrink-0" />
-                        <span className="text-xs font-medium text-gray-900 truncate">
-                          {order.clientName}
-                        </span>
+              {allActiveOrders.slice(1, 3).map((order) => (
+                <div key={order.id} className={cn(cardSurface.elevated, "flex items-center justify-between p-3 rounded border")}>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className={cn("text-base truncate", cardText.primary)}>
+                        {order.clientName} - {order.equipmentType}
                       </div>
-                      {order.clientPhone && (
-                        <a
-                          href={`tel:${order.clientPhone}`}
-                          className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 ml-2"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Phone className="w-3 h-3" />
-                        </a>
+                      {order.description && (
+                        <div className={cn("text-xs truncate", cardText.secondary)}>
+                          {order.description}
+                        </div>
                       )}
                     </div>
-
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium truncate">
-                        {order.equipmentType} {order.equipmentModel && `- ${order.equipmentModel}`}
-                      </span>
-                      <Badge variant="outline" className="text-xs">
-                        {translateStatus(order.status)}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                      <DisplayNumber item={order} variant="inline" size="sm" showIcon={false} />
-                      <span>{Math.round(orderProgress)}% concluído</span>
-                    </div>
-                    {/* Tipo de Atendimento */}
-                    <div className="text-xs text-muted-foreground mb-1">
-                      {order.serviceAttendanceType === 'em_domicilio' && '🏠 Em Domicílio'}
-                      {order.serviceAttendanceType === 'coleta_diagnostico' && '🔍 Coleta p/ Diagnóstico'}
-                      {order.serviceAttendanceType === 'coleta_conserto' && '🔧 Coleta p/ Conserto'}
-                    </div>
-                    {order.description && (
-                      <div className="text-xs text-muted-foreground mt-1 truncate">
-                        <strong>Problema:</strong> {order.description}
-                      </div>
-                    )}
                   </div>
-                );
-              })}
+                  <Badge variant="outline" className="text-sm">
+                    {translateStatus(order.status)}
+                  </Badge>
+                </div>
+              ))}
 
-              {allActiveOrders.length > 4 && (
-                <div className="text-xs text-muted-foreground text-center pt-1 cursor-pointer hover:text-blue-600"
-                     onClick={() => setIsExpanded(true)}>
-                  +{allActiveOrders.length - 4} equipamentos (clique para ver todos)
+              {allActiveOrders.length > 3 && (
+                <div className="text-sm text-center text-muted-foreground py-2">
+                  +{allActiveOrders.length - 3} equipamentos adicionais
                 </div>
               )}
             </div>
+          </div>
+        )}
 
-            {/* Botão Destacado para Ver Todos */}
-            <Button
-              onClick={() => setIsExpanded(true)}
-              variant="outline"
-              size="sm"
-              className="w-full border-[#e5b034] text-[#e5b034] hover:bg-[#e5b034]/10"
-            >
-              <Package className="w-4 h-4 mr-2" />
-              {hasMultipleOrders
-                ? `Ver Todos os ${allActiveOrders.length} Equipamentos`
-                : 'Ver Detalhes Completos'
-              }
+        {/* Botão para Ver Todos os Detalhes */}
+        {hasMultipleOrders && !isExpanded && (
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(true);
+            }}
+            variant="outline"
+            size="sm"
+            className="w-full border-[#e5b034] text-[#e5b034] hover:bg-[#e5b034]/10 text-base py-3"
+          >
+            <Package className="w-5 h-5 mr-2" />
+            Ver Todos os {allActiveOrders.length} Equipamentos
             </Button>
+        )}
 
-            {/* Mostrar ordens atrasadas separadamente */}
-            {hasOverdueOrders && (
-              <div className="border-t pt-2 mt-2">
-                <div className="text-xs font-medium text-red-700 mb-1">Atrasadas:</div>
-                {overdueOrders.slice(0, 2).map((order) => (
-                  <div key={order.id} className="flex items-center justify-between text-xs text-red-600">
-                    <span className="truncate">
-                      {order.equipmentType} {order.equipmentModel && `- ${order.equipmentModel}`}
-                    </span>
-                    <Badge variant="outline" className="text-xs border-red-200 text-red-700">
+        {/* Vista Expandida - Simplificada */}
+        {isExpanded && (
+          <div className="border-t pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-base font-medium">Todos os Equipamentos ({allActiveOrders.length})</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(false);
+                }}
+                className="text-sm"
+              >
+                <ChevronUp className="w-4 h-4 mr-1" />
+                Recolher
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {allActiveOrders.map((order) => (
+                <div key={order.id} className={cn(cardSurface.elevated, "flex items-center justify-between p-4 rounded border")}>
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <User className="w-5 h-5 status-blue-text flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className={cn("font-medium text-base truncate", cardText.primary)}>
+                        {order.clientName}
+                      </div>
+                      <div className={cn("text-sm truncate", cardText.secondary)}>
+                        {order.equipmentType} {order.equipmentModel && `- ${order.equipmentModel}`}
+                      </div>
+                      {order.description && (
+                        <div className={cn("text-xs truncate mt-1", cardText.muted)}>
+                          Problema: {order.description}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {order.clientPhone && (
+                      <a
+                        href={getWhatsAppLink(order.clientPhone)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-green-600 hover:text-green-700"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Phone className="w-4 h-4" />
+                      </a>
+                    )}
+                    <Badge variant="outline" className="text-sm">
                       {translateStatus(order.status)}
                     </Badge>
                   </div>
-                ))}
-                {overdueOrders.length > 2 && (
-                  <div className="text-xs text-red-500 text-center pt-1">
-                    +{overdueOrders.length - 2} atrasadas
-                  </div>
-                )}
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
-
-        {/* Vista Expandida - Detalhes de Todas as Ordens */}
-        {isExpanded && (
-          <div className="space-y-4">
-            {/* 🔹 DIVISÓRIA EXPANDIDA - Detalhes Completos */}
-            <div className="flex items-center gap-3 py-2">
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-300 to-blue-300"></div>
-              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full shadow-sm">
-                <Package className="w-3 h-3 text-blue-600" />
-                <span className="text-xs font-medium text-blue-700">Detalhes dos Equipamentos</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsExpanded(false)}
-                  className="h-auto p-0.5 ml-1 hover:bg-blue-100"
-                >
-                  <ChevronUp className="w-3 h-3 text-blue-600" />
-                </Button>
-              </div>
-              <div className="flex-1 h-px bg-gradient-to-l from-transparent via-blue-300 to-blue-300"></div>
-            </div>
-
-            {/* Ordens Atuais */}
-            {currentOrders.length > 0 && (
-              <div className="space-y-3">
-                <div className="text-sm font-medium text-green-700">Ordens Atuais</div>
-                {currentOrders.map((order) => {
-                const attendanceType = order.serviceAttendanceType || "em_domicilio";
-                const validType = ["em_domicilio", "coleta_conserto", "coleta_diagnostico"].includes(attendanceType)
-                  ? attendanceType as "em_domicilio" | "coleta_conserto" | "coleta_diagnostico"
-                  : "em_domicilio";
-
-                const serviceFlow = getServiceFlow(validType);
-                const currentStepIndex = getCurrentStepIndex(order.status, validType);
-                const orderProgress = serviceFlow.length > 0 ? ((currentStepIndex + 1) / serviceFlow.length) * 100 : 0;
-
-                return (
-                  <div
-                    key={order.id}
-                    className={cn(
-                      "p-3 border rounded-lg cursor-pointer transition-all duration-200",
-                      selectedOrderId === order.id
-                        ? 'border-[#e5b034] bg-[#e5b034]/5 shadow-sm'
-                        : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                    )}
-                    onClick={() => setSelectedOrderId(selectedOrderId === order.id ? null : order.id)}
-                  >
-                    <div className="space-y-2">
-                      {/* Informações do Cliente */}
-                      <div className="bg-gray-50 border border-gray-200 rounded p-2 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <User className="w-3 h-3 text-blue-600" />
-                            <span className="text-sm font-medium text-gray-900">{order.clientName}</span>
-                          </div>
-                          {order.clientPhone && (
-                            <a
-                              href={`tel:${order.clientPhone}`}
-                              className="flex items-center gap-1 text-sm text-green-600 hover:text-green-700 hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Phone className="w-3 h-3" />
-                              <span className="text-xs">{order.clientPhone}</span>
-                            </a>
-                          )}
-                        </div>
-                        {order.pickupAddress && (
-                          <div className="flex items-start gap-2">
-                            <MapPin className="w-3 h-3 text-orange-600 mt-0.5" />
-                            <span className="text-xs text-gray-600">{order.pickupAddress}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">
-                            {order.equipmentType} {order.equipmentModel && `- ${order.equipmentModel}`}
-                          </div>
-                          <div className="text-xs text-gray-500 flex items-center gap-2">
-                            <DisplayNumber item={order} variant="inline" size="sm" showIcon={false} />
-                            <span className="text-[#e5b034]">
-                              {order.serviceAttendanceType === 'em_domicilio' && '🏠 Em Domicílio'}
-                              {order.serviceAttendanceType === 'coleta_diagnostico' && '🔍 Coleta p/ Diagnóstico'}
-                              {order.serviceAttendanceType === 'coleta_conserto' && '🔧 Coleta p/ Conserto'}
-                            </span>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {translateStatus(order.status)}
-                        </Badge>
-                      </div>
-
-                      {/* Problema/Descrição - DESTAQUE */}
-                      {order.description && (
-                        <div className="bg-[#e5b034]/10 border border-[#e5b034]/30 p-2 rounded">
-                          <div className="text-xs font-medium text-[#e5b034] mb-1">Problema Relatado:</div>
-                          <div className="text-sm text-gray-700">
-                            {order.description}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Progresso Individual */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span>Progresso</span>
-                          <span>{Math.round(orderProgress)}%</span>
-                        </div>
-                        <Progress value={orderProgress} className="h-1.5" />
-                      </div>
-
-                      {/* Ações de Progresso para Ordem Selecionada */}
-                      {selectedOrderId === order.id && onUpdateStatus && (
-                        <div className="pt-2 border-t">
-                          <NextStatusButton
-                            serviceOrder={order}
-                            onUpdateStatus={async (orderId: string, newStatus: string, notes?: string) => {
-                              await onUpdateStatus(orderId, newStatus as ServiceOrderStatus, notes);
-                              return true;
-                            }}
-                            relatedOrders={orders.filter(o => o.id !== order.id)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              </div>
-            )}
-
-            {/* Ordens Atrasadas */}
-            {hasOverdueOrders && (
-              <div className="space-y-3">
-                <div className="text-sm font-medium text-red-700 flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  Ordens Atrasadas ({overdueOrders.length})
-                </div>
-                {overdueOrders.map((order) => {
-                  const attendanceType = order.serviceAttendanceType || "em_domicilio";
-                  const validType = ["em_domicilio", "coleta_conserto", "coleta_diagnostico"].includes(attendanceType)
-                    ? attendanceType as "em_domicilio" | "coleta_conserto" | "coleta_diagnostico"
-                    : "em_domicilio";
-
-                  const serviceFlow = getServiceFlow(validType);
-                  const currentStepIndex = getCurrentStepIndex(order.status, validType);
-                  const orderProgress = serviceFlow.length > 0 ? ((currentStepIndex + 1) / serviceFlow.length) * 100 : 0;
-
-                  const scheduledTime = order.scheduledDate
-                    ? format(new Date(order.scheduledDate), 'HH:mm', { locale: ptBR })
-                    : null;
-
-                  return (
-                    <div
-                      key={order.id}
-                      className={cn(
-                        "p-3 border rounded-lg cursor-pointer transition-all duration-200 bg-red-50/50",
-                        selectedOrderId === order.id
-                          ? 'border-red-400 bg-red-100/50 shadow-sm'
-                          : 'border-red-200 hover:border-red-300 hover:shadow-sm'
-                      )}
-                      onClick={() => setSelectedOrderId(selectedOrderId === order.id ? null : order.id)}
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="font-medium text-sm text-red-800">
-                              {order.equipmentType} {order.equipmentModel && `- ${order.equipmentModel}`}
-                            </div>
-                            <div className="text-xs text-red-600 flex items-center gap-2">
-                              <DisplayNumber item={order} variant="inline" size="sm" showIcon={false} />
-                              <span className="text-red-700">
-                                {order.serviceAttendanceType === 'em_domicilio' && '🏠 Em Domicílio'}
-                                {order.serviceAttendanceType === 'coleta_diagnostico' && '🔍 Coleta p/ Diagnóstico'}
-                                {order.serviceAttendanceType === 'coleta_conserto' && '🔧 Coleta p/ Conserto'}
-                              </span>
-                              {scheduledTime && (
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  Agendado: {scheduledTime}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <Badge variant="outline" className="text-xs border-red-200 text-red-700">
-                            {translateStatus(order.status)} (Atrasada)
-                          </Badge>
-                        </div>
-
-                        {/* Problema/Descrição - DESTAQUE PARA ATRASADAS */}
-                        {order.description && (
-                          <div className="bg-red-100/70 border border-red-300/50 p-2 rounded">
-                            <div className="text-xs font-medium text-red-700 mb-1">Problema Relatado:</div>
-                            <div className="text-sm text-red-800">
-                              {order.description}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Progresso Individual */}
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-red-700">Progresso</span>
-                            <span className="text-red-700">{Math.round(orderProgress)}%</span>
-                          </div>
-                          <Progress value={orderProgress} className="h-1.5" />
-                        </div>
-
-                        {/* Ações de Progresso para Ordem Selecionada */}
-                        {selectedOrderId === order.id && onUpdateStatus && (
-                          <div className="pt-2 border-t border-red-200">
-                            <NextStatusButton
-                              serviceOrder={order}
-                              onUpdateStatus={async (orderId: string, newStatus: string, notes?: string) => {
-                                await onUpdateStatus(orderId, newStatus as ServiceOrderStatus, notes);
-                                return true;
-                              }}
-                              relatedOrders={sortedOrders.filter(o => o.id !== order.id)}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Ações Rápidas */}
-        <div className="space-y-3 pt-2">
-          {/* Botões de Navegação e Contato */}
-          <div className="flex gap-2">
-            {/* Botão de Navegação */}
-            {onNavigate && primaryOrder.pickupAddress && (
-              <Button
-                onClick={() => onNavigate(primaryOrder.pickupAddress!)}
-                variant="outline"
-                size="sm"
-                className="flex-1"
-              >
-                <MapPin className="w-4 h-4 mr-2" />
-                Navegar
-              </Button>
-            )}
-
-            {/* Botão de Telefone */}
-            {primaryOrder.clientPhone && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="px-3"
-                onClick={() => window.open(`tel:${primaryOrder.clientPhone}`)}
-              >
-                <Phone className="w-4 h-4" />
-              </Button>
-            )}
-
-            {/* Botão de Detalhes */}
-            {onViewOrder && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="px-3"
-                onClick={() => onViewOrder(primaryOrder.id)}
-              >
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Rodapé com Informações */}
-        <div className="flex justify-between items-center pt-3 border-t text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Calendar className="w-3 h-3" />
-            <DisplayNumber item={primaryOrder} variant="inline" size="sm" showIcon={false} />
-          </div>
-
-          {hasMultipleOrders && (
-            <div className="flex items-center gap-2 text-xs">
-              <div className="flex items-center gap-1">
-                <Package className="w-3 h-3 text-green-600" />
-                <span className="text-green-700">{currentOrders.length} atuais</span>
-              </div>
-              {hasOverdueOrders && (
-                <div className="flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-red-600" />
-                  <span className="text-red-700">{overdueOrders.length} atrasada{overdueOrders.length > 1 ? 's' : ''}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {currentOrders.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="h-auto px-3 py-1 text-xs border-[#e5b034] text-[#e5b034] hover:bg-[#e5b034]/10"
-            >
-              {isExpanded ? (
-                <>
-                  <ChevronUp className="w-3 h-3 mr-1" />
-                  Recolher Detalhes
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="w-3 h-3 mr-1" />
-                  {hasMultipleOrders
-                    ? `Ver Detalhes (${allActiveOrders.length})`
-                    : 'Ver Detalhes'
-                  }
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-      </CardContent>
+      </div>
     </Card>
   );
 };

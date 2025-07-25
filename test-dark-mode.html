@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Dark Mode</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Variáveis CSS do sistema */
+        :root {
+            --card-surface: 0 0% 100%;
+            --card-surface-elevated: 0 0% 98%;
+            --card-text-primary: 222.2 84% 4.9%;
+            --card-text-secondary: 215.4 16.3% 46.9%;
+            --card-text-muted: 215.4 16.3% 56.9%;
+            --card-border: 214.3 31.8% 91.4%;
+            --card-border-accent: 214.3 31.8% 81.4%;
+            
+            --status-orange-bg: 25 95% 97%;
+            --status-orange-text: 25 95% 32%;
+            --status-orange-border: 25 95% 88%;
+        }
+        
+        .dark {
+            --card-surface: 217.2 32.6% 17.5%;
+            --card-surface-elevated: 215 20.2% 25%;
+            --card-text-primary: 210 40% 98%;
+            --card-text-secondary: 215 20.2% 65.1%;
+            --card-text-muted: 215.4 16.3% 56.9%;
+            --card-border: 217.2 32.6% 25%;
+            --card-border-accent: 215 20.2% 35%;
+            
+            --status-orange-bg: 25 95% 20%;
+            --status-orange-text: 25 95% 78%;
+            --status-orange-border: 25 95% 35%;
+        }
+        
+        .card-surface {
+            background-color: hsl(var(--card-surface));
+            color: hsl(var(--card-text-primary));
+            border-color: hsl(var(--card-border));
+        }
+        
+        .card-text-primary {
+            color: hsl(var(--card-text-primary));
+        }
+        
+        .status-orange {
+            background-color: hsl(var(--status-orange-bg));
+            color: hsl(var(--status-orange-text));
+            border-color: hsl(var(--status-orange-border));
+        }
+        
+        /* Correções globais */
+        .dark .bg-white {
+            background-color: hsl(var(--card-surface)) !important;
+        }
+        
+        .dark .text-gray-900 {
+            color: hsl(var(--card-text-primary)) !important;
+        }
+        
+        .dark .bg-orange-100 {
+            background-color: hsl(var(--status-orange-bg)) !important;
+        }
+        
+        .dark .text-orange-700 {
+            color: hsl(var(--status-orange-text)) !important;
+        }
+    </style>
+</head>
+<body class="p-8 bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div class="max-w-4xl mx-auto space-y-6">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Teste Dark Mode</h1>
+            <button 
+                onclick="toggleDarkMode()" 
+                class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+                Toggle Dark Mode
+            </button>
+        </div>
+        
+        <!-- Card com classes antigas (problemáticas) -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 class="text-lg font-semibold text-gray-900 mb-2">Card com Classes Antigas</h2>
+            <p class="text-gray-700">Este card usa bg-white e text-gray-900</p>
+            <div class="mt-3 bg-orange-100 text-orange-700 p-2 rounded border border-orange-200">
+                Badge laranja com classes antigas
+            </div>
+        </div>
+        
+        <!-- Card com novo sistema -->
+        <div class="card-surface border rounded-lg p-4">
+            <h2 class="text-lg font-semibold card-text-primary mb-2">Card com Novo Sistema</h2>
+            <p class="card-text-secondary">Este card usa o novo sistema de cores</p>
+            <div class="mt-3 status-orange p-2 rounded border">
+                Badge laranja com novo sistema
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+        }
+    </script>
+</body>
+</html>

@@ -61,16 +61,35 @@ export async function createServiceOrder(serviceOrder: ServiceOrder): Promise<st
       // Continue with service order creation even if client creation fails
     }
 
-    // Calcular o valor final a partir dos serviceItems
+    // Calcular valores usando o novo serviço de preços
+    const serviceItems = serviceOrder.serviceItems || [];
+    const serviceAttendanceType = serviceOrder.serviceAttendanceType || 'em_domicilio';
+
+    // Para coleta diagnóstico, o valor inicial é o sinal
+    let initialCost = 0;
     let finalCost = 0;
-    if (serviceOrder.serviceItems && serviceOrder.serviceItems.length > 0) {
-      finalCost = serviceOrder.serviceItems.reduce((total, item) => {
-        const itemValue = parseFloat(item.serviceValue || '0') / 100; // Converter de centavos para reais
+
+    if (serviceAttendanceType === 'coleta_diagnostico') {
+      // Para coleta diagnóstico, o valor dos items é o sinal
+      initialCost = serviceItems.reduce((total, item) => {
+        const itemValue = parseFloat(item.serviceValue || '0') / 100;
+        return total + itemValue;
+      }, 0) || 350; // Fallback R$ 350,00
+
+      finalCost = initialCost; // Inicialmente igual ao sinal, será atualizado após diagnóstico
+    } else {
+      // Para outros tipos, valor total direto
+      finalCost = serviceItems.reduce((total, item) => {
+        const itemValue = parseFloat(item.serviceValue || '0') / 100;
         return total + itemValue;
       }, 0);
     }
 
-    console.log(`💰 Valor final calculado: R$ ${finalCost.toFixed(2)}`);
+    console.log(`💰 Valores calculados:`, {
+      serviceAttendanceType,
+      initialCost,
+      finalCost
+    });
 
     // ✅ Gerar número sequencial da OS (igual ao middleware)
     const orderNumber = await generateNextOrderNumber();
@@ -101,7 +120,8 @@ export async function createServiceOrder(serviceOrder: ServiceOrder): Promise<st
       client_email: serviceOrder.clientEmail || null,
       client_phone: serviceOrder.clientPhone || null,
       client_cpf_cnpj: serviceOrder.clientCpfCnpj || null,
-      final_cost: finalCost // ✅ Adicionar o valor final
+      initial_cost: initialCost, // ✅ Valor inicial (sinal para coleta diagnóstico)
+      final_cost: finalCost // ✅ Valor final total
     };
 
     console.log("Inserting service order with:", JSON.stringify({

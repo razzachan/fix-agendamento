@@ -149,7 +149,9 @@ export const useMainCalendar = ({
     setError(null);
 
     try {
-      console.log(`🔍 [useMainCalendar] Buscando eventos de ${format(startDate, 'dd/MM/yyyy')} até ${format(endDate, 'dd/MM/yyyy')}`);
+      console.log(`🔍 [useMainCalendar] Buscando eventos de ${format(startDate, 'dd/MM/yyyy HH:mm')} até ${format(endDate, 'dd/MM/yyyy HH:mm')}`);
+      console.log(`🔍 [useMainCalendar] Range ISO: ${startDate.toISOString()} até ${endDate.toISOString()}`);
+      console.log(`🔍 [useMainCalendar] TechnicianId: ${technicianId}, User role: ${user?.role}`);
 
       let scheduledServices: ScheduledService[] = [];
 
@@ -250,6 +252,8 @@ export const useMainCalendar = ({
 
           // 1. Buscar serviços de um técnico específico (excluindo cancelados)
           const allServices = await scheduledServiceService.getByTechnicianId(technicianId);
+          console.log(`📋 [useMainCalendar] Serviços brutos do técnico ${technicianId}: ${allServices.length}`);
+
           const filteredServices = allServices.filter(service => {
             // Excluir serviços cancelados do calendário
             if (service.status === 'cancelled') {
@@ -265,7 +269,12 @@ export const useMainCalendar = ({
             }
 
             const serviceDate = new Date(service.scheduledStartTime);
-            return serviceDate >= startDate && serviceDate <= endDate;
+            const inRange = serviceDate >= startDate && serviceDate <= endDate;
+
+            // Debug: Log detalhado da filtragem por data
+            console.log(`📅 [useMainCalendar] Serviço ${service.id}: ${format(serviceDate, 'dd/MM/yyyy HH:mm')} - Range: ${format(startDate, 'dd/MM/yyyy HH:mm')} até ${format(endDate, 'dd/MM/yyyy HH:mm')} - InRange: ${inRange}`);
+
+            return inRange;
           });
 
           console.log(`📋 [useMainCalendar] Encontrados ${filteredServices.length} serviços em scheduled_services (técnico ${technicianId})`);

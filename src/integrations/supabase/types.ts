@@ -421,6 +421,8 @@ export type Database = {
           equipment_model: string | null
           equipment_serial: string | null
           equipment_type: string
+          final_cost: number | null
+          initial_cost: number | null
           id: string
           needs_pickup: boolean | null
           pickup_address: string | null
@@ -446,6 +448,8 @@ export type Database = {
           equipment_model?: string | null
           equipment_serial?: string | null
           equipment_type: string
+          final_cost?: number | null
+          initial_cost?: number | null
           id?: string
           needs_pickup?: boolean | null
           pickup_address?: string | null
@@ -471,9 +475,12 @@ export type Database = {
           equipment_model?: string | null
           equipment_serial?: string | null
           equipment_type?: string
+          final_cost?: number | null
+          initial_cost?: number | null
           id?: string
           needs_pickup?: boolean | null
           pickup_address?: string | null
+          pickup_address_complement?: string | null
           pickup_city?: string | null
           pickup_state?: string | null
           pickup_zip_code?: string | null

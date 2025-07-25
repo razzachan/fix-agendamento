@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import ServiceOrderPricingService from '../serviceOrder/serviceOrderPricingService';
 
 /**
  * Service para gerenciar orçamentos no sistema
@@ -227,7 +228,24 @@ export const quoteService = {
         throw eventError;
       }
 
-      // 2. Atualizar status da ordem para 'quote_approved'
+      // 2. Buscar o diagnóstico para obter o valor estimado
+      const { data: diagnosisData, error: diagnosisError } = await supabase
+        .from('diagnosis')
+        .select('estimated_cost')
+        .eq('service_order_id', serviceOrderId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      // 3. Atualizar valores se for coleta diagnóstico
+      if (diagnosisData?.estimated_cost) {
+        await ServiceOrderPricingService.updatePricingAfterQuoteApproval(
+          serviceOrderId,
+          diagnosisData.estimated_cost
+        );
+      }
+
+      // 4. Atualizar status da ordem para 'quote_approved'
       const { error: updateError } = await supabase
         .from('service_orders')
         .update({ status: 'quote_approved' })

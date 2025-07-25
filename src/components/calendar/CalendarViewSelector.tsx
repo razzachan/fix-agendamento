@@ -40,14 +40,14 @@ const CalendarViewSelector: React.FC<CalendarViewSelectorProps> = ({
               size="sm"
               onClick={() => onViewChange(view.id)}
               className={`
-                relative z-10 flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all duration-200
-                ${isActive 
-                  ? 'bg-white text-blue-600 shadow-sm' 
+                relative z-10 flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all duration-200
+                ${isActive
+                  ? 'bg-white text-blue-600 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
                 }
               `}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden sm:inline">{view.label}</span>
             </Button>
             

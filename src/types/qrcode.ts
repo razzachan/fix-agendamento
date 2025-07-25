@@ -123,6 +123,7 @@ export interface QRCodeLabel {
   orderNumber: string;
   equipmentType: string;
   clientName: string;
+  description?: string;  // 🔧 QR CODE: Problema relatado pelo cliente
   generatedDate: string;
   printConfig: QRCodePrintConfig;
 }

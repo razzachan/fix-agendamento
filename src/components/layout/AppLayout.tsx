@@ -2,7 +2,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from './AppSidebar';
 import Header from './Header';
 import { PWAInstallPrompt } from '@/components/pwa/PWAInstallPrompt';
@@ -37,21 +36,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   console.log('🔔 [AppLayout] Renderizando AppLayout');
 
   return (
-    <SidebarProvider defaultOpen={false}>
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
       <AppSidebar />
-      <SidebarInset>
+      <div className="flex-1 flex flex-col transition-all duration-300" style={{ marginLeft: 'var(--sidebar-width, 80px)' }}>
         {console.log('🔔 [AppLayout] Renderizando Header')}
         <Header />
-        <main className="flex-1 overflow-y-auto p-4 bg-gray-50">
-          <div className="container mx-auto">
+        <main className="flex-1 overflow-y-auto pt-16 md:pt-4 bg-gray-50 dark:bg-gray-900">
+          <div className="w-full max-w-full sm:container sm:mx-auto mobile-safe-area px-3 sm:px-0">
             {children}
           </div>
         </main>
-      </SidebarInset>
-
-      {/* Componentes PWA */}
-      <PWAInstallPrompt />
-    </SidebarProvider>
+        {/* Componentes PWA */}
+        <PWAInstallPrompt />
+      </div>
+    </div>
   );
 };
 

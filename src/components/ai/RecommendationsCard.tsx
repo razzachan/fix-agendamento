@@ -86,13 +86,13 @@ export function RecommendationsCard() {
   const getImpactColor = (impact: string) => {
     switch (impact) {
       case 'Alto':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200';
       case 'Médio':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200';
       case 'Baixo':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 dark:bg-gray-800/30 text-gray-800 dark:text-gray-200';
     }
   };
 
@@ -102,13 +102,13 @@ export function RecommendationsCard() {
   const getEffortColor = (effort: string) => {
     switch (effort) {
       case 'Baixo':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200';
       case 'Médio':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200';
       case 'Alto':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 dark:bg-gray-800/30 text-gray-800 dark:text-gray-200';
     }
   };
 

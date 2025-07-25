@@ -1,0 +1,231 @@
+/* Modern Sidebar Styles - Based on CodingNepal Design */
+/* Agora usando classes do Tailwind para dark mode */
+
+/* Site Navigation (Mobile) - usando classes Tailwind */
+.site-nav {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding: 12px 16px;
+}
+
+@media (max-width: 768px) {
+  .site-nav {
+    display: block;
+  }
+}
+
+/* Sidebar - usando classes Tailwind */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  transition: width 0.4s ease, transform 0.4s ease;
+  z-index: 50;
+  width: 288px; /* w-72 */
+}
+
+.sidebar.collapsed {
+  width: 80px; /* w-20 */
+}
+
+/* CSS Variables for layout */
+:root {
+  --sidebar-width: 288px;
+}
+
+.sidebar.collapsed ~ * {
+  --sidebar-width: 80px;
+}
+
+@media (max-width: 768px) {
+  .sidebar.collapsed {
+    transform: translateX(-100%);
+    width: 288px;
+  }
+}
+
+/* Sidebar Header - usando classes Tailwind */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+/* Sidebar Content - usando classes Tailwind */
+.sidebar-content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.sidebar.collapsed .sidebar-content {
+  scrollbar-width: none;
+}
+
+/* Search Form - usando classes Tailwind */
+.search-form {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 24px;
+  border-radius: 8px;
+  transition: all 0.4s ease;
+  cursor: pointer;
+}
+
+.search-form input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 14px;
+}
+
+/* Menu List - usando classes Tailwind */
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu-item {
+  position: relative;
+}
+
+.menu-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border: none;
+  background: transparent;
+  width: 100%;
+  cursor: pointer;
+}
+
+.menu-label {
+  font-weight: 500;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar.collapsed .menu-label {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Sidebar Footer - usando classes Tailwind */
+.sidebar-footer {
+  padding: 16px;
+}
+
+/* Theme Toggle - usando classes Tailwind */
+.theme-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.theme-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-text {
+  font-size: 14px;
+  font-weight: 500;
+  transition: opacity 0.4s 0.2s ease;
+}
+
+.sidebar.collapsed .theme-text,
+.sidebar.collapsed .theme-toggle-track {
+  opacity: 0;
+  width: 0;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle-track {
+  height: 24px;
+  width: 48px;
+  border-radius: 999px;
+  margin-left: auto;
+  position: relative;
+  transition: opacity 0.4s 0.2s ease, background-color 0.3s ease;
+}
+
+.theme-toggle-indicator {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.6);
+    transition: 0.4s ease;
+  }
+
+  body:has(.sidebar:not(.collapsed))::before {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  body:has(.sidebar:not(.collapsed)) {
+    overflow: hidden;
+  }
+}
+
+/* Scrollbar Styling - usando classes Tailwind */
+.sidebar-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 dark:bg-gray-600;
+  border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+  @apply bg-[#e5b034];
+}
+
+.sidebar.collapsed .sidebar-content::-webkit-scrollbar {
+  display: none;
+}

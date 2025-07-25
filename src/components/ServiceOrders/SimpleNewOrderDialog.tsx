@@ -29,8 +29,11 @@ const SimpleNewOrderDialog: React.FC<SimpleNewOrderDialogProps> = ({
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [clientAddressComplement, setClientAddressComplement] = useState('');
   const [equipmentType, setEquipmentType] = useState('');
   const [problem, setProblem] = useState('');
+  const [serviceValue, setServiceValue] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,11 +61,14 @@ const SimpleNewOrderDialog: React.FC<SimpleNewOrderDialogProps> = ({
         completedDate: null,
         equipmentModel: null,
         equipmentSerial: null,
-        needsPickup: false,
-        pickupAddress: null,
-        currentLocation: 'workshop',
+        needsPickup: !!clientAddress,
+        pickupAddress: clientAddress || null,
+        pickupAddressComplement: clientAddressComplement || null,
+        currentLocation: clientAddress ? 'client' : 'workshop',
         serviceAttendanceType: 'em_domicilio',
-        clientDescription: problem
+        clientDescription: problem,
+        initialCost: 0, // Em domicílio não tem sinal
+        finalCost: serviceValue ? parseFloat(serviceValue) / 100 : 0
       };
 
       if (onCreateOrder) {
@@ -90,8 +96,11 @@ const SimpleNewOrderDialog: React.FC<SimpleNewOrderDialogProps> = ({
     setClientName('');
     setClientPhone('');
     setClientEmail('');
+    setClientAddress('');
+    setClientAddressComplement('');
     setEquipmentType('');
     setProblem('');
+    setServiceValue('');
   };
 
   const handleCancel = () => {
@@ -146,6 +155,26 @@ const SimpleNewOrderDialog: React.FC<SimpleNewOrderDialogProps> = ({
             </div>
 
             <div>
+              <Label htmlFor="clientAddress">Endereço</Label>
+              <Input
+                id="clientAddress"
+                value={clientAddress}
+                onChange={(e) => setClientAddress(e.target.value)}
+                placeholder="Endereço completo"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="clientAddressComplement">Complemento do Endereço</Label>
+              <Input
+                id="clientAddressComplement"
+                value={clientAddressComplement}
+                onChange={(e) => setClientAddressComplement(e.target.value)}
+                placeholder="Apto, Bloco, Casa, etc."
+              />
+            </div>
+
+            <div>
               <Label htmlFor="equipmentType">Tipo de Equipamento *</Label>
               <Input
                 id="equipmentType"
@@ -166,6 +195,29 @@ const SimpleNewOrderDialog: React.FC<SimpleNewOrderDialogProps> = ({
                 className="w-full p-2 border border-gray-300 rounded-md resize-none"
                 rows={3}
                 required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="serviceValue">Valor do Serviço (opcional)</Label>
+              <Input
+                id="serviceValue"
+                value={serviceValue ? (parseInt(serviceValue) / 100).toLocaleString('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL'
+                }) : ''}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '');
+                  setServiceValue(value);
+                  if (value) {
+                    const formatted = (parseInt(value) / 100).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL'
+                    });
+                    e.target.value = formatted;
+                  }
+                }}
+                placeholder="R$ 0,00"
               />
             </div>
 

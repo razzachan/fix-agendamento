@@ -26,7 +26,7 @@ import {
   Phone,
   Edit
 } from 'lucide-react';
-import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, addMonths, subMonths, subDays } from 'date-fns';
+import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, addMonths, subMonths, subDays, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMainCalendar } from '@/hooks/calendar/useMainCalendar';
@@ -52,7 +52,7 @@ interface MainCalendarViewProps {
 const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) => {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
+  const [viewMode, setViewMode] = useState<CalendarViewMode>('day');
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('all');
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -77,8 +77,8 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
         };
       case 'day':
         return {
-          startDate: currentDate,
-          endDate: currentDate
+          startDate: startOfDay(currentDate),
+          endDate: endOfDay(currentDate)
         };
       case 'list':
         return {
@@ -593,25 +593,11 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
             )}
 
             {viewMode === 'day' && (
-              <>
-                {isDragDropEnabled ? (
-                  <DragDropCalendar
-                    key={`drag-drop-day-${refreshKey}`}
-                    events={events}
-                    weekDays={weekDays}
-                    workHours={workHours}
-                    onEventUpdate={handleEventUpdate}
-                    onEventClick={handleEventClick}
-                    getEventsByTimeSlot={getEventsByTimeSlot}
-                  />
-                ) : (
-                  <DayView
-                    currentDate={currentDate}
-                    events={events}
-                    onEventClick={handleEventClick}
-                  />
-                )}
-              </>
+              <DayView
+                currentDate={currentDate}
+                events={events}
+                onEventClick={handleEventClick}
+              />
             )}
 
             {viewMode === 'list' && (

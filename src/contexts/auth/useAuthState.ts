@@ -15,16 +15,21 @@ export function useAuthState() {
     const checkSession = async () => {
       try {
         // Verificar se já existe um usuário na sessão
-        console.log("Verificando sessão existente...");
+        console.log("🔍 [useAuthState] ===== VERIFICANDO SESSÃO EXISTENTE =====");
         const userData = await authService.getCurrentUser();
+        console.log("🔍 [useAuthState] Resultado getCurrentUser:", userData);
         if (userData) {
-          console.log("Sessão encontrada para usuário:", userData.email);
+          console.log("🔍 [useAuthState] Sessão encontrada para usuário:", {
+            email: userData.email,
+            role: userData.role,
+            id: userData.id
+          });
           setUser(userData);
         } else {
-          console.log("Nenhuma sessão ativa encontrada");
+          console.log("🔍 [useAuthState] Nenhuma sessão ativa encontrada");
         }
       } catch (error) {
-        console.error("Falha ao verificar sessão:", error);
+        console.error("🔍 [useAuthState] Falha ao verificar sessão:", error);
       } finally {
         setIsLoading(false);
       }

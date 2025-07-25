@@ -8,7 +8,9 @@ import { saveUserSession } from './persistentSession';
  */
 export async function login(email: string, password: string): Promise<User | null> {
   try {
-    console.log(`Tentando login para: ${email}`);
+    console.log('🎯 [Login] ===== INICIANDO PROCESSO DE LOGIN =====');
+    console.log('🎯 [Login] Email:', email);
+    console.log('🎯 [Login] Timestamp:', new Date().toISOString());
 
     // Special demo accounts handling
     // These accounts should work regardless of Supabase auth
@@ -365,14 +367,22 @@ export async function login(email: string, password: string): Promise<User | nul
     console.log(`🔍 [Login] Login padrão bem-sucedido para: ${email}, ID: ${data.user.id}`);
 
     // Buscar dados do usuário na tabela profiles primeiro
+    console.log(`🔍 [Login] Buscando perfil para ID: ${data.user.id}`);
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', data.user.id)
       .single();
 
+    console.log(`🔍 [Login] Resultado da busca profiles:`, {
+      profileData,
+      profileError,
+      hasData: !!profileData,
+      role: profileData?.role
+    });
+
     if (profileError) {
-      console.error('Erro ao buscar perfil na tabela profiles:', profileError);
+      console.error('❌ [Login] Erro ao buscar perfil na tabela profiles:', profileError);
 
       // Tentar buscar na tabela users como fallback
       const { data: userData, error: userError } = await supabase
@@ -382,7 +392,7 @@ export async function login(email: string, password: string): Promise<User | nul
         .single();
 
       if (userError) {
-        console.error('Erro ao buscar perfil na tabela users:', userError);
+        console.error('❌ [Login] Erro ao buscar perfil na tabela users:', userError);
       } else {
         console.log('✅ [Login] Dados encontrados na tabela users:', userData);
       }
@@ -390,11 +400,31 @@ export async function login(email: string, password: string): Promise<User | nul
       console.log('✅ [Login] Dados encontrados na tabela profiles:', profileData);
     }
 
+    // Determinar role com prioridade: profiles > auth metadata > fallback
+    let userRole = 'client'; // fallback padrão
+
+    console.log('🔍 [Login] Determinando role do usuário:', {
+      email: email,
+      profileDataRole: profileData?.role,
+      authMetadataRole: data.user.user_metadata?.role,
+      rawUserMetadata: data.user.user_metadata
+    });
+
+    if (profileData?.role) {
+      userRole = profileData.role;
+      console.log(`🎯 [Login] Role obtida da tabela profiles: ${userRole}`);
+    } else if (data.user.user_metadata?.role) {
+      userRole = data.user.user_metadata.role;
+      console.log(`🎯 [Login] Role obtida dos metadados auth: ${userRole}`);
+    } else {
+      console.log(`⚠️ [Login] Usando role fallback: ${userRole}`);
+    }
+
     const user = {
       id: data.user.id,
       name: profileData?.name || data.user.user_metadata.name || 'Usuário',
       email: data.user.email || '',
-      role: profileData?.role || 'client',
+      role: userRole,
       avatar: profileData?.avatar || undefined,
       phone: profileData?.phone || undefined,
       address: profileData?.address || undefined,
@@ -417,6 +447,22 @@ export async function login(email: string, password: string): Promise<User | nul
       sessionStorage.clear();
       // Forçar reload da página
       window.location.reload();
+      return null;
+    }
+
+    // Limpar cache para oficina se role estiver incorreta
+    if (email === 'joaooficina@fixfogoes.com.br' && user.role !== 'workshop') {
+      console.log('🚨 [Login] Role incorreto detectado para oficina, forçando logout completo...');
+
+      // Executar logout direto sem import circular
+      await supabase.auth.signOut();
+
+      // Limpar tudo
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // Forçar reload da página
+      window.location.href = '/login';
       return null;
     }
 

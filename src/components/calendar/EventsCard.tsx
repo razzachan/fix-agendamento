@@ -33,13 +33,13 @@ const EventsCard: React.FC<EventsCardProps> = ({
   user
 }) => {
   return (
-    <Card className="col-span-1 md:col-span-2 shadow-md border-0 overflow-hidden bg-white">
-      <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-purple-50 to-indigo-50 border-b">
+    <Card className="col-span-1 md:col-span-2 shadow-md border-0 overflow-hidden bg-white dark:bg-gray-800">
+      <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 border-b dark:border-gray-700">
         <div className="flex items-center gap-2">
-          <ListChecks className="h-5 w-5 text-purple-600" />
-          <CardTitle className="text-lg">
-            {date 
-              ? format(date, "'Serviços para' d 'de' MMMM", { locale: ptBR }) 
+          <ListChecks className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+          <CardTitle className="text-lg text-gray-900 dark:text-gray-100">
+            {date
+              ? format(date, "'Serviços para' d 'de' MMMM", { locale: ptBR })
               : "Selecione uma data"}
           </CardTitle>
         </div>

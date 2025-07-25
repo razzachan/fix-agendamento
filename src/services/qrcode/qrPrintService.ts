@@ -35,8 +35,14 @@ export class QRPrintService {
 
       const finalConfig = { ...this.DEFAULT_CONFIG, ...config };
 
-      // Gerar imagem do QR Code
-      const qrCodeImage = await QRCodeService.generateQRCodeImage(qrCode, finalConfig.qrSize * 4);
+      // Gerar URL completa para o QR Code
+      const baseUrl = typeof window !== 'undefined'
+        ? window.location.origin
+        : 'https://app.fixfogoes.com.br';
+      const trackingUrl = `${baseUrl}/track/${qrCode}`;
+
+      // Gerar imagem do QR Code com URL completa
+      const qrCodeImage = await QRCodeService.generateQRCodeImage(trackingUrl, finalConfig.qrSize * 4);
 
       const label: QRCodeLabel = {
         qrCode,
@@ -44,6 +50,7 @@ export class QRPrintService {
         orderNumber: serviceOrder.orderNumber || `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`,
         equipmentType: serviceOrder.equipmentType,
         clientName: serviceOrder.clientName,
+        description: serviceOrder.description || '', // 🔧 QR CODE: Incluir problema relatado
         generatedDate: new Date().toLocaleDateString('pt-BR', {
           day: '2-digit',
           month: '2-digit',
@@ -162,28 +169,71 @@ export class QRPrintService {
   }
 
   /**
-   * Baixa etiqueta como PDF
+   * Baixa etiqueta como PNG (melhor para mobile)
    */
   static async downloadLabel(label: QRCodeLabel): Promise<void> {
     try {
-      console.log('💾 [QRPrintService] Baixando etiqueta');
+      console.log('💾 [QRPrintService] Baixando etiqueta como PNG');
 
-      const pdfDataUrl = await this.generatePDF(label);
-      
+      // Criar elemento HTML temporário para a etiqueta
+      const labelElement = this.createLabelElement(label);
+      document.body.appendChild(labelElement);
+
+      // Converter para canvas
+      const canvas = await html2canvas(labelElement, {
+        width: label.printConfig.labelWidth * 3.78, // Converter mm para pixels (96 DPI)
+        height: label.printConfig.labelHeight * 3.78,
+        scale: 2,
+        backgroundColor: '#ffffff'
+      });
+
+      // Remover elemento temporário
+      document.body.removeChild(labelElement);
+
+      // Converter canvas para PNG
+      const pngDataUrl = canvas.toDataURL('image/png', 1.0);
+
       // Criar link de download
       const link = document.createElement('a');
-      link.href = pdfDataUrl;
-      link.download = `etiqueta_${label.orderNumber.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      
+      link.href = pngDataUrl;
+      link.download = `etiqueta_${label.orderNumber.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+
       // Simular clique
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
-      console.log('✅ [QRPrintService] Download iniciado');
+      console.log('✅ [QRPrintService] Download PNG iniciado');
 
     } catch (error) {
-      console.error('❌ [QRPrintService] Erro ao baixar:', error);
+      console.error('❌ [QRPrintService] Erro ao baixar PNG:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Baixa etiqueta como PDF (mantido para compatibilidade)
+   */
+  static async downloadLabelAsPDF(label: QRCodeLabel): Promise<void> {
+    try {
+      console.log('💾 [QRPrintService] Baixando etiqueta como PDF');
+
+      const pdfDataUrl = await this.generatePDF(label);
+
+      // Criar link de download
+      const link = document.createElement('a');
+      link.href = pdfDataUrl;
+      link.download = `etiqueta_${label.orderNumber.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+
+      // Simular clique
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      console.log('✅ [QRPrintService] Download PDF iniciado');
+
+    } catch (error) {
+      console.error('❌ [QRPrintService] Erro ao baixar PDF:', error);
       throw error;
     }
   }
@@ -250,6 +300,35 @@ export class QRPrintService {
       const equipmentDiv = document.createElement('div');
       equipmentDiv.textContent = label.equipmentType.substring(0, 15);
       textContainer.appendChild(equipmentDiv);
+
+      // 🔧 QR CODE: Incluir problema/descrição na etiqueta - Mais espaço
+      if (label.description && label.description.trim()) {
+        const descriptionDiv = document.createElement('div');
+        descriptionDiv.style.fontSize = `${label.printConfig.fontSize - 1}pt`;
+        descriptionDiv.style.color = '#444';
+        descriptionDiv.style.fontStyle = 'italic';
+        descriptionDiv.style.lineHeight = '1.2';
+        descriptionDiv.style.wordWrap = 'break-word';
+        descriptionDiv.style.maxWidth = '100%';
+
+        // 🔧 PROBLEMA: Filtrar repetição do nome do equipamento
+        let problemText = label.description.trim();
+
+        // Se o problema começa com o nome do equipamento, remover
+        if (problemText.toLowerCase().startsWith(label.equipmentType.toLowerCase())) {
+          problemText = problemText.substring(label.equipmentType.length).trim();
+          // Remover pontuação inicial se houver
+          problemText = problemText.replace(/^[:\-\s]+/, '');
+        }
+
+        // Limitar a 45 caracteres para caber melhor na etiqueta
+        const finalText = problemText.length > 45
+          ? `${problemText.substring(0, 45)}...`
+          : problemText;
+
+        descriptionDiv.textContent = `Problema: ${finalText}`;
+        textContainer.appendChild(descriptionDiv);
+      }
 
       if (label.printConfig.includeDate) {
         const dateDiv = document.createElement('div');

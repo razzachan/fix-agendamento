@@ -13,11 +13,14 @@ import {
   Clock,
   Phone,
   Navigation,
-  Eye
+  Eye,
+  MessageCircle
 } from 'lucide-react';
 import { QuickProgressButton } from './QuickProgressButton';
 import { useNavigate } from 'react-router-dom';
 import { translateStatus } from '@/utils/translations';
+import { AddressDisplay } from '@/components/ui/AddressDisplay';
+import { extractAddressFromServiceOrder } from '@/utils/addressFormatter';
 
 interface AddressGroupCardProps {
   address: string;
@@ -81,7 +84,12 @@ export const AddressGroupCard: React.FC<AddressGroupCardProps> = ({
               <MapPin className="h-5 w-5 text-[#e5b034] flex-shrink-0" />
               <div className="min-w-0 flex-1">
                 <CardTitle className="text-base font-medium truncate">{clientName}</CardTitle>
-                <p className="text-sm text-gray-600 truncate">{address}</p>
+                <AddressDisplay
+                  data={extractAddressFromServiceOrder(orders[0])}
+                  variant="compact"
+                  showIcon={false}
+                  className="text-sm text-gray-600"
+                />
               </div>
             </div>
 
@@ -150,6 +158,23 @@ export const AddressGroupCard: React.FC<AddressGroupCardProps> = ({
                   title="Ligar para cliente"
                 >
                   <Phone className="h-3 w-3" />
+                </Button>
+              )}
+
+              {clientPhone && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-green-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const cleanPhone = clientPhone.replace(/\D/g, '');
+                    const message = encodeURIComponent('Olá! Sou técnico da Fix Fogões. Estou entrando em contato sobre seu serviço agendado.');
+                    window.open(`https://wa.me/55${cleanPhone}?text=${message}`, '_blank');
+                  }}
+                  title="WhatsApp para cliente"
+                >
+                  <MessageCircle className="h-3 w-3" />
                 </Button>
               )}
 

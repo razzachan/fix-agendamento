@@ -8,10 +8,48 @@ import { getUserSession, saveUserSession } from './persistentSession';
  */
 export async function getCurrentUser(): Promise<User | null> {
   try {
+    console.log('🔍 [getCurrentUser] ===== INICIANDO VERIFICAÇÃO DE USUÁRIO =====');
+
     // Primeiro, tenta recuperar a sessão do localStorage
     const localUser = getUserSession();
+    console.log('🔍 [getCurrentUser] LocalUser encontrado:', !!localUser);
     if (localUser) {
-      console.log('Usuário recuperado do localStorage:', localUser.email);
+      console.log('🔍 [getCurrentUser] Usuário recuperado do localStorage:', {
+        email: localUser.email,
+        role: localUser.role,
+        id: localUser.id
+      });
+
+      // Validar se a role está correta para oficinas
+      if (localUser.email === 'joaooficina@fixfogoes.com.br' && localUser.role !== 'workshop') {
+        console.log('🚨 [Session] Role incorreto detectado na sessão local, limpando...');
+
+        // Executar logout direto sem import circular
+        await supabase.auth.signOut();
+
+        // Limpar TUDO - incluindo chaves específicas do Supabase
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key) keysToRemove.push(key);
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+
+        // Limpar sessionStorage também
+        const sessionKeysToRemove = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          if (key) sessionKeysToRemove.push(key);
+        }
+        sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+
+        console.log('🧹 [Session] Limpeza completa realizada');
+
+        // Redirecionar para login
+        window.location.href = '/login';
+        return null;
+      }
+
       return localUser;
     }
 

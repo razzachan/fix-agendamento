@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Atualização Oficina</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste de Atualização de Oficina</h1>
+    
+    <div class="test-section info">
+        <h3>📋 Informações do Teste</h3>
+        <p><strong>Oficina:</strong> joaooficina@fixfogoes.com.br</p>
+        <p><strong>ID:</strong> 45929bf5-374c-44ef-bdd8-dcd3cd51dab3</p>
+        <p><strong>Objetivo:</strong> Testar se a atualização de senha está funcionando</p>
+    </div>
+
+    <div class="test-section">
+        <h3>🔑 Teste 1: Login Atual</h3>
+        <button onclick="testCurrentLogin()">Testar Login com Senha Atual</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>🔄 Teste 2: Atualizar Senha</h3>
+        <input type="password" id="new-password" placeholder="Nova senha" value="novasenha123">
+        <button onclick="updatePassword()">Atualizar Senha</button>
+        <div id="update-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>✅ Teste 3: Login com Nova Senha</h3>
+        <button onclick="testNewLogin()">Testar Login com Nova Senha</button>
+        <div id="new-login-result"></div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://hdyucwabemspehokoiks.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkeXVjd2FiZW1zcGVob2tvaWtzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NDA0MDc2OSwiZXhwIjoyMDU5NjE2NzY5fQ.G_2PF8hXeXIfl59xmywqpGdWiJC6JEVHFwJkoyBSWc0';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        const workshopEmail = 'joaooficina@fixfogoes.com.br';
+        const workshopId = '45929bf5-374c-44ef-bdd8-dcd3cd51dab3';
+        const possiblePasswords = ['123456789', '1234', '123456', 'novasenha123'];
+
+        async function testCurrentLogin() {
+            const resultDiv = document.getElementById('login-result');
+            resultDiv.innerHTML = '<p>🔄 Testando senhas possíveis...</p>';
+
+            for (const password of possiblePasswords) {
+                try {
+                    console.log(`Testando senha: ${password}`);
+                    const { data, error } = await supabase.auth.signInWithPassword({
+                        email: workshopEmail,
+                        password: password
+                    });
+
+                    if (!error && data.user) {
+                        resultDiv.innerHTML = `
+                            <div class="success">
+                                <h4>✅ Login Bem-sucedido!</h4>
+                                <p><strong>Senha atual:</strong> ${password}</p>
+                                <pre>${JSON.stringify(data.user, null, 2)}</pre>
+                            </div>
+                        `;
+                        await supabase.auth.signOut(); // Logout após teste
+                        return;
+                    }
+                } catch (e) {
+                    console.log(`Erro com senha ${password}:`, e);
+                }
+            }
+
+            resultDiv.innerHTML = `
+                <div class="error">
+                    <h4>❌ Nenhuma senha funcionou</h4>
+                    <p>Senhas testadas: ${possiblePasswords.join(', ')}</p>
+                </div>
+            `;
+        }
+
+        async function updatePassword() {
+            const resultDiv = document.getElementById('update-result');
+            const newPassword = document.getElementById('new-password').value;
+
+            if (!newPassword) {
+                resultDiv.innerHTML = '<div class="error">❌ Digite uma nova senha</div>';
+                return;
+            }
+
+            try {
+                resultDiv.innerHTML = '<p>🔄 Atualizando senha...</p>';
+
+                // Usar admin API para atualizar senha
+                const { data, error } = await supabase.auth.admin.updateUserById(workshopId, {
+                    password: newPassword
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <h4>✅ Senha Atualizada!</h4>
+                        <p><strong>Nova senha:</strong> ${newPassword}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>❌ Erro ao Atualizar Senha</h4>
+                        <pre>${JSON.stringify(error, null, 2)}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        async function testNewLogin() {
+            const resultDiv = document.getElementById('new-login-result');
+            const newPassword = document.getElementById('new-password').value;
+
+            if (!newPassword) {
+                resultDiv.innerHTML = '<div class="error">❌ Digite a nova senha primeiro</div>';
+                return;
+            }
+
+            try {
+                resultDiv.innerHTML = '<p>🔄 Testando login com nova senha...</p>';
+
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: workshopEmail,
+                    password: newPassword
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <h4>✅ Login com Nova Senha Bem-sucedido!</h4>
+                        <p><strong>Email:</strong> ${data.user.email}</p>
+                        <p><strong>ID:</strong> ${data.user.id}</p>
+                        <pre>${JSON.stringify(data.user, null, 2)}</pre>
+                    </div>
+                `;
+
+                await supabase.auth.signOut(); // Logout após teste
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>❌ Erro no Login com Nova Senha</h4>
+                        <pre>${JSON.stringify(error, null, 2)}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        // Executar teste inicial ao carregar a página
+        window.onload = function() {
+            console.log('🚀 Página carregada, pronto para testes');
+        };
+    </script>
+</body>
+</html>

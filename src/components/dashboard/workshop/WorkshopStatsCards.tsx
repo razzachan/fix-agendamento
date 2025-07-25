@@ -36,16 +36,16 @@ const WorkshopStatsCards: React.FC<WorkshopStatsCardsProps> = memo(({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl">
       {/* Card 1: Aguardando Diagnóstico */}
-      <Card className="border-l-4 border-l-orange-500 hover:shadow-lg transition-shadow">
+      <Card className="border-l-4 border-l-orange-500 dark:border-l-orange-400 hover:shadow-lg transition-shadow">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-          <CardTitle className="text-sm font-semibold text-gray-800">Aguardando Diagnóstico</CardTitle>
-          <Clock className="h-4 w-4 text-orange-500" />
+          <CardTitle className="text-sm font-semibold text-gray-800 dark:text-gray-200">Aguardando Diagnóstico</CardTitle>
+          <Clock className="h-4 w-4 text-orange-500 dark:text-orange-400" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-orange-600 mb-1">
+          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mb-1">
             {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : pendingDiagnostics}
           </div>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-600 dark:text-gray-400">
             Equipamentos recebidos para avaliação
           </p>
         </CardContent>
@@ -84,16 +84,16 @@ const WorkshopStatsCards: React.FC<WorkshopStatsCardsProps> = memo(({
       </Card>
 
       {/* Card 4: Prontos para Coleta */}
-      <Card className="border-l-4 border-l-green-500 hover:shadow-lg transition-shadow">
+      <Card className="border-l-4 border-l-green-500 dark:border-l-green-400 hover:shadow-lg transition-shadow">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-          <CardTitle className="text-sm font-semibold text-gray-800">Prontos para Coleta</CardTitle>
-          <Package className="h-4 w-4 text-green-500" />
+          <CardTitle className="text-sm font-semibold text-gray-800 dark:text-gray-200">Prontos para Coleta</CardTitle>
+          <Package className="h-4 w-4 text-green-500 dark:text-green-400" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600 mb-1">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
             {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : readyForPickup}
           </div>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-600 dark:text-gray-400">
             Equipamentos finalizados aguardando retirada
           </p>
         </CardContent>

@@ -86,6 +86,7 @@ export interface ServiceOrder {
   equipmentSerial: string | null;
   needsPickup: boolean;
   pickupAddress: string | null;
+  pickupAddressComplement: string | null;
   pickupCity: string | null;
   pickupState: string | null;
   pickupZipCode: string | null;
@@ -96,7 +97,8 @@ export interface ServiceOrder {
   serviceItems: ServiceOrderItem[];
   diagnosis?: EquipmentDiagnosis;
   archived?: boolean;
-  finalCost?: number; // ✅ Valor final do serviço
+  initialCost?: number; // ✅ Valor inicial (sinal para coleta diagnóstico)
+  finalCost?: number; // ✅ Valor final total do serviço
 
   // Campos para identificar a oficina responsável
   workshopId?: string | null;

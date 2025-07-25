@@ -19,14 +19,48 @@ const DayView: React.FC<DayViewProps> = ({
   onEventClick
 }) => {
   const workHours = Array.from({ length: 10 }, (_, i) => i + 9); // 9h às 18h
-  
+
   const dayEvents = events.filter(event => isSameDay(event.startTime, currentDate));
 
+  // Debug: Log eventos do dia com mais detalhes
+  console.log(`📅 [DayView] Data atual: ${format(currentDate, 'dd/MM/yyyy')} (${currentDate.toISOString()})`);
+  console.log(`📅 [DayView] Total eventos recebidos: ${events.length}, Eventos do dia: ${dayEvents.length}`);
+
+  if (events.length > 0) {
+    console.log('📋 [DayView] Todos os eventos recebidos:', events.map(e => ({
+      id: e.id,
+      clientName: e.clientName,
+      startTime: format(e.startTime, 'dd/MM/yyyy HH:mm'),
+      startTimeISO: e.startTime.toISOString(),
+      status: e.status,
+      isSameDay: isSameDay(e.startTime, currentDate)
+    })));
+  }
+
+  if (dayEvents.length > 0) {
+    console.log('📋 [DayView] Eventos filtrados para o dia:', dayEvents.map(e => ({
+      id: e.id,
+      clientName: e.clientName,
+      startTime: format(e.startTime, 'HH:mm'),
+      status: e.status
+    })));
+  }
+
   const getEventsForHour = (hour: number) => {
-    return dayEvents.filter(event => {
+    const hourEvents = dayEvents.filter(event => {
       const eventHour = event.startTime.getHours();
       return eventHour === hour;
     });
+
+    // Debug: Log eventos por hora apenas se houver eventos
+    if (hourEvents.length > 0) {
+      console.log(`⏰ [DayView] Hora ${hour}h: ${hourEvents.length} eventos`, hourEvents.map(e => ({
+        clientName: e.clientName,
+        startTime: format(e.startTime, 'HH:mm')
+      })));
+    }
+
+    return hourEvents;
   };
 
   const getEventColor = (status: string) => {
@@ -52,23 +86,23 @@ const DayView: React.FC<DayViewProps> = ({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Cabeçalho do dia */}
+    <div className="space-y-2 sm:space-y-4">
+      {/* Cabeçalho do dia - compacto no mobile */}
       <Card className="shadow-lg border-0">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-          <CardTitle className="text-2xl font-bold text-center">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b p-3 sm:p-6">
+          <CardTitle className="text-lg sm:text-2xl font-bold text-center">
             {format(currentDate, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
           </CardTitle>
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="text-center text-xs sm:text-sm text-muted-foreground">
             {dayEvents.length} agendamento{dayEvents.length !== 1 ? 's' : ''} para hoje
           </div>
         </CardHeader>
       </Card>
 
-      {/* Timeline do dia */}
+      {/* Timeline do dia - otimizada para mobile */}
       <Card className="shadow-lg border-0 overflow-hidden">
         <CardContent className="p-0">
-          <div className="max-h-[600px] overflow-y-auto">
+          <div className="max-h-[70vh] sm:max-h-[600px] overflow-y-auto">
             <AnimatePresence>
               {workHours.map(hour => {
                 const hourEvents = getEventsForHour(hour);
@@ -81,23 +115,23 @@ const DayView: React.FC<DayViewProps> = ({
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: hour * 0.05 }}
                     className={`
-                      flex border-b min-h-[100px]
+                      flex border-b min-h-[80px] sm:min-h-[100px]
                       ${isLunchTime ? 'bg-gradient-to-r from-orange-50 to-yellow-50' : 'bg-white hover:bg-gray-50'}
                     `}
                   >
-                    {/* Coluna de horário */}
+                    {/* Coluna de horário - compacta no mobile */}
                     <div className={`
-                      w-20 flex-shrink-0 p-4 text-center border-r
+                      w-12 sm:w-20 flex-shrink-0 p-2 sm:p-4 text-center border-r
                       ${isLunchTime ? 'bg-orange-100' : 'bg-gray-50'}
                     `}>
-                      <div className="font-bold text-lg">{hour}:00</div>
+                      <div className="font-bold text-sm sm:text-lg">{hour}:00</div>
                       {isLunchTime && (
-                        <div className="text-xs text-orange-600 mt-1">🍽️ Almoço</div>
+                        <div className="text-xs text-orange-600 mt-1 hidden sm:block">🍽️ Almoço</div>
                       )}
                     </div>
 
-                    {/* Coluna de eventos */}
-                    <div className="flex-1 p-4">
+                    {/* Coluna de eventos - padding reduzido no mobile */}
+                    <div className="flex-1 p-2 sm:p-4">
                       {isLunchTime ? (
                         <div className="flex items-center justify-center h-full text-orange-600">
                           <div className="text-center">
@@ -115,27 +149,27 @@ const DayView: React.FC<DayViewProps> = ({
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: index * 0.1 }}
                               className={`
-                                p-4 rounded-lg border-l-4 cursor-pointer transition-all duration-200 hover:shadow-md
+                                p-3 sm:p-4 rounded-lg border-l-4 cursor-pointer transition-all duration-200 hover:shadow-md
                                 ${getEventColor(event.status)}
                               `}
                               onClick={() => onEventClick(event)}
                             >
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="h-4 w-4 text-gray-500" />
-                                  <span className="font-medium">
+                              <div className="flex items-start justify-between mb-2 sm:mb-3">
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
+                                  <span className="font-medium text-xs sm:text-sm">
                                     {format(event.startTime, 'HH:mm')} - {format(event.endTime, 'HH:mm')}
                                   </span>
                                 </div>
-                                <Badge variant="outline" className="text-xs">
+                                <Badge variant="outline" className="text-xs px-1 py-0">
                                   {getStatusText(event.status)}
                                 </Badge>
                               </div>
 
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <User className="h-4 w-4 text-gray-500" />
-                                  <span className="font-semibold text-lg">{event.clientName}</span>
+                              <div className="space-y-1 sm:space-y-2">
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
+                                  <span className="font-semibold text-sm sm:text-lg">{event.clientName}</span>
                                 </div>
 
                                 <div className="flex items-center gap-2">

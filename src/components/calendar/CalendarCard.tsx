@@ -24,15 +24,15 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
   isAdminView
 }) => {
   return (
-    <Card className="col-span-1 shadow-md border-0 overflow-hidden bg-white">
-      <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-purple-50 to-indigo-50 border-b">
+    <Card className="col-span-1 shadow-md border-0 overflow-hidden bg-white dark:bg-gray-800">
+      <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 border-b dark:border-gray-700">
         <div className="flex items-center gap-2">
-          <CalendarDays className="h-5 w-5 text-purple-600" />
-          <CardTitle className="text-lg">Calendário</CardTitle>
+          <CalendarDays className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+          <CardTitle className="text-lg text-gray-900 dark:text-gray-100">Calendário</CardTitle>
         </div>
-        
+
         {isAdminView && selectedTechnicianName && selectedTechnicianName !== 'all' && (
-          <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200">
+          <Badge variant="outline" className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800">
             {selectedTechnicianName}
           </Badge>
         )}

@@ -10,7 +10,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       <ClientHeader />
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
+      <main className="w-full px-0 py-8 sm:container sm:mx-auto sm:px-4 max-w-6xl">
         {children}
       </main>
       <ClientFooter />

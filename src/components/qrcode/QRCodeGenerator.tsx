@@ -19,6 +19,8 @@ import { ServiceOrder } from '@/types';
 import { EquipmentQRCode, QRCodeLabel } from '@/types/qrcode';
 import { useQRCodeGeneration } from '@/hooks/useQRCodeGeneration';
 import { useAuth } from '@/contexts/AuthContext';
+import ThermalPrintService from '@/services/qrcode/thermalPrintService';
+import ThermalPrintInfo from './ThermalPrintInfo';
 import { toast } from 'sonner';
 
 interface QRCodeGeneratorProps {
@@ -41,6 +43,7 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
     generateLabel,
     printLabel,
     downloadLabel,
+    downloadLabelAsPDF,
     isGenerating,
     isGeneratingLabel,
     isPrinting,
@@ -134,7 +137,7 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
   };
 
   /**
-   * Imprime etiqueta
+   * Imprime etiqueta (método padrão - inclui térmica)
    */
   const handlePrintLabel = async () => {
     if (!generatedLabel) {
@@ -150,7 +153,27 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
   };
 
   /**
-   * Baixa etiqueta como PDF
+   * Força impressão térmica Bluetooth
+   */
+  const handleThermalPrint = async () => {
+    if (!generatedLabel) {
+      toast.error('Etiqueta não gerada');
+      return;
+    }
+
+    try {
+      const success = await ThermalPrintService.printThermalLabel(generatedLabel);
+      if (!success) {
+        toast.error('Impressão térmica não disponível');
+      }
+    } catch (error) {
+      console.error('Erro na impressão térmica:', error);
+      toast.error('Erro na impressão térmica');
+    }
+  };
+
+  /**
+   * Baixa etiqueta como PNG (padrão - melhor para mobile)
    */
   const handleDownloadLabel = async () => {
     if (!generatedLabel) {
@@ -161,7 +184,23 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
     try {
       await downloadLabel(generatedLabel);
     } catch (error) {
-      console.error('Erro ao baixar etiqueta:', error);
+      console.error('Erro ao baixar etiqueta PNG:', error);
+    }
+  };
+
+  /**
+   * Baixa etiqueta como PDF (alternativa)
+   */
+  const handleDownloadPDF = async () => {
+    if (!generatedLabel) {
+      toast.error('Etiqueta não gerada');
+      return;
+    }
+
+    try {
+      await downloadLabelAsPDF(generatedLabel);
+    } catch (error) {
+      console.error('Erro ao baixar etiqueta PDF:', error);
     }
   };
 
@@ -301,41 +340,62 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
           <>
             <Separator />
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center gap-2 text-blue-600">
                 <CheckCircle className="w-4 h-4" />
                 <span className="text-sm font-medium">🏷️ Etiqueta Pronta para Impressão!</span>
               </div>
 
-              {/* Prévia da Etiqueta */}
-              <div className="bg-white border-2 border-dashed border-gray-300 p-4 rounded-lg">
+              {/* Prévia da Etiqueta - Compacta */}
+              <div className="bg-white border-2 border-dashed border-gray-300 p-2 rounded-lg">
                 <div className="text-center">
-                  <p className="text-xs text-gray-500 mb-3">📄 Prévia da Etiqueta (62mm x 29mm)</p>
+                  <p className="text-xs text-gray-500 mb-2">📄 Prévia da Etiqueta (62mm x 29mm)</p>
 
-                  {/* Layout da etiqueta */}
-                  <div className="bg-white border border-gray-400 p-3 mx-auto max-w-sm" style={{ aspectRatio: '62/29' }}>
-                    <div className="flex items-center gap-3 h-full">
-                      {/* QR Code */}
+                  {/* Layout da etiqueta - Menor */}
+                  <div className="bg-white border border-gray-400 p-2 mx-auto max-w-xs" style={{ aspectRatio: '62/29' }}>
+                    <div className="flex items-center gap-2 h-full">
+                      {/* QR Code - Menor */}
                       <div className="flex-shrink-0">
                         <img
                           src={generatedLabel.qrCodeData}
                           alt="QR Code"
-                          className="w-16 h-16 border border-gray-300"
+                          className="w-12 h-12 border border-gray-300"
                         />
                       </div>
 
-                      {/* Informações */}
-                      <div className="flex-1 text-left space-y-1">
-                        <div className="text-xs font-bold text-gray-800">
+                      {/* Informações - Mais compactas */}
+                      <div className="flex-1 text-left space-y-0.5">
+                        <div className="text-xs font-bold text-gray-800 leading-tight">
                           {generatedLabel.orderNumber}
                         </div>
                         <div className="text-xs text-gray-700 leading-tight">
-                          {generatedLabel.clientName}
+                          {generatedLabel.clientName.substring(0, 15)}{generatedLabel.clientName.length > 15 ? '...' : ''}
                         </div>
                         <div className="text-xs text-gray-600 leading-tight">
-                          {generatedLabel.equipmentType}
+                          {generatedLabel.equipmentType.substring(0, 12)}{generatedLabel.equipmentType.length > 12 ? '...' : ''}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        {/* 🔧 QR CODE: Mostrar problema na prévia - Filtrado */}
+                        {generatedLabel.description && generatedLabel.description.trim() && (
+                          <div className="text-xs text-gray-500 italic leading-tight">
+                            {(() => {
+                              // 🔧 PROBLEMA: Filtrar repetição do nome do equipamento
+                              let problemText = generatedLabel.description.trim();
+
+                              // Se o problema começa com o nome do equipamento, remover
+                              if (problemText.toLowerCase().startsWith(generatedLabel.equipmentType.toLowerCase())) {
+                                problemText = problemText.substring(generatedLabel.equipmentType.length).trim();
+                                // Remover pontuação inicial se houver
+                                problemText = problemText.replace(/^[:\-\s]+/, '');
+                              }
+
+                              // Limitar a 30 caracteres para a prévia
+                              return problemText.length > 30
+                                ? `${problemText.substring(0, 30)}...`
+                                : problemText;
+                            })()}
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-500 leading-tight">
                           {generatedLabel.generatedDate}
                         </div>
                       </div>
@@ -344,36 +404,92 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
                 </div>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-                <p className="text-xs text-blue-700 mb-3">
+              <div className="bg-blue-50 border border-blue-200 p-2 rounded-lg">
+                <p className="text-xs text-blue-700 mb-2">
                   ✅ Etiqueta gerada com sucesso! Agora você pode imprimir ou baixar.
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePrintLabel}
-                    disabled={isPrinting}
-                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                  >
-                    {isPrinting ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Printer className="w-4 h-4 mr-2" />
-                    )}
-                    🖨️ Imprimir
-                  </Button>
+                {/* 🔧 IMPRESSÃO TÉRMICA: Botões adaptativos para mobile/desktop */}
+                {ThermalPrintService.isMobileEnvironment() ? (
+                  // Mobile: Priorizar impressão térmica
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleThermalPrint}
+                        disabled={isPrinting}
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                      >
+                        {isPrinting ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Printer className="w-4 h-4 mr-2" />
+                        )}
+                        📱 Térmica
+                      </Button>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDownloadLabel}
-                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    📥 Baixar PDF
-                  </Button>
-                </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDownloadLabel}
+                        className="border-green-300 text-green-700 hover:bg-green-100"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        📱 PNG
+                      </Button>
+                    </div>
+
+                    {/* Botão secundário para impressão padrão */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handlePrintLabel}
+                      disabled={isPrinting}
+                      className="w-full text-xs text-gray-600"
+                    >
+                      🖨️ Impressão Padrão (Navegador)
+                    </Button>
+                  </div>
+                ) : (
+                  // Desktop: Layout tradicional
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePrintLabel}
+                      disabled={isPrinting}
+                      className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                    >
+                      {isPrinting ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Printer className="w-4 h-4 mr-2" />
+                      )}
+                      🖨️ Imprimir
+                    </Button>
+
+                    <div className="grid grid-cols-2 gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDownloadLabel}
+                        className="border-green-300 text-green-700 hover:bg-green-100"
+                      >
+                        <Download className="w-4 h-4 mr-1" />
+                        📱 PNG
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDownloadPDF}
+                        className="text-xs text-gray-600 hover:bg-gray-100"
+                      >
+                        📄 PDF
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </>
@@ -396,6 +512,11 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
           <p>2. Imprima a etiqueta e cole no equipamento</p>
           <p>3. Use o scanner para rastrear a localização</p>
         </div>
+
+        {/* 🔧 IMPRESSÃO TÉRMICA: Informações para técnicos */}
+        {ThermalPrintService.isMobileEnvironment() && (
+          <ThermalPrintInfo className="mt-4" />
+        )}
       </CardContent>
     </Card>
   );

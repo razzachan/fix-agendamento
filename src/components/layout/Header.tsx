@@ -1,9 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { supabase } from '@/integrations/supabase/client';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,18 +11,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
-import { Bell, Loader2, Menu, X, Wifi, WifiOff } from 'lucide-react';
-import { useToast } from "@/hooks/use-toast";
-import NotificationItem from '@/components/notifications/NotificationItem';
+import { Bell, User, LogOut, Wifi, WifiOff, Loader2, CheckCheck, Trash2, RefreshCw } from 'lucide-react';
 import { useNotificationsRealtime } from '@/hooks/useNotificationsRealtime';
+import { formatRelativeTime } from '@/utils/dateUtils';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
-  const { toast } = useToast();
-  const { open, toggleSidebar } = useSidebar();
 
-  // Sistema de notificações em tempo real
+  // Hook de notificações em tempo real
   const {
     notifications,
     stats,
@@ -31,31 +26,9 @@ const Header: React.FC = () => {
     isConnected,
     markAsRead,
     markAllAsRead,
-    clearAll
+    clearAll,
+    refresh
   } = useNotificationsRealtime();
-
-  // Handlers para ações de notificação
-  const handleMarkAllAsRead = async () => {
-    const success = await markAllAsRead();
-    if (success) {
-      toast({
-        title: "Notificações",
-        description: "Todas as notificações foram marcadas como lidas",
-      });
-    }
-  };
-
-  const handleClearAll = async () => {
-    const success = await clearAll();
-    if (success) {
-      toast({
-        title: "Notificações",
-        description: "Todas as notificações foram removidas",
-      });
-    }
-  };
-
-
 
   const getInitials = (name: string) => {
     return name
@@ -65,35 +38,31 @@ const Header: React.FC = () => {
       .toUpperCase();
   };
 
-  const roleLabels = {
-    admin: 'Administrador',
-    technician: 'Técnico',
-    client: 'Cliente'
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'Administrador';
+      case 'technician':
+        return 'Técnico';
+      case 'workshop':
+        return 'Oficina';
+      case 'client':
+        return 'Cliente';
+      default:
+        return 'Usuário';
+    }
   };
 
 
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 py-2 px-4">
-      <div className="container mx-auto flex justify-between items-center">
+    <header className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700 py-3 px-4">
+      <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          {/* Botão de toggle do sidebar customizado */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleSidebar}
-            className="relative group hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 shadow-sm"
-            title={open ? "Ocultar menu lateral" : "Mostrar menu lateral"}
-          >
-            <div className="relative">
-              <Menu className="h-4 w-4 text-gray-600 group-hover:text-blue-600 transition-colors" />
-              {/* Indicador visual sutil */}
-              <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-            </div>
-          </Button>
-          <h1 className="text-xl font-semibold text-gray-700">Fix Fogões</h1>
+          <h1 className="text-xl font-semibold text-gray-700 dark:text-white">Fix Fogões</h1>
         </div>
         <div className="flex items-center gap-4">
+          {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative">
@@ -114,7 +83,7 @@ const Header: React.FC = () => {
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-[420px]" align="end">
+            <DropdownMenuContent align="end" className="w-[420px]">
               <DropdownMenuLabel className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -125,34 +94,51 @@ const Header: React.FC = () => {
                       <span className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded-full">• Offline</span>
                     )}
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {stats.total > 0 && `${stats.unread} não lidas de ${stats.total}`}
+                  <div className="flex items-center gap-1">
+                    {stats.unread > 0 && (
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                        {stats.unread} não lida{stats.unread > 1 ? 's' : ''}
+                      </span>
+                    )}
                   </div>
                 </div>
-                {stats.total > 0 && (
-                  <div className="flex gap-2 w-full">
-                    {stats.unread > 0 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-xs h-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                        onClick={handleMarkAllAsRead}
-                      >
-                        Marcar todas como lidas
-                      </Button>
-                    )}
+
+                {/* Ações rápidas */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={refresh}
+                    disabled={isLoading}
+                    className="h-6 text-xs"
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                    Atualizar
+                  </Button>
+                  {stats.unread > 0 && (
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 text-xs h-8 text-red-600 hover:text-red-800 hover:bg-red-50"
-                      onClick={handleClearAll}
+                      onClick={markAllAsRead}
+                      className="h-6 text-xs"
                     >
-                      Limpar todas
+                      <CheckCheck className="h-3 w-3 mr-1" />
+                      Marcar todas como lidas
                     </Button>
-                  </div>
-                )}
+                  )}
+                  {stats.total > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearAll}
+                      className="h-6 text-xs"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Limpar
+                    </Button>
+                  )}
+                </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
 
               {isLoading ? (
                 <div className="flex justify-center items-center py-4">
@@ -175,10 +161,10 @@ const Header: React.FC = () => {
                             {notification.title}
                           </h4>
                           <p className="text-xs text-gray-600 mt-1 break-words whitespace-pre-wrap">
-                            {notification.description}
+                            {notification.message}
                           </p>
                           <p className="text-xs text-gray-400 mt-1">
-                            {new Date(notification.time).toLocaleString('pt-BR')}
+                            {formatRelativeTime(notification.created_at)}
                           </p>
                         </div>
                         {!notification.read && (
@@ -187,7 +173,6 @@ const Header: React.FC = () => {
                       </div>
                     </div>
                   ))}
-
                 </div>
               ) : (
                 <div className="py-8 px-4 text-center text-sm text-gray-500">
@@ -214,31 +199,36 @@ const Header: React.FC = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {user && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 pl-2 pr-4">
-                  <Avatar className="h-7 w-7">
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
-                  </Avatar>
-                  <span className="text-sm font-medium text-gray-700">{user.name}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end">
-                <DropdownMenuLabel>
-                  <div className="flex flex-col">
-                    <p className="text-sm font-medium">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">{roleLabels[user.role]}</p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer" onClick={() => logout()}>
-                  Sair
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          {/* User Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="flex items-center gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-[#e5b034] text-white">
+                    {user?.name ? getInitials(user.name) : <User className="h-4 w-4" />}
+                  </AvatarFallback>
+                </Avatar>
+                {user?.name && (
+                  <span className="hidden md:inline-block text-sm font-medium">
+                    {user.name}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>
+                <div className="flex flex-col">
+                  <p className="text-sm font-medium">{user?.name || user?.email}</p>
+                  <p className="text-xs text-muted-foreground">{getRoleLabel(user?.role || '')}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="cursor-pointer" onClick={() => logout()}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sair
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

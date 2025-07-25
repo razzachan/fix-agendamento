@@ -3,6 +3,8 @@ import React from 'react';
 import { MapPin, Calendar, Clock } from 'lucide-react';
 import { ServiceOrder } from '@/types';
 import { formatDate } from '../utils';
+import { AddressDisplay } from '@/components/ui/AddressDisplay';
+import { extractAddressFromServiceOrder } from '@/utils/addressFormatter';
 
 interface OrderServiceInfoProps {
   order: ServiceOrder;
@@ -11,42 +13,27 @@ interface OrderServiceInfoProps {
 const OrderServiceInfo: React.FC<OrderServiceInfoProps> = ({ order }) => {
   return (
     <div className="space-y-4">
-      {order.needsPickup && order.pickupAddress && (
+      {order.needsPickup && (
         <div>
           <h3 className="font-medium text-sm text-muted-foreground mb-1">Endereço para Coleta</h3>
-          <div className="flex">
-            <MapPin className="h-4 w-4 mr-2 text-muted-foreground mt-1 flex-shrink-0" />
-            <div>
-              <p>{order.pickupAddress}</p>
-              {order.pickupCity && order.pickupState && (
-                <p className="text-muted-foreground">
-                  {order.pickupCity}, {order.pickupState}
-                  {order.pickupZipCode && ` - ${order.pickupZipCode}`}
-                </p>
-              )}
-              {order.clientAddressComplement && (
-                <p className="text-muted-foreground">
-                  Complemento: {order.clientAddressComplement}
-                </p>
-              )}
-              {order.clientAddressReference && (
-                <p className="text-muted-foreground">
-                  Referência: {order.clientAddressReference}
-                </p>
-              )}
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                  `${order.pickupAddress}, ${order.pickupCity}, ${order.pickupState}`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline text-sm flex items-center mt-1"
-              >
-                <MapPin className="h-3 w-3 mr-1" />
-                Ver no Google Maps
-              </a>
-            </div>
-          </div>
+          <AddressDisplay
+            data={extractAddressFromServiceOrder(order)}
+            variant="detailed"
+            className="mb-2"
+          />
+          {order.pickupAddress && (
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                `${order.pickupAddress}, ${order.pickupCity}, ${order.pickupState}`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline text-sm flex items-center"
+            >
+              <MapPin className="h-3 w-3 mr-1" />
+              Ver no Google Maps
+            </a>
+          )}
         </div>
       )}
 

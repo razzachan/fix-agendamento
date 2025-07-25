@@ -47,6 +47,34 @@ def obter_valor_servico(tipo_atendimento: str, valor_clientechat: float = None) 
 
     logger.info(f"✅ Valor final definido: R$ {valor_final}")
     return valor_final
+
+def obter_valor_inicial(tipo_atendimento: str, valor_clientechat: float = None) -> float:
+    """
+    Obtém o valor inicial (sinal) baseado no tipo de atendimento
+
+    LÓGICA:
+    - coleta_diagnostico: Valor do ClienteChat (sinal de R$ 350,00 padrão)
+    - em_domicilio: 0 (sem sinal)
+    - coleta_conserto: 0 (sem sinal)
+    """
+    logger.info(f"💰 Obtendo valor inicial para: tipo={tipo_atendimento}, valor_clientechat={valor_clientechat}")
+
+    if tipo_atendimento == "coleta_diagnostico":
+        # Para coleta diagnóstico, o valor é o sinal
+        if valor_clientechat and valor_clientechat > 0:
+            valor_inicial = valor_clientechat
+            logger.info(f"📱 SINAL DO CLIENTECHAT: R$ {valor_inicial} para coleta_diagnostico")
+        else:
+            valor_inicial = 350.00  # Sinal padrão
+            logger.warning(f"⚠️ FALLBACK SINAL: Usando R$ {valor_inicial} para coleta_diagnostico")
+    else:
+        # Outros tipos não têm sinal
+        valor_inicial = 0.00
+        logger.info(f"📋 SEM SINAL: R$ {valor_inicial} para {tipo_atendimento}")
+
+    logger.info(f"✅ Valor inicial definido: R$ {valor_inicial}")
+    return valor_inicial
+
 _technicians_cache = {}
 _cache_timestamp = None
 
@@ -3512,6 +3540,10 @@ async def criar_os_completa(dados: dict):
             "completed_date": None,  # ✅ AINDA NÃO COMPLETADO
             "needs_pickup": dados.get("tipo_atendimento") in ["coleta_conserto", "coleta_diagnostico"],  # ✅ BASEADO NO TIPO
             "current_location": "client",  # ✅ SEMPRE INICIA NO CLIENTE (independente do tipo)
+            "initial_cost": obter_valor_inicial(
+                dados.get("tipo_atendimento", "em_domicilio"),
+                dados.get("valor_os")
+            ),
             "final_cost": obter_valor_servico(
                 dados.get("tipo_atendimento", "em_domicilio"),
                 dados.get("valor_os")

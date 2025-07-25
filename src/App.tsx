@@ -40,6 +40,7 @@ import Quotes from './pages/Quotes';
 import RepairsAndDeliveries from './pages/RepairsAndDeliveries';
 import TrackingPage from './pages/TrackingPage';
 import SLAMonitoring from './pages/SLAMonitoring';
+import MobileTest from './pages/MobileTest';
 import NotFound from './pages/NotFound';
 // Client Pages
 import { ClientPortal } from './pages/client/ClientPortal';
@@ -50,6 +51,7 @@ import { ClientProfilePassword } from './pages/client/ClientProfilePassword';
 import Reports from './pages/Reports';
 import PWASettings from './pages/PWASettings';
 import AI from './pages/AI';
+import ForceLogout from './pages/ForceLogout';
 // Components
 import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -73,6 +75,7 @@ function App() {
               {/* Rotas públicas */}
               <Route path="/login" element={<Login />} />
               <Route path="/client/login" element={<Login />} />
+              <Route path="/force-logout" element={<ForceLogout />} />
 
               {/* Rota pública de rastreamento por QR Code */}
               <Route path="/track/:qrCode" element={<TrackingPage />} />
@@ -316,6 +319,16 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'technician', 'workshop']}>
                     <AppLayout><MainCalendarPage /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Rota de teste mobile */}
+              <Route
+                path="/mobile-test"
+                element={
+                  <ProtectedRoute allowedRoles={['admin', 'technician', 'workshop']}>
+                    <AppLayout><MobileTest /></AppLayout>
                   </ProtectedRoute>
                 }
               />

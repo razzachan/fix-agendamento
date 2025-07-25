@@ -47,6 +47,7 @@ const formSchema = z.object({
   clientPhone: z.string().optional(),
   clientEmail: z.string().email({ message: 'Email inválido' }).optional(),
   clientAddress: z.string().optional(),
+  clientAddressComplement: z.string().optional(),
   serviceAttendanceType: z.enum(['em_domicilio', 'coleta_conserto', 'coleta_diagnostico'], {
     required_error: 'Selecione o tipo de atendimento'
   }),
@@ -56,6 +57,7 @@ const formSchema = z.object({
     equipmentType: z.string().min(2, { message: 'Tipo de equipamento é obrigatório' }),
     equipmentModel: z.string().optional(),
     problem: z.string().min(5, { message: 'Descrição do problema é obrigatória' }),
+    serviceValue: z.string().optional(),
   })).min(1, { message: 'Adicione pelo menos um equipamento' }),
   scheduledDate: z.string().optional().nullable(),
   scheduledTime: z.string().optional().nullable(),
@@ -97,6 +99,7 @@ const NewOrderDialog: React.FC<NewOrderDialogProps> = ({
       clientPhone: '',
       clientEmail: '',
       clientAddress: '',
+      clientAddressComplement: '',
       serviceAttendanceType: 'em_domicilio',
       equipments: [
         {
@@ -104,6 +107,7 @@ const NewOrderDialog: React.FC<NewOrderDialogProps> = ({
           equipmentType: '',
           equipmentModel: '',
           problem: '',
+          serviceValue: '',
         }
       ],
       scheduledDate: format(new Date(), 'yyyy-MM-dd'),
@@ -196,7 +200,7 @@ const NewOrderDialog: React.FC<NewOrderDialogProps> = ({
       equipmentModel: equipment.equipmentModel || null,
       equipmentSerial: null,
       clientDescription: equipment.problem,
-      serviceValue: ''
+      serviceValue: equipment.serviceValue || ''
     }));
 
     // Determinar se devemos criar um novo cliente ou usar um existente
@@ -263,10 +267,23 @@ const NewOrderDialog: React.FC<NewOrderDialogProps> = ({
       equipmentSerial: null,
       needsPickup: needsPickup,
       pickupAddress: values.clientAddress || null,
+      pickupAddressComplement: values.clientAddressComplement || null,
       currentLocation: needsPickup ? 'client' : 'workshop',
       serviceAttendanceType: values.serviceAttendanceType,
       clientDescription: description,
-      serviceItems: serviceItems
+      serviceItems: serviceItems,
+      // Para coleta diagnóstico, o valor é o sinal inicial
+      // Para outros tipos, é o valor final
+      initialCost: values.serviceAttendanceType === 'coleta_diagnostico'
+        ? values.equipments.reduce((total, equipment) => {
+            const itemValue = parseFloat(equipment.serviceValue || '0') / 100;
+            return total + itemValue;
+          }, 0) || 350 // Fallback R$ 350,00
+        : 0,
+      finalCost: values.equipments.reduce((total, equipment) => {
+        const itemValue = parseFloat(equipment.serviceValue || '0') / 100;
+        return total + itemValue;
+      }, 0)
     };
 
     // Enviar para criação
@@ -410,6 +427,22 @@ const NewOrderDialog: React.FC<NewOrderDialogProps> = ({
                             <FormLabel>Endereço</FormLabel>
                             <FormControl>
                               <Input {...field} placeholder="Endereço completo" className="h-10" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="clientAddressComplement"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Complemento do Endereço</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Apto, Bloco, Casa, etc." className="h-10" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -562,6 +595,38 @@ const NewOrderDialog: React.FC<NewOrderDialogProps> = ({
                                     <FormLabel>Descrição do Problema</FormLabel>
                                     <FormControl>
                                       <Input {...field} placeholder="Descreva o problema" className="h-10" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name={`equipments.${index}.serviceValue`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Valor do Serviço (opcional)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        placeholder="R$ 0,00"
+                                        className="h-10"
+                                        onChange={(e) => {
+                                          const value = e.target.value.replace(/\D/g, '');
+                                          field.onChange(value);
+                                          if (value) {
+                                            const formatted = (parseInt(value) / 100).toLocaleString('pt-BR', {
+                                              style: 'currency',
+                                              currency: 'BRL'
+                                            });
+                                            e.target.value = formatted;
+                                          }
+                                        }}
+                                        value={field.value ? (parseInt(field.value) / 100).toLocaleString('pt-BR', {
+                                          style: 'currency',
+                                          currency: 'BRL'
+                                        }) : ''}
+                                      />
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>

@@ -1,0 +1,228 @@
+/* Estilos específicos para o Dashboard do Técnico */
+
+/* Scrollbar personalizada para navegação horizontal */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Breakpoint customizado para telas muito pequenas */
+@media (min-width: 400px) {
+  .xs\:inline {
+    display: inline;
+  }
+
+  .xs\:hidden {
+    display: none;
+  }
+}
+
+/* Melhorias para cards em dispositivos móveis */
+@media (max-width: 640px) {
+  .mobile-card-spacing {
+    padding: 1rem;
+  }
+  
+  .mobile-card-spacing .card-header {
+    padding-bottom: 0.75rem;
+  }
+  
+  .mobile-card-spacing .card-content {
+    padding-top: 0.75rem;
+  }
+}
+
+/* Prevenção de sobreposição de elementos */
+.dashboard-container {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-alert {
+  position: relative;
+  z-index: 10;
+}
+
+.dashboard-card {
+  position: relative;
+  z-index: 5;
+}
+
+/* Melhorias para badges em dispositivos móveis */
+@media (max-width: 640px) {
+  .mobile-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .mobile-badge .lucide {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+}
+
+/* Layout responsivo para grid de métricas */
+.metrics-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 640px) {
+  .metrics-grid {
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .metrics-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Melhorias para botões em dispositivos móveis */
+@media (max-width: 640px) {
+  .mobile-button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  
+  .mobile-button .lucide {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+/* Prevenção de overflow horizontal */
+.dashboard-content {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Melhorias para texto em dispositivos móveis */
+@media (max-width: 640px) {
+  .mobile-text-sm {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  
+  .mobile-text-xs {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+}
+
+/* Container principal responsivo */
+.dashboard-main {
+  min-height: 100vh;
+  background-color: rgb(249 250 251 / 0.3);
+}
+
+.dashboard-wrapper {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0;
+}
+
+@media (min-width: 640px) {
+  .dashboard-wrapper {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-wrapper {
+    padding: 2rem;
+  }
+}
+
+/* Melhorias para navegação por abas */
+.tab-navigation {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  border: 1px solid rgb(229 231 235);
+}
+
+.tab-button {
+  flex-shrink: 0;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  transition: all 0.2s ease-in-out;
+  min-width: fit-content;
+}
+
+@media (min-width: 640px) {
+  .tab-button {
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+  }
+}
+
+/* Melhorias específicas para mobile */
+@media (max-width: 640px) {
+  .tab-navigation nav {
+    padding: 0.25rem;
+  }
+
+  .tab-button {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.75rem;
+    min-width: auto;
+  }
+}
+
+.tab-button:hover {
+  color: rgb(55 65 81);
+  border-bottom-color: rgb(209 213 219);
+  background-color: rgb(249 250 251);
+}
+
+.tab-button.active {
+  color: rgb(37 99 235);
+  border-bottom-color: rgb(59 130 246);
+  background-color: rgb(239 246 255 / 0.5);
+}
+
+/* Melhorias para cards de conteúdo */
+.content-card {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  border: 1px solid rgb(229 231 235);
+  overflow: hidden;
+}
+
+/* Espaçamento responsivo */
+.responsive-spacing {
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .responsive-spacing {
+    gap: 1.5rem;
+  }
+}
+
+/* Prevenção de problemas de z-index */
+.alert-container {
+  position: relative;
+  z-index: 20;
+}
+
+.card-container {
+  position: relative;
+  z-index: 10;
+}
+
+.modal-container {
+  position: relative;
+  z-index: 50;
+}

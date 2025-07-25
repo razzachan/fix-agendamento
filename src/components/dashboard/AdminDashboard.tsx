@@ -171,11 +171,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Cards de Métricas Principais */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Ordens Pendentes */}
-        <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-orange-50 to-orange-100 hover:shadow-xl transition-all duration-300">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 rounded-bl-full opacity-10"></div>
+        <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/20 dark:to-orange-900/20 hover:shadow-xl transition-all duration-300">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 dark:from-orange-600 dark:to-orange-800 rounded-bl-full opacity-10"></div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-orange-800">Ordens Pendentes</CardTitle>
-            <div className="p-2 bg-orange-500 rounded-lg">
+            <CardTitle className="text-sm font-medium text-orange-800 dark:text-orange-200">Ordens Pendentes</CardTitle>
+            <div className="p-2 bg-orange-500 dark:bg-orange-600 rounded-lg">
               <Clock className="h-4 w-4 text-white" />
             </div>
           </CardHeader>

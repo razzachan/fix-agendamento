@@ -1,6 +1,8 @@
 
 import React from 'react';
 import { Client } from '@/types';
+import { AddressDisplay } from '@/components/ui/AddressDisplay';
+import { extractAddressFromClient } from '@/utils/addressFormatter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Phone, MapPin, User } from 'lucide-react';
 
@@ -36,19 +38,10 @@ const ClientInfoCard: React.FC<ClientInfoCardProps> = ({ client }) => {
           )}
         </div>
 
-        {client.address && (
-          <div className="flex items-start gap-2">
-            <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-            <div>
-              <div>{client.address}</div>
-              {client.city && client.state && (
-                <div className="text-muted-foreground">
-                  {client.city}/{client.state} {client.zipCode && `- ${client.zipCode}`}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <AddressDisplay
+          data={extractAddressFromClient(client)}
+          variant="default"
+        />
       </CardContent>
     </Card>
   );

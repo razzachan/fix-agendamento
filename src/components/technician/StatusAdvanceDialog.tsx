@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,18 +68,31 @@ export function StatusAdvanceDialog({
     discount_reason: ''
   });
 
+  // 🔧 MODAL QR CODE: Separar useEffect para evitar reset desnecessário do step
+  const [isInitialized, setIsInitialized] = useState(false);
+
   useEffect(() => {
-    if (open && serviceOrder) {
+    if (open && serviceOrder && !isInitialized) {
       setStep('requirements');
       setPaymentStep(1); // Reset para o primeiro sub-step
       setPhotoCompleted(false);
       setPaymentCompleted(false);
       setQrCodeCompleted(false);
       setShowPhotoDialog(false);
+      setIsInitialized(true);
       analyzeRequirements();
       checkExistingPhotos();
+    } else if (!open) {
+      setIsInitialized(false);
     }
-  }, [open, serviceOrder, nextStatus]);
+  }, [open, serviceOrder]);
+
+  // 🔧 MODAL QR CODE: useEffect separado para mudanças de nextStatus
+  useEffect(() => {
+    if (open && serviceOrder && isInitialized) {
+      analyzeRequirements();
+    }
+  }, [nextStatus]);
 
   const analyzeRequirements = async () => {
     if (!serviceOrder) return;
@@ -622,6 +634,14 @@ export function StatusAdvanceDialog({
     // 🔧 MODAL CALENDÁRIO: Debug detalhado para identificar problemas
     if (process.env.NODE_ENV === 'development') {
       console.log('🔍 [StatusAdvanceDialog] renderQRCodeStep - serviceOrder:', serviceOrder);
+      console.log('🔍 [StatusAdvanceDialog] renderQRCodeStep - Campos importantes:', {
+        id: serviceOrder?.id,
+        order_number: serviceOrder?.order_number,
+        orderNumber: serviceOrder?.orderNumber,
+        client_name: serviceOrder?.client_name,
+        equipment_type: serviceOrder?.equipment_type,
+        equipmentType: serviceOrder?.equipmentType
+      });
       console.log('🔍 [StatusAdvanceDialog] renderQRCodeStep - technicianId:', technicianId);
       console.log('🔍 [StatusAdvanceDialog] renderQRCodeStep - technicianName:', technicianName);
     }
@@ -640,7 +660,25 @@ export function StatusAdvanceDialog({
         {serviceOrder ? (
           <div className="border rounded-lg p-4">
             <div className="text-sm text-muted-foreground mb-4">
-              <p><strong>OS:</strong> {serviceOrder.id}</p>
+              <p><strong>OS:</strong> {(() => {
+                // 🔧 TRATAMENTO: Usar número da OS formatado em vez do UUID
+                const possibleOrderNumber =
+                  serviceOrder.order_number ||
+                  serviceOrder.orderNumber ||
+                  serviceOrder['order-number'] ||
+                  serviceOrder.os_number ||
+                  null;
+
+                if (possibleOrderNumber) {
+                  // Se já tem #, usar como está, senão adicionar #
+                  return possibleOrderNumber.toString().startsWith('#')
+                    ? possibleOrderNumber
+                    : `#${possibleOrderNumber}`;
+                }
+
+                // Fallback: usar ID abreviado
+                return `#${serviceOrder.id.substring(0, 8).toUpperCase()}`;
+              })()}</p>
               <p><strong>Cliente:</strong> {serviceOrder.client_name}</p>
               <p><strong>Equipamento:</strong> {serviceOrder.equipment_type || serviceOrder.equipmentType || 'N/A'}</p>
             </div>
@@ -675,7 +713,18 @@ export function StatusAdvanceDialog({
                         serviceOrder.os_number ||
                         null;
 
-                      const finalOrderNumber = possibleOrderNumber || `OS #${serviceOrder.id.substring(0, 8).toUpperCase()}`;
+                      // 🔧 FORMATAÇÃO: Garantir formato legível
+                      let finalOrderNumber;
+
+                      if (possibleOrderNumber) {
+                        // Se já tem #, usar como está, senão adicionar #
+                        finalOrderNumber = possibleOrderNumber.toString().startsWith('#')
+                          ? possibleOrderNumber
+                          : `#${possibleOrderNumber}`;
+                      } else {
+                        // Fallback: usar ID abreviado com formato legível
+                        finalOrderNumber = `#${serviceOrder.id.substring(0, 8).toUpperCase()}`;
+                      }
 
                       // Debug: Log do resultado final
                       if (process.env.NODE_ENV === 'development') {
@@ -701,7 +750,48 @@ export function StatusAdvanceDialog({
             scheduledDate: null,
             scheduledTime: '',
             completedDate: null,
-            description: '',
+            description: (() => {
+              // 🔧 QR CODE: Incluir problema relatado pelo cliente - Busca mais abrangente
+              try {
+                const possibleDescription =
+                  serviceOrder.client_description ||
+                  serviceOrder.clientDescription ||
+                  serviceOrder.description ||
+                  serviceOrder.problema ||
+                  serviceOrder.problem ||
+                  serviceOrder.issue ||
+                  serviceOrder.client_problem ||
+                  serviceOrder.equipment_problem ||
+                  serviceOrder.reported_problem ||
+                  serviceOrder.notes ||
+                  serviceOrder.observation ||
+                  serviceOrder.observacao ||
+                  '';
+
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('🔍 [StatusAdvanceDialog] Todos os campos de problema:', {
+                    client_description: serviceOrder.client_description,
+                    clientDescription: serviceOrder.clientDescription,
+                    description: serviceOrder.description,
+                    problema: serviceOrder.problema,
+                    problem: serviceOrder.problem,
+                    issue: serviceOrder.issue,
+                    client_problem: serviceOrder.client_problem,
+                    equipment_problem: serviceOrder.equipment_problem,
+                    reported_problem: serviceOrder.reported_problem,
+                    notes: serviceOrder.notes,
+                    observation: serviceOrder.observation,
+                    observacao: serviceOrder.observacao
+                  });
+                  console.log('🔍 [StatusAdvanceDialog] description/problema final:', possibleDescription);
+                }
+
+                return possibleDescription;
+              } catch (error) {
+                console.error('❌ [StatusAdvanceDialog] Erro ao processar description:', error);
+                return '';
+              }
+            })(),
             equipmentType: (() => {
               // 🔧 CALENDÁRIO: Tratamento robusto para diferentes formatos de equipamento
               try {
@@ -879,103 +969,81 @@ export function StatusAdvanceDialog({
 
   if (!serviceOrder) return null;
 
-  // 🔧 MODAL SOBREPOSIÇÃO: Modal customizado com z-index mais alto para QR Code
-  const renderModalContent = () => (
-    <DialogContent
-      className="max-w-2xl"
-      style={{
-        // 🔧 MODAL SOBREPOSIÇÃO: Z-index mais alto para o step QR Code
-        zIndex: step === 'qrcode' ? 9999 : undefined
-      }}
-    >
-      <DialogHeader>
-        <DialogTitle className="flex items-center gap-2">
-          <CheckCircle className="h-5 w-5 text-green-500" />
-          Avançar para: {nextStatusLabel}
-          {step === 'payment' && (
-            <span className="text-sm text-muted-foreground ml-2">
-              - Etapa {paymentStep}/2
-            </span>
-          )}
-        </DialogTitle>
-      </DialogHeader>
-
-      <div className="space-y-4">
-        {/* Informações da ordem */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Informações da Ordem</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="font-medium">Cliente:</span> {serviceOrder.client_name}
-              </div>
-              <div>
-                <span className="font-medium">Equipamento:</span> {serviceOrder.equipment_type}
-              </div>
-              <div>
-                <span className="font-medium">Tipo:</span> {
-                  serviceOrder.service_attendance_type === 'coleta_diagnostico' ? 'Coleta Diagnóstico' :
-                  serviceOrder.service_attendance_type === 'coleta_conserto' ? 'Coleta Conserto' :
-                  serviceOrder.service_attendance_type === 'em_domicilio' ? 'Em Domicílio' :
-                  serviceOrder.service_attendance_type
-                }
-              </div>
-              <div>
-                <span className="font-medium">Status Atual:</span> {
-                  serviceOrder.status === 'on_the_way' ? 'A Caminho' :
-                  serviceOrder.status === 'scheduled' ? 'Agendado' :
-                  serviceOrder.status === 'in_progress' ? 'Em Andamento' :
-                  serviceOrder.status === 'collected' ? 'Coletado' :
-                  serviceOrder.status === 'at_workshop' ? 'Na Oficina' :
-                  serviceOrder.status === 'completed' ? 'Concluído' :
-                  serviceOrder.status
-                }
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Separator />
-
-        {/* Renderizar step atual */}
-        {step === 'requirements' && renderRequirementsStep()}
-        {step === 'qrcode' && renderQRCodeStep()}
-        {step === 'payment' && renderPaymentStep()}
-        {step === 'confirm' && renderConfirmStep()}
-      </div>
-    </DialogContent>
-  );
-
   return (
     <>
-      {/* 🔧 MODAL SOBREPOSIÇÃO: Portal com z-index mais alto para QR Code */}
-      {step === 'qrcode' ? (
-        createPortal(
-          <div
-            className="fixed inset-0 bg-black/80 flex items-center justify-center"
-            style={{ zIndex: 9999 }}
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                onOpenChange(false);
-              }
-            }}
-          >
-            <div
-              className="bg-background rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {renderModalContent()}
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] flex flex-col p-0"
+          style={{
+            // 🔧 MODAL SOBREPOSIÇÃO: Z-index mais alto para o step QR Code
+            zIndex: step === 'qrcode' ? 9999 : 50
+          }}
+        >
+          {/* 🎯 CABEÇALHO FIXO */}
+          <div className="flex-shrink-0 p-6 pb-0">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                Avançar para: {nextStatusLabel}
+                {step === 'payment' && (
+                  <span className="text-sm text-muted-foreground ml-2">
+                    - Etapa {paymentStep}/2
+                  </span>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+
+          {/* 🎯 CONTEÚDO COM SCROLL */}
+          <div className="flex-1 overflow-y-auto px-6 pb-6">
+            <div className="space-y-4">
+            {/* Informações da ordem - Compacto */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Informações da Ordem</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="font-medium">Cliente:</span> {serviceOrder.client_name}
+                  </div>
+                  <div>
+                    <span className="font-medium">Equipamento:</span> {serviceOrder.equipment_type}
+                  </div>
+                  <div>
+                    <span className="font-medium">Tipo:</span> {
+                      serviceOrder.service_attendance_type === 'coleta_diagnostico' ? 'Coleta Diagnóstico' :
+                      serviceOrder.service_attendance_type === 'coleta_conserto' ? 'Coleta Conserto' :
+                      serviceOrder.service_attendance_type === 'em_domicilio' ? 'Em Domicílio' :
+                      serviceOrder.service_attendance_type
+                    }
+                  </div>
+                  <div>
+                    <span className="font-medium">Status Atual:</span> {
+                      serviceOrder.status === 'on_the_way' ? 'A Caminho' :
+                      serviceOrder.status === 'scheduled' ? 'Agendado' :
+                      serviceOrder.status === 'in_progress' ? 'Em Andamento' :
+                      serviceOrder.status === 'collected' ? 'Coletado' :
+                      serviceOrder.status === 'at_workshop' ? 'Na Oficina' :
+                      serviceOrder.status === 'completed' ? 'Concluído' :
+                      serviceOrder.status
+                    }
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Separator />
+
+            {/* Renderizar step atual */}
+            {step === 'requirements' && renderRequirementsStep()}
+            {step === 'qrcode' && renderQRCodeStep()}
+            {step === 'payment' && renderPaymentStep()}
+            {step === 'confirm' && renderConfirmStep()}
             </div>
-          </div>,
-          document.body
-        )
-      ) : (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-          {renderModalContent()}
-        </Dialog>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog de foto reutilizado */}
       <PhotoCaptureDialog

@@ -108,7 +108,12 @@ export const GlobalStatusAdvanceDialog: React.FC = () => {
         service_attendance_type: serviceOrder.serviceAttendanceType as any,
         status: serviceOrder.status,
         final_cost: serviceOrder.finalCost,
-        pickup_address: serviceOrder.pickupAddress
+        pickup_address: serviceOrder.pickupAddress,
+        // 🔧 PROBLEMA QR CODE: Incluir campos de descrição/problema
+        description: serviceOrder.description,
+        client_description: serviceOrder.clientDescription,
+        problema: serviceOrder.problema,
+        problem: serviceOrder.problem
       }}
       nextStatus={nextStatus}
       nextStatusLabel={nextStatusLabel}

@@ -3,15 +3,16 @@ import { ServiceOrder } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Navigation, 
-  Phone, 
-  Clock, 
-  MapPin, 
+import {
+  Navigation,
+  Phone,
+  Clock,
+  MapPin,
   Package,
   ArrowRight,
   Route,
-  Calendar
+  Calendar,
+  MessageCircle
 } from 'lucide-react';
 
 interface QuickActionsBarProps {
@@ -21,6 +22,25 @@ interface QuickActionsBarProps {
   onCallClient: (phone: string) => void;
   onViewRoute: () => void;
 }
+
+// Função para gerar link do WhatsApp
+const generateWhatsAppLink = (phone: string, orderInfo?: { clientName: string; equipmentType: string; orderNumber?: string }) => {
+  const cleanPhone = phone.replace(/\D/g, '');
+
+  let message = 'Olá! Sou técnico da Fix Fogões.';
+
+  if (orderInfo) {
+    message += ` Estou entrando em contato sobre o serviço agendado para ${orderInfo.equipmentType}`;
+    if (orderInfo.orderNumber) {
+      message += ` (OS #${orderInfo.orderNumber})`;
+    }
+    message += '.';
+  } else {
+    message += ' Estou entrando em contato sobre seu serviço agendado.';
+  }
+
+  return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
+};
 
 export const QuickActionsBar: React.FC<QuickActionsBarProps> = ({
   selectedOrder,
@@ -94,7 +114,7 @@ export const QuickActionsBar: React.FC<QuickActionsBarProps> = ({
               Navegar
             </Button>
           )}
-          
+
           {phone && (
             <Button
               size="sm"
@@ -104,6 +124,25 @@ export const QuickActionsBar: React.FC<QuickActionsBarProps> = ({
             >
               <Phone className="h-3 w-3 mr-1" />
               Ligar
+            </Button>
+          )}
+
+          {phone && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const whatsappLink = generateWhatsAppLink(phone, {
+                  clientName: selectedOrder?.clientName || '',
+                  equipmentType: selectedOrder?.equipmentType || '',
+                  orderNumber: selectedOrder?.orderNumber
+                });
+                window.open(whatsappLink, '_blank');
+              }}
+              className="flex-1 border-green-200 text-green-700 hover:bg-green-50"
+            >
+              <MessageCircle className="h-3 w-3 mr-1" />
+              WhatsApp
             </Button>
           )}
         </div>

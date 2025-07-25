@@ -39,7 +39,7 @@ const RoutingPage: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="container mx-auto py-6 px-4 sm:px-6 lg:px-8"
+        className="w-full py-6 px-0 sm:container sm:mx-auto sm:px-6 lg:px-8"
       >
         <PageHeader
           title="Roteirização Inteligente"

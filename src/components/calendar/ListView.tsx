@@ -23,6 +23,17 @@ const ListView: React.FC<ListViewProps> = ({
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date');
 
+  // Debug: Log eventos da lista
+  console.log(`📅 [ListView] Total eventos: ${events.length}`);
+  if (events.length > 0) {
+    console.log('📋 [ListView] Primeiros eventos:', events.slice(0, 3).map(e => ({
+      id: e.id,
+      clientName: e.clientName,
+      startTime: format(e.startTime, 'dd/MM HH:mm'),
+      status: e.status
+    })));
+  }
+
   // Filtrar eventos
   const filteredEvents = events.filter(event => {
     const matchesSearch = searchTerm === '' || 
@@ -103,33 +114,33 @@ const ListView: React.FC<ListViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Controles de filtro e busca */}
+    <div className="space-y-3 sm:space-y-6">
+      {/* Controles de filtro e busca - compactos no mobile */}
       <Card className="shadow-lg border-0">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b p-3 sm:p-6">
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             Lista de Agendamentos
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Busca */}
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+            {/* Busca - compacta no mobile */}
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Buscar por cliente, equipamento ou técnico..."
+                placeholder="Buscar..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 text-sm"
               />
             </div>
 
-            {/* Filtro por status */}
+            {/* Filtro por status - compacto no mobile */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Filtrar por status" />
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>

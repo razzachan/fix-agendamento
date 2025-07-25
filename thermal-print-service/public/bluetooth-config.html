@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Fogões - Configuração Bluetooth</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        
+        .section h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        input, select, button {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .devices-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+        }
+        
+        .device-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .device-item:hover {
+            background: #f0f8ff;
+        }
+        
+        .device-item:last-child {
+            border-bottom: none;
+        }
+        
+        .device-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .device-address {
+            color: #666;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .instructions h4 {
+            margin-top: 0;
+        }
+        
+        .instructions ol {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔵 Configuração Bluetooth</h1>
+            <p>Configure sua impressora térmica Bluetooth</p>
+        </div>
+        
+        <div class="content">
+            <div class="instructions">
+                <h4>📋 Antes de começar:</h4>
+                <ol>
+                    <li>Ligue sua impressora térmica</li>
+                    <li>Pareie a impressora no Bluetooth do Windows</li>
+                    <li>Anote o endereço MAC da impressora</li>
+                    <li>Use esta página para testar a conexão</li>
+                </ol>
+            </div>
+            
+            <div class="section">
+                <h3>🔍 1. Buscar Impressoras</h3>
+                <button id="scanBtn" onclick="scanDevices()">
+                    <span id="scanText">🔍 Buscar Impressoras Bluetooth</span>
+                </button>
+                
+                <div id="devicesContainer" style="display: none;">
+                    <h4>Dispositivos Encontrados:</h4>
+                    <div id="devicesList" class="devices-list"></div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3>⚙️ 2. Configuração Manual</h3>
+                <div class="form-group">
+                    <label for="macAddress">Endereço MAC da Impressora:</label>
+                    <input type="text" id="macAddress" placeholder="00:11:22:33:44:55" 
+                           pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$">
+                    <small style="color: #666;">Formato: 00:11:22:33:44:55 ou 00-11-22-33-44-55</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="channel">Canal Bluetooth:</label>
+                    <select id="channel">
+                        <option value="1">Canal 1 (Padrão)</option>
+                        <option value="2">Canal 2</option>
+                        <option value="3">Canal 3</option>
+                    </select>
+                </div>
+                
+                <button id="testBtn" onclick="testConnection()">
+                    <span id="testText">🧪 Testar Conexão</span>
+                </button>
+            </div>
+            
+            <div class="section">
+                <h3>🖨️ 3. Teste de Impressão</h3>
+                <button id="printBtn" onclick="testPrint()" disabled>
+                    <span id="printText">🖨️ Imprimir Etiqueta de Teste</span>
+                </button>
+            </div>
+            
+            <div id="status"></div>
+        </div>
+    </div>
+
+    <script>
+        let connectedAddress = null;
+        
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        async function scanDevices() {
+            const scanBtn = document.getElementById('scanBtn');
+            const scanText = document.getElementById('scanText');
+            const devicesContainer = document.getElementById('devicesContainer');
+            const devicesList = document.getElementById('devicesList');
+            
+            scanBtn.disabled = true;
+            scanText.innerHTML = '<span class="spinner"></span>Buscando...';
+            
+            try {
+                const response = await fetch('/api/printers');
+                const data = await response.json();
+                
+                if (data.success && data.printers.bluetooth.length > 0) {
+                    devicesList.innerHTML = '';
+                    
+                    data.printers.bluetooth.forEach(device => {
+                        if (device.address !== 'MANUAL_CONFIG') {
+                            const deviceDiv = document.createElement('div');
+                            deviceDiv.className = 'device-item';
+                            deviceDiv.onclick = () => selectDevice(device.address);
+                            deviceDiv.innerHTML = `
+                                <div class="device-name">${device.name}</div>
+                                <div class="device-address">${device.address}</div>
+                                ${device.paired ? '<small style="color: green;">✅ Pareado</small>' : '<small style="color: orange;">⚠️ Não pareado</small>'}
+                            `;
+                            devicesList.appendChild(deviceDiv);
+                        }
+                    });
+                    
+                    devicesContainer.style.display = 'block';
+                    showStatus(`✅ ${data.printers.bluetooth.length - 1} dispositivos encontrados`, 'success');
+                } else {
+                    showStatus('⚠️ Nenhuma impressora Bluetooth encontrada. Use a configuração manual.', 'info');
+                }
+                
+            } catch (error) {
+                showStatus(`❌ Erro ao buscar dispositivos: ${error.message}`, 'error');
+            } finally {
+                scanBtn.disabled = false;
+                scanText.innerHTML = '🔍 Buscar Impressoras Bluetooth';
+            }
+        }
+        
+        function selectDevice(address) {
+            document.getElementById('macAddress').value = address;
+            showStatus(`📱 Dispositivo selecionado: ${address}`, 'info');
+        }
+        
+        async function testConnection() {
+            const address = document.getElementById('macAddress').value;
+            const channel = document.getElementById('channel').value;
+            const testBtn = document.getElementById('testBtn');
+            const testText = document.getElementById('testText');
+            
+            if (!address) {
+                showStatus('❌ Digite o endereço MAC da impressora', 'error');
+                return;
+            }
+            
+            testBtn.disabled = true;
+            testText.innerHTML = '<span class="spinner"></span>Testando...';
+            
+            try {
+                const response = await fetch('/api/bluetooth/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ address, channel: parseInt(channel) })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    connectedAddress = address;
+                    document.getElementById('printBtn').disabled = false;
+                    showStatus(`✅ Conexão bem-sucedida! Impressora pronta para uso.`, 'success');
+                } else {
+                    showStatus(`❌ Erro na conexão: ${data.error}`, 'error');
+                }
+                
+            } catch (error) {
+                showStatus(`❌ Erro no teste: ${error.message}`, 'error');
+            } finally {
+                testBtn.disabled = false;
+                testText.innerHTML = '🧪 Testar Conexão';
+            }
+        }
+        
+        async function testPrint() {
+            if (!connectedAddress) {
+                showStatus('❌ Teste a conexão primeiro', 'error');
+                return;
+            }
+            
+            const printBtn = document.getElementById('printBtn');
+            const printText = document.getElementById('printText');
+            
+            printBtn.disabled = true;
+            printText.innerHTML = '<span class="spinner"></span>Imprimindo...';
+            
+            try {
+                const testData = {
+                    orderNumber: 'TESTE-BT',
+                    clientName: 'Teste Bluetooth',
+                    equipmentType: 'Impressora Térmica',
+                    description: 'Teste de conectividade Bluetooth',
+                    qrCode: 'TEST_BLUETOOTH_CONNECTION',
+                    generatedDate: new Date().toLocaleDateString('pt-BR'),
+                    connectionType: 'bluetooth',
+                    deviceInfo: {
+                        address: connectedAddress,
+                        name: 'Impressora Bluetooth'
+                    }
+                };
+                
+                const response = await fetch('/api/print', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(testData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus('✅ Etiqueta de teste impressa com sucesso! Configuração concluída.', 'success');
+                } else {
+                    showStatus(`❌ Erro na impressão: ${data.error}`, 'error');
+                }
+                
+            } catch (error) {
+                showStatus(`❌ Erro na impressão: ${error.message}`, 'error');
+            } finally {
+                printBtn.disabled = false;
+                printText.innerHTML = '🖨️ Imprimir Etiqueta de Teste';
+            }
+        }
+        
+        // Validação do endereço MAC
+        document.getElementById('macAddress').addEventListener('input', function(e) {
+            const value = e.target.value;
+            const isValid = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(value);
+            
+            if (value && !isValid) {
+                e.target.style.borderColor = '#dc3545';
+            } else {
+                e.target.style.borderColor = '#ddd';
+            }
+        });
+    </script>
+</body>
+</html>

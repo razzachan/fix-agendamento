@@ -17,6 +17,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { translateStatus } from '@/utils/translations';
+import { AddressDisplay } from '@/components/ui/AddressDisplay';
+import { extractAddressFromServiceOrder } from '@/utils/addressFormatter';
 
 interface OrderCardProps {
   order: ServiceOrder;
@@ -44,20 +46,20 @@ const OrderCard: React.FC<OrderCardProps> = ({
   // Cores baseadas no status
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'in_progress': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'at_workshop': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'awaiting_approval': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'approved': return 'bg-green-100 text-green-800 border-green-200';
-      case 'ready_for_delivery': return 'bg-teal-100 text-teal-800 border-teal-200';
-      case 'completed': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'scheduled': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800';
+      case 'in_progress': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800';
+      case 'at_workshop': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-800';
+      case 'awaiting_approval': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-800';
+      case 'approved': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800';
+      case 'ready_for_delivery': return 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-200 dark:border-teal-800';
+      case 'completed': return 'bg-gray-100 dark:bg-gray-800/30 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700';
+      default: return 'bg-gray-100 dark:bg-gray-800/30 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700';
     }
   };
 
   return (
     <Card
-      className="cursor-pointer hover:shadow-md transition-all duration-200 border-l-4 border-l-[#e5b034] bg-white"
+      className="cursor-pointer hover:shadow-md transition-all duration-200 border-l-4 border-l-[#e5b034] bg-white dark:bg-gray-800"
       onClick={onClick}
     >
       <CardContent className="p-3">
@@ -125,14 +127,12 @@ const OrderCard: React.FC<OrderCardProps> = ({
           )}
 
           {/* Endereço */}
-          {order.clientFullAddress && (
-            <div className="flex items-start gap-1.5 text-xs text-gray-600">
-              <MapPin className="h-3 w-3 mt-0.5 flex-shrink-0 text-red-500" />
-              <span className="line-clamp-2 text-xs leading-relaxed">
-                {order.clientFullAddress}
-              </span>
-            </div>
-          )}
+          <AddressDisplay
+            data={extractAddressFromServiceOrder(order)}
+            variant="compact"
+            className="text-xs text-gray-600"
+            iconClassName="h-3 w-3 text-red-500"
+          />
 
           {/* Telefone */}
           {order.clientPhone && (

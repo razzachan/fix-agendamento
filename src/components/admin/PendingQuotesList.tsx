@@ -175,18 +175,18 @@ export function PendingQuotesList() {
                 const isExpired = daysUntilExpiry < 0;
                 
                 return (
-                  <div 
-                    key={quote.id} 
+                  <div
+                    key={quote.id}
                     className={`border rounded-lg p-4 transition-colors ${
-                      isExpired ? 'bg-red-50 border-red-200' : 
-                      isExpiringSoon ? 'bg-yellow-50 border-yellow-200' : 
-                      'hover:bg-gray-50'
+                      isExpired ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' :
+                      isExpiringSoon ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800' :
+                      'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-gray-200 dark:border-gray-700'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-3">
-                          <h4 className="font-medium text-gray-900">
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100">
                             {quote.client_name}
                           </h4>
                           {getServiceTypeBadge(quote.service_attendance_type)}
@@ -195,7 +195,7 @@ export function PendingQuotesList() {
                           {isExpired ? (
                             <Badge variant="destructive">Expirado</Badge>
                           ) : isExpiringSoon ? (
-                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                            <Badge variant="secondary" className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
                               Expira em {daysUntilExpiry} dias
                             </Badge>
                           ) : (

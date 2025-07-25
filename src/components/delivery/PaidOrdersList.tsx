@@ -7,6 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { DeliverySchedulingDialog } from './DeliverySchedulingDialog';
 import { AlertBadge, useAlertType, useDaysOverdue } from '@/components/ui/AlertBadge';
 import { toast } from 'sonner';
+import { AddressDisplay } from '@/components/ui/AddressDisplay';
+import { extractAddressFromServiceOrder } from '@/utils/addressFormatter';
 
 interface PaidOrder {
   id: string;
@@ -269,11 +271,16 @@ export function PaidOrdersList() {
                   
                   {/* Endereço */}
                   <div className="text-sm text-gray-600">
-                    <span className="font-medium flex items-center gap-1">
+                    <span className="font-medium flex items-center gap-1 mb-1">
                       <MapPin className="h-3 w-3" />
                       Endereço de Entrega:
                     </span>
-                    <p className="mt-1">{order.pickup_address}</p>
+                    <AddressDisplay
+                      data={extractAddressFromServiceOrder(order)}
+                      variant="compact"
+                      showIcon={false}
+                      className="ml-4"
+                    />
                   </div>
                   
                   {/* Botão de ação */}

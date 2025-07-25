@@ -50,12 +50,14 @@ export function mapServiceOrder(order: any): ServiceOrder {
     equipmentSerial: order.equipment_serial,
     needsPickup: order.needs_pickup || false,
     pickupAddress: order.pickup_address,
+    pickupAddressComplement: order.pickup_address_complement,
     pickupCity: order.pickup_city,
     pickupState: order.pickup_state,
     pickupZipCode: order.pickup_zip_code,
     currentLocation: order.current_location as any,
     serviceAttendanceType: validAttendanceType as "em_domicilio" | "coleta_conserto" | "coleta_diagnostico",
-    finalCost: order.final_cost ? parseFloat(order.final_cost.toString()) : 0, // ✅ Mapear final_cost para finalCost
+    initialCost: order.initial_cost ? parseFloat(order.initial_cost.toString()) : 0, // ✅ Valor inicial (sinal)
+    finalCost: order.final_cost ? parseFloat(order.final_cost.toString()) : 0, // ✅ Valor final total
     clientDescription: order.description,
     archived: order.archived || false,
 
