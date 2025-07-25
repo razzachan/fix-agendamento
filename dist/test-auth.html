@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Autenticação</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Teste de Autenticação</h1>
+        
+        <div id="status" class="status info">
+            Aguardando teste...
+        </div>
+        
+        <button onclick="testLocalStorage()">💾 Testar LocalStorage</button>
+        <button onclick="testSessionStorage()">🗂️ Testar SessionStorage</button>
+        <button onclick="testCookies()">🍪 Testar Cookies</button>
+        <button onclick="testReactAuth()">⚛️ Testar React Auth</button>
+        <button onclick="clearResults()">🗑️ Limpar</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+        
+        function addResult(title, data, type = 'info') {
+            const resultsEl = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.innerHTML = `
+                <h3>${title}</h3>
+                <div class="status ${type}">
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                </div>
+            `;
+            resultsEl.appendChild(resultDiv);
+        }
+        
+        function testLocalStorage() {
+            updateStatus('🔄 Testando LocalStorage...', 'info');
+            
+            try {
+                // Verificar se localStorage está disponível
+                const testKey = 'test_' + Date.now();
+                localStorage.setItem(testKey, 'test_value');
+                const testValue = localStorage.getItem(testKey);
+                localStorage.removeItem(testKey);
+                
+                // Verificar dados de autenticação existentes
+                const authData = {
+                    available: !!localStorage,
+                    testWorking: testValue === 'test_value',
+                    authToken: localStorage.getItem('auth_token'),
+                    supabaseAuth: localStorage.getItem('sb-hdyucwabemspehokoiks-auth-token'),
+                    userSession: localStorage.getItem('user_session'),
+                    allKeys: Object.keys(localStorage).filter(key => 
+                        key.includes('auth') || 
+                        key.includes('user') || 
+                        key.includes('supabase') ||
+                        key.includes('sb-')
+                    )
+                };
+                
+                addResult('💾 LocalStorage', authData, 'success');
+                updateStatus('✅ LocalStorage testado com sucesso', 'success');
+                
+            } catch (error) {
+                addResult('❌ Erro LocalStorage', error, 'error');
+                updateStatus('❌ Erro no LocalStorage', 'error');
+            }
+        }
+        
+        function testSessionStorage() {
+            updateStatus('🔄 Testando SessionStorage...', 'info');
+            
+            try {
+                const testKey = 'test_' + Date.now();
+                sessionStorage.setItem(testKey, 'test_value');
+                const testValue = sessionStorage.getItem(testKey);
+                sessionStorage.removeItem(testKey);
+                
+                const sessionData = {
+                    available: !!sessionStorage,
+                    testWorking: testValue === 'test_value',
+                    allKeys: Object.keys(sessionStorage).filter(key => 
+                        key.includes('auth') || 
+                        key.includes('user') || 
+                        key.includes('supabase')
+                    )
+                };
+                
+                addResult('🗂️ SessionStorage', sessionData, 'success');
+                updateStatus('✅ SessionStorage testado com sucesso', 'success');
+                
+            } catch (error) {
+                addResult('❌ Erro SessionStorage', error, 'error');
+                updateStatus('❌ Erro no SessionStorage', 'error');
+            }
+        }
+        
+        function testCookies() {
+            updateStatus('🔄 Testando Cookies...', 'info');
+            
+            try {
+                // Testar se cookies funcionam
+                document.cookie = 'test_cookie=test_value; path=/';
+                const cookieWorking = document.cookie.includes('test_cookie=test_value');
+                
+                const cookieData = {
+                    available: !!document.cookie,
+                    testWorking: cookieWorking,
+                    allCookies: document.cookie,
+                    authCookies: document.cookie.split(';').filter(cookie => 
+                        cookie.includes('auth') || 
+                        cookie.includes('user') || 
+                        cookie.includes('supabase')
+                    )
+                };
+                
+                // Limpar cookie de teste
+                document.cookie = 'test_cookie=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                
+                addResult('🍪 Cookies', cookieData, 'success');
+                updateStatus('✅ Cookies testados com sucesso', 'success');
+                
+            } catch (error) {
+                addResult('❌ Erro Cookies', error, 'error');
+                updateStatus('❌ Erro nos Cookies', 'error');
+            }
+        }
+        
+        async function testReactAuth() {
+            updateStatus('🔄 Testando acesso ao React Auth...', 'info');
+            
+            try {
+                // Tentar acessar a página de login do React
+                const loginResponse = await fetch(`${window.location.origin}/login`);
+                const loginWorking = loginResponse.ok;
+                
+                // Tentar acessar a página protegida
+                const ordersResponse = await fetch(`${window.location.origin}/orders`);
+                const ordersWorking = ordersResponse.ok;
+                
+                const reactData = {
+                    origin: window.location.origin,
+                    hostname: window.location.hostname,
+                    port: window.location.port,
+                    loginPageAccessible: loginWorking,
+                    loginStatus: loginResponse.status,
+                    ordersPageAccessible: ordersWorking,
+                    ordersStatus: ordersResponse.status,
+                    ordersRedirect: ordersResponse.redirected,
+                    ordersUrl: ordersResponse.url
+                };
+                
+                addResult('⚛️ React Auth', reactData, loginWorking ? 'success' : 'error');
+                updateStatus(loginWorking ? '✅ React acessível' : '❌ Problema no React', loginWorking ? 'success' : 'error');
+                
+            } catch (error) {
+                addResult('❌ Erro React Auth', error, 'error');
+                updateStatus('❌ Erro ao acessar React', 'error');
+            }
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            updateStatus('Aguardando teste...', 'info');
+        }
+        
+        // Informações do ambiente
+        window.addEventListener('load', () => {
+            addResult('🌐 Informações do Ambiente', {
+                hostname: window.location.hostname,
+                port: window.location.port,
+                protocol: window.location.protocol,
+                origin: window.location.origin,
+                userAgent: navigator.userAgent.substring(0, 100) + '...',
+                cookieEnabled: navigator.cookieEnabled,
+                storageQuota: navigator.storage ? 'Available' : 'Not Available'
+            }, 'info');
+        });
+    </script>
+</body>
+</html>

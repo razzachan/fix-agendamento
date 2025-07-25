@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Teste ClienteChat Duas Etapas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #E5B034;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #d4a02a;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { border-color: #28a745; background: #d4edda; }
+        .error { border-color: #dc3545; background: #f8d7da; }
+        .info { border-color: #17a2b8; background: #d1ecf1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste Sistema ClienteChat Duas Etapas</h1>
+        <p><strong>Nova funcionalidade:</strong> Uma neural chain que detecta automaticamente se é primeira consulta ou escolha de horário!</p>
+
+        <div class="test-section">
+            <h3>🎯 ETAPA 1: Primeira Consulta (Dados Completos)</h3>
+            <p>Simula cliente enviando dados completos para agendamento</p>
+            <button onclick="testPrimeiraConsulta()">🚀 Testar Primeira Consulta</button>
+            <div id="resultado1" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 ETAPA 2: Escolha de Horário</h3>
+            <p>Simula cliente escolhendo uma das opções de horário (1, 2 ou 3)</p>
+            <button onclick="testEscolhaHorario('1')">1️⃣ Escolher Opção 1</button>
+            <button onclick="testEscolhaHorario('2')">2️⃣ Escolher Opção 2</button>
+            <button onclick="testEscolhaHorario('3')">3️⃣ Escolher Opção 3</button>
+            <div id="resultado2" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>❌ TESTE: Mensagem Incompleta</h3>
+            <p>Simula cliente enviando mensagem sem todos os dados necessários</p>
+            <button onclick="testMensagemIncompleta()">⚠️ Testar Mensagem Incompleta</button>
+            <div id="resultado3" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Status da API</h3>
+            <button onclick="verificarStatus()">🔍 Verificar Status da API</button>
+            <div id="status" class="result" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://fix-agendamento-production.up.railway.app/agendamento-inteligente';
+
+        async function fazerRequisicao(dados, resultadoId, metodo = 'POST') {
+            const resultadoDiv = document.getElementById(resultadoId);
+            resultadoDiv.style.display = 'block';
+            resultadoDiv.textContent = '⏳ Enviando requisição...';
+            resultadoDiv.className = 'result info';
+
+            try {
+                const options = {
+                    method: metodo,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+
+                if (metodo === 'POST') {
+                    options.body = JSON.stringify(dados);
+                }
+
+                const response = await fetch(API_URL, options);
+                const resultado = await response.json();
+                
+                const timestamp = new Date().toLocaleTimeString();
+                resultadoDiv.textContent = `[${timestamp}] 📡 Status: ${response.status}\n📝 Resposta:\n${JSON.stringify(resultado, null, 2)}`;
+                resultadoDiv.className = response.ok ? 'result success' : 'result error';
+                
+                return resultado;
+            } catch (error) {
+                const timestamp = new Date().toLocaleTimeString();
+                resultadoDiv.textContent = `[${timestamp}] ❌ Erro: ${error.message}`;
+                resultadoDiv.className = 'result error';
+                return null;
+            }
+        }
+
+        async function testPrimeiraConsulta() {
+            const dados = {
+                "cpf": "123.456.789-00",
+                "nome": "João Silva",
+                "email": "joao.silva@email.com",
+                "urgente": "não",
+                "endereco": "Rua das Flores, 123, Centro, Florianópolis, SC",
+                "problema": "não está acendendo",
+                "telefone": "48988332664",
+                "equipamento": "fogão",
+                "equipamento_2": "",
+                "equipamento_3": "",
+                "problema_2": "",
+                "problema_3": "",
+                "tipo_equipamento_1": "",
+                "tipo_equipamento_2": "",
+                "tipo_equipamento_3": ""
+                // horario_escolhido ausente = ETAPA 1
+            };
+
+            await fazerRequisicao(dados, 'resultado1');
+        }
+
+        async function testEscolhaHorario(opcao) {
+            const dados = {
+                "cpf": "123.456.789-00",
+                "nome": "João Silva",
+                "email": "joao.silva@email.com",
+                "urgente": "não",
+                "endereco": "Rua das Flores, 123, Centro, Florianópolis, SC",
+                "problema": "não está acendendo",
+                "telefone": "48988332664",
+                "equipamento": "fogão",
+                "equipamento_2": "",
+                "equipamento_3": "",
+                "problema_2": "",
+                "problema_3": "",
+                "tipo_equipamento_1": "",
+                "tipo_equipamento_2": "",
+                "tipo_equipamento_3": "",
+                "horario_escolhido": opcao  // ETAPA 2
+            };
+
+            await fazerRequisicao(dados, 'resultado2');
+        }
+
+        async function testMensagemIncompleta() {
+            const dados = {
+                "nome": "João Silva",
+                "endereco": "", // Campo obrigatório vazio
+                "equipamento": "fogão",
+                "problema": "",
+                "telefone": "48988332664"
+                // Dados incompletos para testar validação
+            };
+
+            await fazerRequisicao(dados, 'resultado3');
+        }
+
+        async function verificarStatus() {
+            await fazerRequisicao(null, 'status', 'GET');
+        }
+
+        // Verificar status automaticamente ao carregar a página
+        window.onload = function() {
+            verificarStatus();
+        };
+    </script>
+</body>
+</html>
