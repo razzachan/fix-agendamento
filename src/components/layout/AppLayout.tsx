@@ -33,6 +33,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     return <Navigate to="/client/portal" replace />;
   }
 
+  // Garantir que workshop, admin e technician nunca sejam redirecionados para client portal
+  if (user?.role && !['client', 'workshop', 'admin', 'technician'].includes(user.role)) {
+    console.log('🚨 [AppLayout] Role não reconhecido:', user.role);
+    return <Navigate to="/login" replace />;
+  }
+
   console.log('🔔 [AppLayout] Renderizando AppLayout');
 
   return (
