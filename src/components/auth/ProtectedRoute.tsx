@@ -49,7 +49,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     if (user.role === 'client') {
       return <Navigate to="/client/portal" state={{ from: location }} replace />;
     }
-    // Outros usuários para o dashboard padrão
+    // Workshop, admin e technician sempre vão para dashboard - NUNCA para client portal
+    if (user.role === 'workshop' || user.role === 'admin' || user.role === 'technician') {
+      return <Navigate to="/dashboard" state={{ from: location }} replace />;
+    }
+    // Fallback para outros usuários
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 

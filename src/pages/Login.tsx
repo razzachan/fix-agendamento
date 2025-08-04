@@ -16,8 +16,12 @@ const Login: React.FC = () => {
       // Redirecionar baseado na role do usuário
       if (user.role === 'client') {
         navigate('/client/portal');
-      } else {
+      } else if (user.role === 'workshop' || user.role === 'admin' || user.role === 'technician') {
         navigate('/dashboard');
+      } else {
+        // Role não reconhecido, forçar logout
+        console.log('🚨 [Login] Role não reconhecido:', user.role);
+        navigate('/login');
       }
     }
   }, [isAuthenticated, isLoading, user, navigate]);

@@ -32,9 +32,12 @@ export function useAuthActions(
         if (userData.role === 'client') {
           console.log('🚀 [Auth] Redirecionando para portal do cliente');
           navigate('/client/portal');
-        } else {
+        } else if (userData.role === 'workshop' || userData.role === 'admin' || userData.role === 'technician') {
           console.log('🚀 [Auth] Redirecionando para dashboard');
           navigate('/dashboard');
+        } else {
+          console.log('🚨 [Auth] Role não reconhecido, redirecionando para login');
+          navigate('/login');
         }
       } else {
         console.error("Login falhou - dados de usuário não retornados");
