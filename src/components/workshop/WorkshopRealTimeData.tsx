@@ -87,7 +87,7 @@ export function WorkshopRealTimeData({ className }: WorkshopRealTimeDataProps) {
       'received_at_workshop': 'Recebido',
       'collected': 'Coletado',
       'diagnosis_completed': 'Diagnóstico Concluído',
-      'quote_sent': 'Orçamento Enviado',
+      'awaiting_quote_approval': 'Aguardando Aprovação do Orçamento',
       'quote_approved': 'Orçamento Aprovado',
       'in_progress': 'Em Progresso',
       'ready_for_delivery': 'Pronto para Entrega'

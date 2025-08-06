@@ -7,6 +7,7 @@ import { Stethoscope, Building2 } from 'lucide-react';
 import { DiagnosisDialog } from '@/components/workshop/DiagnosisDialog';
 import { DiagnosisDisplay } from '@/components/workshop/DiagnosisDisplay';
 import { ApprovedQuoteActions } from '@/components/workshop/ApprovedQuoteActions';
+import { RejectedQuoteActions } from '@/components/workshop/RejectedQuoteActions';
 import { RepairProgressTimeline } from '@/components/repair/RepairProgressTimeline';
 import { WorkshopSelector } from '@/components/workshop/WorkshopSelector';
 
@@ -99,6 +100,18 @@ const WorkshopEquipmentItem: React.FC<WorkshopEquipmentItemProps> = ({
         />
 
         <ApprovedQuoteActions
+          order={{
+            id: order.id,
+            client_name: order.clientName,
+            equipment_type: order.equipmentType,
+            equipment_model: order.equipmentModel,
+            status: order.status,
+            service_attendance_type: order.serviceAttendanceType
+          }}
+          onStatusUpdate={onDiagnosisSuccess}
+        />
+
+        <RejectedQuoteActions
           order={{
             id: order.id,
             client_name: order.clientName,

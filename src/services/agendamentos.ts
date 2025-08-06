@@ -1,5 +1,6 @@
 import { format, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { GoogleAdsTrackingService } from './googleAdsTrackingService';
 
 // Tipos
 export interface AgendamentoAI {
@@ -292,6 +293,9 @@ class AgendamentosService {
   // Criar novo agendamento
   async create(agendamento: Omit<AgendamentoAI, 'id'>): Promise<AgendamentoAI> {
     try {
+      // Capturar parâmetros de tracking do Google Ads
+      const trackingParams = GoogleAdsTrackingService.captureTrackingParams();
+
       // Preparar dados para inserção no Supabase
       const now = new Date().toISOString();
       const agendamentoData = {
@@ -305,7 +309,14 @@ class AgendamentosService {
         tipo_servico: agendamento.tipo_servico,
         logistica: agendamento.logistica,
         created_at: now,
-        updated_at: now
+        updated_at: now,
+        // Campos de tracking do Google Ads
+        gclid: trackingParams.gclid,
+        utm_source: trackingParams.utmSource,
+        utm_medium: trackingParams.utmMedium,
+        utm_campaign: trackingParams.utmCampaign,
+        utm_term: trackingParams.utmTerm,
+        utm_content: trackingParams.utmContent
       };
 
       // Inserir no Supabase
@@ -346,6 +357,17 @@ class AgendamentosService {
         updated_at: data.updated_at,
         ordem_servico_id: data.ordem_servico_id
       };
+
+      // Registrar conversão de lead no Google Ads (se tiver GCLID)
+      if (trackingParams.gclid) {
+        try {
+          await GoogleAdsTrackingService.recordLeadConversion(data.id.toString());
+          console.log('✅ Conversão de lead registrada para agendamento:', data.id);
+        } catch (conversionError) {
+          console.error('Erro ao registrar conversão de lead:', conversionError);
+          // Não falha a criação do agendamento por causa do tracking
+        }
+      }
 
       return newAgendamento;
     } catch (error) {

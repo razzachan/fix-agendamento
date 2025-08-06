@@ -1,16 +1,20 @@
 
 import React from 'react';
-import { MapPin, Calendar, Clock } from 'lucide-react';
+import { MapPin, Calendar, Clock, DollarSign, AlertTriangle } from 'lucide-react';
 import { ServiceOrder } from '@/types';
 import { formatDate } from '../utils';
 import { AddressDisplay } from '@/components/ui/AddressDisplay';
 import { extractAddressFromServiceOrder } from '@/utils/addressFormatter';
+import { calculateFinancialSummary, validateFinancialConsistency, formatCurrency } from '@/utils/financialCalculations';
 
 interface OrderServiceInfoProps {
   order: ServiceOrder;
 }
 
 const OrderServiceInfo: React.FC<OrderServiceInfoProps> = ({ order }) => {
+  const financial = calculateFinancialSummary(order);
+  const validation = validateFinancialConsistency(order);
+
   return (
     <div className="space-y-4">
       {order.needsPickup && (
@@ -91,6 +95,75 @@ const OrderServiceInfo: React.FC<OrderServiceInfoProps> = ({ order }) => {
             {order.status === 'cancelled' && 'Cancelado'}
           </p>
         </div>
+      </div>
+
+      {/* Resumo Financeiro */}
+      <div>
+        <h3 className="font-medium text-sm text-muted-foreground mb-1">Resumo Financeiro</h3>
+
+        {/* Valor Total */}
+        {financial.totalAmount > 0 && (
+          <div className="flex items-center mb-2">
+            <DollarSign className="h-4 w-4 mr-2 text-green-600" />
+            <div>
+              <p className="text-lg font-semibold text-green-600">
+                {formatCurrency(financial.totalAmount)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {financial.statusDescription}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Detalhes de Pagamento */}
+        {(financial.advancePayment > 0 || financial.pendingAmount > 0) && (
+          <div className="space-y-1 text-sm">
+            {financial.advancePayment > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Sinal pago:</span>
+                <span className="font-medium">{formatCurrency(financial.advancePayment)}</span>
+              </div>
+            )}
+            {financial.pendingAmount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Valor pendente:</span>
+                <span className="font-medium text-orange-600">{formatCurrency(financial.pendingAmount)}</span>
+              </div>
+            )}
+            {financial.diagnosticEstimate > 0 && financial.diagnosticEstimate !== financial.totalAmount && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Estimativa técnica:</span>
+                <span className="font-medium text-blue-600">{formatCurrency(financial.diagnosticEstimate)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Avisos de Validação */}
+        {(!validation.isValid || validation.warnings.length > 0) && (
+          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+            <div className="flex items-start">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" />
+              <div className="text-xs">
+                {validation.errors.map((error, index) => (
+                  <p key={index} className="text-red-600 font-medium">{error}</p>
+                ))}
+                {validation.warnings.map((warning, index) => (
+                  <p key={index} className="text-yellow-700">{warning}</p>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Fallback quando não há valores */}
+        {financial.totalAmount === 0 && financial.advancePayment === 0 && financial.diagnosticEstimate === 0 && (
+          <div className="flex items-center">
+            <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
+            <p className="text-muted-foreground">Valor a definir</p>
+          </div>
+        )}
       </div>
     </div>
   );

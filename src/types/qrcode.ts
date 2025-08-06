@@ -120,6 +120,7 @@ export interface QRCodePrintConfig {
 export interface QRCodeLabel {
   qrCode: string;
   qrCodeData: string;    // Dados para o QR Code
+  serviceOrderId: string; // UUID da ordem de serviço
   orderNumber: string;
   equipmentType: string;
   clientName: string;
@@ -143,9 +144,9 @@ export const QR_CODE_CONSTANTS = {
   MAX_PRINT_COUNT: 10,
   SCAN_TIMEOUT: 30000, // 30 segundos
   DEFAULT_LABEL_SIZE: {
-    width: 62,  // mm
-    height: 29, // mm
-    qrSize: 20  // mm
+    width: 40.6,  // mm - 30% menor (58 × 0.7)
+    height: 46.2, // mm - Aumentado 10% (42 × 1.1)
+    qrSize: 14  // mm - 30% menor (20 × 0.7)
   }
 } as const;
 

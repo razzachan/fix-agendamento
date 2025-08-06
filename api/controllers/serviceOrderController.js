@@ -9,6 +9,10 @@ const VALID_STATUSES = [
   'scheduled',     // Agendado (status inicial das OS)
   'in_progress',   // Em andamento
   'diagnosis',     // Em diagnóstico
+  'diagnosis_completed', // Diagnóstico concluído
+  'awaiting_quote_approval', // Aguardando aprovação do orçamento
+  'quote_approved', // Orçamento aprovado
+  'quote_rejected', // Orçamento rejeitado
   'awaiting_parts', // Aguardando peças
   'awaiting_approval', // Aguardando aprovação do cliente
   'repair',        // Em reparo

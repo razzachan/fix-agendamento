@@ -328,36 +328,42 @@ async def gerar_horarios_proximas_datas_disponiveis(technician_id: str, urgente:
 
 async def verificar_horario_disponivel_tecnico(technician_id: str, horario_dt: datetime) -> bool:
     """
-    Verifica se um técnico específico está disponível em um horário específico
+    🎯 NOVA ARQUITETURA: Verifica se um técnico específico está disponível usando calendar_events
     """
     try:
         supabase = get_supabase_client()
 
-        # Verificar conflitos em service_orders
-        data_str = horario_dt.strftime('%Y-%m-%d')
-        hora_str = horario_dt.strftime('%H:%M')
+        logger.info(f"🔍 DEBUG: Verificando técnico {technician_id} em {horario_dt.isoformat()}")
 
-        logger.info(f"🔍 DEBUG: Verificando {technician_id} em {data_str} {hora_str}")
-
-        # 🔧 CORREÇÃO CRÍTICA: scheduled_date é DATETIME, filtrar manualmente por data
-        response_os = supabase.table("service_orders").select("*").eq(
+        # 🎯 VERIFICAR NA NOVA TABELA calendar_events (fonte única da verdade)
+        response_calendar = supabase.table("calendar_events").select("*").eq(
             "technician_id", technician_id
-        ).eq("scheduled_time", hora_str).execute()
+        ).eq("start_time", horario_dt.isoformat()).execute()
 
-        # Filtrar manualmente por data
-        conflitos_os = []
-        if response_os.data:
-            for os in response_os.data:
-                scheduled_date_str = os.get('scheduled_date', '')
-                if scheduled_date_str.startswith(data_str):
-                    conflitos_os.append(os)
-
-        if conflitos_os:
-            logger.info(f"❌ DEBUG: Conflito em service_orders: {len(conflitos_os)} registros")
+        if response_calendar.data and len(response_calendar.data) > 0:
+            logger.info(f"❌ DEBUG: Conflito no calendário: {len(response_calendar.data)} eventos")
             return False
 
-        # Verificar conflitos em agendamentos_ai
-        inicio_range = horario_dt.isoformat()
+        # 📋 VERIFICAR agendamentos_ai (pré-agendamentos pendentes)
+        # Buscar por technician_id se disponível, senão por nome
+        response_ai = supabase.table("agendamentos_ai").select("*").eq(
+            "data_agendada", horario_dt.isoformat()
+        ).in_("status", ["pendente", "confirmado"]).execute()
+
+        # Filtrar por técnico (pode ser por ID ou nome)
+        conflitos_ai = []
+        if response_ai.data:
+            for ag in response_ai.data:
+                if (ag.get('technician_id') == technician_id or
+                    (ag.get('tecnico_id') == technician_id)):
+                    conflitos_ai.append(ag)
+
+        if conflitos_ai:
+            logger.info(f"❌ DEBUG: Conflito em pré-agendamentos: {len(conflitos_ai)} registros")
+            return False
+
+        logger.info(f"✅ DEBUG: Técnico {technician_id} disponível em {horario_dt.isoformat()}")
+        return True
         fim_range = (horario_dt + timedelta(hours=1)).isoformat()
 
         response_ai = supabase.table("agendamentos_ai").select("*").eq(
@@ -1289,27 +1295,31 @@ async def verificar_horario_tecnico_disponivel(technician_id: str, date_str: str
 
 async def verificar_horario_disponivel(horario_dt: datetime, tecnico: str) -> bool:
     """
-    Verifica se um horário específico está disponível
+    🎯 NOVA ARQUITETURA: Verifica disponibilidade usando calendar_events (fonte única da verdade)
+    + agendamentos_ai (pré-agendamentos pendentes)
     """
     try:
         supabase = get_supabase_client()
 
-        # Verificar agendamentos existentes
-        response = supabase.table("agendamentos_ai").select("*").eq(
+        # 🎯 VERIFICAR NA NOVA TABELA calendar_events (eventos confirmados)
+        response_calendar = supabase.table("calendar_events").select("*").eq(
+            "start_time", horario_dt.isoformat()
+        ).ilike("technician_name", f"%{tecnico}%").execute()
+
+        if response_calendar.data and len(response_calendar.data) > 0:
+            logger.info(f"⚠️ Horário {horario_dt.isoformat()} ocupado no calendário para {tecnico}")
+            return False
+
+        # 📋 VERIFICAR agendamentos_ai (pré-agendamentos pendentes - IMPORTANTE!)
+        response_ai = supabase.table("agendamentos_ai").select("*").eq(
             "data_agendada", horario_dt.isoformat()
-        ).eq("tecnico", tecnico).execute()
+        ).eq("tecnico", tecnico).in_("status", ["pendente", "confirmado"]).execute()
 
-        if response.data and len(response.data) > 0:
+        if response_ai.data and len(response_ai.data) > 0:
+            logger.info(f"⚠️ Horário ocupado por pré-agendamento para {tecnico}")
             return False
 
-        # Verificar ordens de serviço agendadas
-        response_os = supabase.table("service_orders").select("*").eq(
-            "scheduled_date", horario_dt.strftime('%Y-%m-%d')
-        ).eq("scheduled_time", horario_dt.strftime('%H:%M')).execute()
-
-        if response_os.data and len(response_os.data) > 0:
-            return False
-
+        logger.info(f"✅ Horário {horario_dt.isoformat()} disponível para {tecnico}")
         return True
 
     except Exception as e:
@@ -1482,32 +1492,32 @@ def determinar_periodo_ideal_por_rota(endereco: str) -> str:
 
 async def verificar_conflito_grupos_logisticos(data_verificacao: datetime, grupo_solicitado: str, technician_id: str, supabase) -> dict:
     """
-    🚫 Verifica se já existem agendamentos de outros grupos logísticos no mesmo dia
+    🎯 NOVA ARQUITETURA: Verifica conflitos de grupos logísticos usando calendar_events
     Evita misturar Grupo A/B com Grupo C no mesmo dia
     """
     try:
-        data_str = data_verificacao.strftime('%Y-%m-%d')
-        logger.info(f"🔍 Verificando conflitos de grupos para {data_str} - Grupo solicitado: {grupo_solicitado}")
+        data_inicio = data_verificacao.replace(hour=0, minute=0, second=0, microsecond=0)
+        data_fim = data_verificacao.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-        # Buscar todos os agendamentos do técnico no dia
-        response = supabase.table("service_orders").select("*").eq(
+        logger.info(f"🔍 Verificando conflitos de grupos para {data_verificacao.strftime('%Y-%m-%d')} - Grupo solicitado: {grupo_solicitado}")
+
+        # 🎯 BUSCAR EVENTOS NO CALENDÁRIO (fonte única da verdade)
+        response_calendar = supabase.table("calendar_events").select("*").eq(
             "technician_id", technician_id
-        ).execute()
+        ).gte("start_time", data_inicio.isoformat()).lte("start_time", data_fim.isoformat()).execute()
 
         grupos_existentes = set()
         agendamentos_dia = []
 
-        if response.data:
-            for os in response.data:
-                scheduled_date_str = os.get('scheduled_date', '')
-                if scheduled_date_str.startswith(data_str):
-                    endereco = os.get('pickup_address', '')
-                    if endereco:
-                        grupo = determine_logistics_group(endereco)
-                        grupos_existentes.add(grupo)
-                        agendamentos_dia.append({
-                            'os': os.get('order_number', 'N/A'),
-                            'endereco': endereco[:50] + '...' if len(endereco) > 50 else endereco,
+        if response_calendar.data:
+            for evento in response_calendar.data:
+                endereco = evento.get('address', '')
+                if endereco:
+                    grupo = determine_logistics_group(endereco)
+                    grupos_existentes.add(grupo)
+                    agendamentos_dia.append({
+                        'cliente': evento.get('client_name', 'N/A'),
+                        'endereco': endereco[:50] + '...' if len(endereco) > 50 else endereco,
                             'grupo': grupo
                         })
 
@@ -1776,16 +1786,26 @@ async def verificar_disponibilidade_tecnico(tecnico_key: str, data_inicio: datet
         if not tecnico:
             return {"disponivel": False, "carga_trabalho": 100, "proximos_horarios": []}
 
-        # Buscar agendamentos existentes do técnico
+        # 🎯 BUSCAR AGENDAMENTOS NO CALENDÁRIO (fonte única da verdade)
         data_fim = data_inicio + timedelta(days=dias)
 
-        response = supabase.table("service_orders").select("*").gte(
-            "scheduled_date", data_inicio.strftime('%Y-%m-%d')
+        response_calendar = supabase.table("calendar_events").select("*").gte(
+            "start_time", data_inicio.isoformat()
         ).lte(
-            "scheduled_date", data_fim.strftime('%Y-%m-%d')
-        ).ilike("technician_name", f"%{tecnico['nome']}%").execute()
+            "start_time", data_fim.isoformat()
+        ).eq("technician_id", tecnico.get('tecnico_id', '')).execute()
 
-        agendamentos_existentes = len(response.data) if response.data else 0
+        # 🔄 COMPATIBILIDADE: Também verificar por nome se ID não encontrar resultados
+        agendamentos_existentes = 0
+        if response_calendar.data:
+            agendamentos_existentes = len(response_calendar.data)
+        elif tecnico.get('nome'):
+            response_by_name = supabase.table("calendar_events").select("*").gte(
+                "start_time", data_inicio.isoformat()
+            ).lte(
+                "start_time", data_fim.isoformat()
+            ).ilike("technician_name", f"%{tecnico['nome']}%").execute()
+            agendamentos_existentes = len(response_by_name.data) if response_by_name.data else 0
         capacidade_total = tecnico["capacidade_diaria"] * dias
         carga_trabalho = (agendamentos_existentes / capacidade_total) * 100
 
@@ -2723,23 +2743,25 @@ async def calcular_bonus_rota(data_str: str, hora: int, coordenadas: Tuple[float
         supabase = get_supabase_client()
         bonus = 0.0
 
-        # Buscar agendamentos do mesmo dia
+        # 🎯 BUSCAR EVENTOS NO CALENDÁRIO (fonte única da verdade)
+        response_calendar = supabase.table("calendar_events").select("*").gte(
+            "start_time", f"{data_str}T00:00:00"
+        ).lt("start_time", f"{data_str}T23:59:59").execute()
+
+        # 📋 TAMBÉM VERIFICAR pré-agendamentos pendentes
         response_ai = supabase.table("agendamentos_ai").select("*").gte(
             "data_agendada", f"{data_str}T00:00:00"
-        ).lt("data_agendada", f"{data_str}T23:59:59").execute()
+        ).lt("data_agendada", f"{data_str}T23:59:59").in_("status", ["pendente", "confirmado"]).execute()
 
-        response_os = supabase.table("service_orders").select("*").eq("scheduled_date", data_str).execute()
-
+        eventos_calendario = response_calendar.data if response_calendar.data else []
         agendamentos_ai = response_ai.data if response_ai.data else []
-        ordens_servico = response_os.data if response_os.data else []
 
-        # Verificar proximidade com outros agendamentos
-        for ag in agendamentos_ai:
-            if ag.get('endereco'):
-                # Estimar coordenadas do agendamento existente
-                coords_ag = await geocodificar_endereco(ag['endereco'])
-                if coords_ag:
-                    distancia = calculate_distance(coordenadas, coords_ag)
+        # Verificar proximidade com eventos confirmados no calendário
+        for evento in eventos_calendario:
+            if evento.get('address'):
+                coords_evento = await geocodificar_endereco(evento['address'])
+                if coords_evento:
+                    distancia = calculate_distance(coordenadas, coords_evento)
 
                     # Bonus por proximidade (até 5km = bonus máximo)
                     if distancia <= 2:
@@ -2748,6 +2770,19 @@ async def calcular_bonus_rota(data_str: str, hora: int, coordenadas: Tuple[float
                         bonus += 3  # Próximo
                     elif distancia <= 10:
                         bonus += 1  # Relativamente próximo
+
+        # Verificar proximidade com pré-agendamentos pendentes
+        for ag in agendamentos_ai:
+            if ag.get('endereco'):
+                coords_ag = await geocodificar_endereco(ag['endereco'])
+                if coords_ag:
+                    distancia = calculate_distance(coordenadas, coords_ag)
+
+                    # Bonus menor para pré-agendamentos (podem ser cancelados)
+                    if distancia <= 2:
+                        bonus += 2  # Muito próximo
+                    elif distancia <= 5:
+                        bonus += 1  # Próximo
 
         # Bonus adicional se há concentração no mesmo grupo logístico
         agendamentos_mesmo_grupo = sum(1 for ag in agendamentos_ai if ag.get('grupo_logistico') == grupo_logistico)
@@ -3558,38 +3593,86 @@ async def criar_os_completa(dados: dict):
 
         logger.info(f"✅ OS criada com sucesso: {os_numero} (ID: {os_id})")
 
-        # 🔧 CORREÇÃO: Criar agendamento específico em scheduled_services
-        # Para manter consistência com o resto do sistema
+        # 🎯 NOVA ARQUITETURA: Criar evento diretamente em calendar_events
+        # Fonte única da verdade - elimina necessidade de sincronização
+        logger.info(f"🔍 DEBUG - Verificando condições para criar evento:")
+        logger.info(f"  - tecnico_id: {tecnico_id} (tipo: {type(tecnico_id)})")
+        logger.info(f"  - horario_agendado_iso: {horario_agendado_iso} (tipo: {type(horario_agendado_iso)})")
+
         if tecnico_id and horario_agendado_iso:
+            logger.info("✅ Condições atendidas - criando evento no calendário")
             try:
                 # Calcular horário de fim (1 hora depois)
                 horario_inicio = datetime.fromisoformat(horario_agendado_iso.replace('Z', '+00:00'))
                 horario_fim = horario_inicio + timedelta(hours=1)
 
-                agendamento_data = {
-                    "service_order_id": os_id,
-                    "client_id": cliente_id,  # 🔧 CORREÇÃO: Adicionar client_id que estava faltando
+                # 🎯 DADOS PARA calendar_events (fonte única da verdade)
+                calendar_event_data = {
+                    "client_name": dados["nome"],
+                    "client_phone": dados.get("telefone", ""),
+                    "client_id": cliente_id,
                     "technician_id": tecnico_id,
                     "technician_name": tecnico_nome_real,
-                    "client_name": dados["nome"],
-                    "scheduled_start_time": horario_inicio.isoformat(),
-                    "scheduled_end_time": horario_fim.isoformat(),
+                    "start_time": horario_inicio.isoformat(),
+                    "end_time": horario_fim.isoformat(),
                     "address": dados["endereco"],
-                    "address_complement": dados.get("complemento", ""),  # 🏠 NOVO: Complemento do endereço
+                    "address_complement": dados.get("complemento", ""),
                     "description": dados["problema"],
-                    "status": "scheduled"
+                    "equipment_type": dados.get("equipamento", "Não especificado"),
+                    "status": "scheduled",
+                    "service_order_id": os_id,
+                    "is_urgent": dados.get("urgente", False)
                 }
 
-                response_agendamento = supabase.table("scheduled_services").insert(agendamento_data).execute()
-                agendamento_id = response_agendamento.data[0]["id"]
+                # 🎯 INSERIR NA NOVA TABELA calendar_events (fonte única da verdade)
+                response_calendar = supabase.table("calendar_events").insert(calendar_event_data).execute()
+                calendar_event_id = response_calendar.data[0]["id"]
 
-                logger.info(f"✅ Agendamento criado com sucesso: {agendamento_id}")
+                logger.info(f"✅ Evento do calendário criado com sucesso: {calendar_event_id}")
                 logger.info(f"🕐 Horário: {horario_inicio.strftime('%d/%m/%Y %H:%M')} - {horario_fim.strftime('%H:%M')}")
+                logger.info(f"🎯 NOVA ARQUITETURA: Usando calendar_events como fonte única da verdade")
+
+                # 🔄 COMPATIBILIDADE: Também criar em scheduled_services para transição gradual
+                try:
+                    agendamento_data_legacy = {
+                        "service_order_id": os_id,
+                        "client_id": cliente_id,
+                        "technician_id": tecnico_id,
+                        "technician_name": tecnico_nome_real,
+                        "client_name": dados["nome"],
+                        "scheduled_start_time": horario_inicio.isoformat(),
+                        "scheduled_end_time": horario_fim.isoformat(),
+                        "address": dados["endereco"],
+                        "address_complement": dados.get("complemento", ""),
+                        "description": dados["problema"],
+                        "status": "scheduled"
+                    }
+
+                    response_legacy = supabase.table("scheduled_services").insert(agendamento_data_legacy).execute()
+                    logger.info(f"✅ Compatibilidade: Também criado em scheduled_services")
+                except Exception as legacy_error:
+                    logger.warning(f"⚠️ Erro na compatibilidade com scheduled_services: {legacy_error}")
+                    # Não falhar se a tabela legacy der erro
 
             except Exception as e:
-                logger.error(f"❌ Erro ao criar agendamento: {str(e)}")
-                # Não falhar a criação da OS por causa do agendamento
+                logger.error(f"❌ ERRO CRÍTICO ao criar evento no calendário: {str(e)}")
+                logger.error(f"🔍 DEBUG - tecnico_id: {tecnico_id}")
+                logger.error(f"🔍 DEBUG - horario_agendado_iso: {horario_agendado_iso}")
+                logger.error(f"🔍 DEBUG - calendar_event_data: {calendar_event_data}")
+                logger.error(f"🔍 DEBUG - Tipo do erro: {type(e).__name__}")
+
+                # 🚨 IMPORTANTE: Não falhar silenciosamente - registrar detalhes completos
+                import traceback
+                logger.error(f"🔍 DEBUG - Stack trace completo: {traceback.format_exc()}")
+
+                # Não falhar a criação da OS por causa do agendamento, mas registrar tudo
                 pass
+        else:
+            logger.warning("⚠️ Evento do calendário NÃO foi criado - condições não atendidas:")
+            if not tecnico_id:
+                logger.warning("  - tecnico_id está vazio ou None")
+            if not horario_agendado_iso:
+                logger.warning("  - horario_agendado_iso está vazio ou None")
 
         return {
             "success": True,

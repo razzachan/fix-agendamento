@@ -53,14 +53,12 @@ export const useDashboardUtils = () => {
         return 'Em Aberto';
       case 'scheduled':
         return 'Agendado';
-      case 'confirmed':
-        return 'Confirmado';
+      case 'on_the_way':
+        return 'A Caminho';
       case 'scheduled_collection':
         return 'Coleta Agendada';
       case 'in_progress':
         return 'Em Andamento';
-      case 'on_the_way':
-        return 'À Caminho';
       case 'collected':
         return 'Coletado';
       case 'collected_for_diagnosis':
@@ -71,6 +69,8 @@ export const useDashboardUtils = () => {
         return 'Recebido na Oficina';
       case 'diagnosis_completed':
         return 'Diagnóstico Concluído';
+      case 'awaiting_quote_approval':
+        return 'Aguardando Aprovação do Orçamento';
       case 'quote_approved':
         return 'Orçamento Aprovado';
       case 'ready_for_delivery':
@@ -80,7 +80,7 @@ export const useDashboardUtils = () => {
       case 'on_the_way_to_deliver':
         return 'À Caminho para Entrega';
       case 'payment_pending':
-        return 'Pagamento Pendente';
+        return 'Pagamento';
       case 'completed':
         return 'Concluído';
       case 'cancelled':

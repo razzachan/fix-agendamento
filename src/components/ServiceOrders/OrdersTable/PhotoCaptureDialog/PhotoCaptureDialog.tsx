@@ -7,6 +7,8 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogPortal,
+  DialogOverlay,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import ImageUploader from '@/components/ServiceOrderForm/ImageUploader';
@@ -17,6 +19,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import ExistingImagesList from './ExistingImagesList';
 import CameraCapture from './CameraCapture';
+import AndroidCameraCapture from '@/components/camera/AndroidCameraCapture';
+import RobustCameraCapture from '@/components/camera/RobustCameraCapture';
 
 interface PhotoCaptureDialogProps {
   open: boolean;
@@ -53,45 +57,55 @@ export const PhotoCaptureDialog: React.FC<PhotoCaptureDialogProps> = ({
     }
   });
   
-  const [localExistingImages, setLocalExistingImages] = useState<ServiceOrderImage[]>([]);
-  
+  const [localExistingImages, setLocalExistingImages] = useState<ServiceOrderImage[]>(existingImages);
+
   useEffect(() => {
-    setLocalExistingImages(existingImages);
-  }, [existingImages]);
+    if (JSON.stringify(localExistingImages) !== JSON.stringify(existingImages)) {
+      setLocalExistingImages(existingImages);
+    }
+  }, [existingImages, localExistingImages]);
 
   const handleImageUpload = async (newImages: ServiceOrderImage[]) => {
     setImages(prevImages => [...prevImages, ...newImages]);
   };
 
-  const capturePhoto = async () => {
-    if (!videoRef.current) return;
+  const capturePhoto = async (photoBlob: Blob) => {
+    console.log('🎯 [PhotoCaptureDialog] capturePhoto chamada com blob:', photoBlob.size, 'bytes');
 
     try {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      console.log('📁 Criando arquivo...');
+      const file = new File([photoBlob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      console.log('📁 Arquivo criado:', file.name, file.size, 'bytes', file.type);
 
-      ctx.drawImage(videoRef.current, 0, 0);
-      
-      const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-        }, 'image/jpeg', 0.8);
-      });
+      console.log('☁️ Fazendo upload...');
+      console.log('☁️ serviceOrderService:', serviceOrderService);
+      console.log('☁️ uploadImage function:', serviceOrderService.uploadImage);
 
-      const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-      
+      toast.loading('Fazendo upload da foto...');
+
       const uploadedImage = await serviceOrderService.uploadImage(file);
+      console.log('☁️ Resultado do upload:', uploadedImage);
+
       if (uploadedImage) {
-        setImages(prev => [...prev, uploadedImage]);
+        console.log('✅ Upload concluído:', uploadedImage);
+        setImages(prev => {
+          console.log('📋 Imagens anteriores:', prev);
+          const newImages = [...prev, uploadedImage];
+          console.log('📋 Novas imagens:', newImages);
+          return newImages;
+        });
+        toast.success('Foto capturada e salva com sucesso!');
+      } else {
+        console.error('❌ Upload falhou - retornou null/undefined');
+        toast.error('Falha no upload da imagem.');
       }
-      
+
+      console.log('📴 Fechando câmera...');
       setShowCamera(false);
     } catch (error) {
-      console.error('Error capturing photo:', error);
-      toast.error('Erro ao capturar foto. Tente novamente.');
+      console.error('❌ Error capturing photo:', error);
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
+      toast.error(`Erro ao capturar foto: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   };
 
@@ -147,14 +161,19 @@ export const PhotoCaptureDialog: React.FC<PhotoCaptureDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-      if (!isOpen && videoRef.current?.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-      }
-      onOpenChange(isOpen);
-    }}>
+    <div className="photo-capture-modal">
+      <Dialog
+        open={open}
+        onOpenChange={(isOpen) => {
+          if (!isOpen && videoRef.current?.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+          }
+          onOpenChange(isOpen);
+        }}
+      >
       <DialogContent className="sm:max-w-[500px]">
+        <div data-testid="photo-capture-content">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Camera className="h-5 w-5" />
@@ -173,20 +192,39 @@ export const PhotoCaptureDialog: React.FC<PhotoCaptureDialogProps> = ({
           />
 
           {showCamera ? (
-            <CameraCapture 
-              onCapture={capturePhoto}
-              onCancel={() => setShowCamera(false)}
-              videoRef={videoRef}
-            />
+            // Usar componente ROBUSTO para todos os dispositivos
+            <div className="space-y-4">
+              <RobustCameraCapture
+                onCapture={capturePhoto}
+                onCancel={() => setShowCamera(false)}
+              />
+
+              {/* Mostrar ImageUploader também */}
+              <div className="border-t pt-4">
+                <p className="text-sm text-muted-foreground mb-2 text-center">
+                  Ou anexe imagens da galeria:
+                </p>
+                <ImageUploader
+                  images={images}
+                  onImagesChange={handleImageUpload}
+                  maxImages={5}
+                />
+              </div>
+            </div>
           ) : (
             <div className="space-y-4">
               <div className="flex justify-center gap-2">
-                <Button onClick={() => setShowCamera(true)} className="gap-2">
+                <Button
+                  onClick={() => {
+                    setShowCamera(true);
+                  }}
+                  className="gap-2"
+                >
                   <Camera className="h-4 w-4" />
                   Usar Câmera
                 </Button>
               </div>
-              
+
               <ImageUploader
                 images={images}
                 onImagesChange={handleImageUpload}
@@ -211,7 +249,9 @@ export const PhotoCaptureDialog: React.FC<PhotoCaptureDialogProps> = ({
             </Button>
           </div>
         </div>
+        </div>
       </DialogContent>
     </Dialog>
+    </div>
   );
 };

@@ -30,11 +30,13 @@ import { getServiceFlow, getNextStatus, getCurrentStepIndex } from '@/utils/serv
 import { isActiveOrder, isScheduledOrder, isInProgressOrder, sortOrdersByHybridPriority, isTechnicianActiveOrder, sortTechnicianOrdersByPriority } from '@/utils/statusMappingUtils';
 import NextStatusButton from '@/components/ServiceOrders/ProgressTracker/NextStatusButton';
 import ServiceTimelineDropdown from '@/components/ServiceOrders/ProgressTracker/ServiceTimelineDropdown';
+import { useAuth } from '@/contexts/AuthContext';
 
 import { MetricCard } from './MetricCard';
 import { SuperActiveOrderCard } from './SuperActiveOrderCard';
-import { OverdueOrdersAlert } from './OverdueOrdersAlert';
+import OverdueOrdersAlert from './OverdueOrdersAlert';
 import { CollectedEquipmentCard } from './CollectedEquipmentCard';
+import { ScheduledDeliveriesCard } from './ScheduledDeliveriesCard';
 import { ProductivityDashboard } from '@/components/technician/ProductivityDashboard';
 import OrderDetailsModal from './OrderDetailsModal';
 import TechnicianStockDashboard from '@/components/technician/TechnicianStockDashboard';
@@ -60,6 +62,7 @@ const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
   onStatusUpdate
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusNotes, setStatusNotes] = useState('');
@@ -85,8 +88,19 @@ const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     order.status === 'completed' || order.status === 'cancelled'
   );
 
+
+
   // 🔧 FILTRO: Ordens ativas apenas do dia atual (para não poluir o dashboard)
   const todayActiveOrders = activeOrders.filter(order => {
+    // Ordens com delivery_scheduled sempre aparecem (equipamentos prontos para entrega)
+    if (order.status === 'delivery_scheduled') return true;
+
+    // Ordens coletadas para entrega sempre aparecem
+    if (order.status === 'collected_for_delivery') return true;
+
+    // Ordens em rota de entrega sempre aparecem (técnico responsável pela entrega)
+    if (order.status === 'on_the_way_to_deliver') return true;
+
     if (!order.scheduledDate) return true; // Incluir ordens sem data (podem ser urgentes)
 
     const orderDate = new Date(order.scheduledDate);
@@ -123,13 +137,20 @@ const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     order.status === 'collected' || order.status === 'collected_for_diagnosis'
   );
 
-  // Ordenar ordens ativas por prioridade específica do técnico (ordens coletadas vão para o final)
-  const sortedActiveOrders = sortTechnicianOrdersByPriority([...currentActiveOrders, ...overdueOrders]);
+  // Filtrar entregas agendadas que precisam ser coletadas na oficina
+  const scheduledDeliveries = technicianOrders.filter(order =>
+    order.status === 'delivery_scheduled'
+  );
 
   // Ordens de hoje
   const todayOrders = technicianOrders.filter(order =>
     order.scheduledDate && isToday(new Date(order.scheduledDate))
   );
+
+
+
+  // Ordenar ordens ativas por prioridade específica do técnico (ordens coletadas vão para o final)
+  const sortedActiveOrders = sortTechnicianOrdersByPriority([...currentActiveOrders, ...overdueOrders]);
 
   // Ordens de amanhã
   const tomorrowOrders = technicianOrders.filter(order =>
@@ -330,6 +351,16 @@ const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
               </div>
             )}
 
+            {/* Card de Entregas Agendadas */}
+            {scheduledDeliveries.length > 0 && (
+              <div className="card-container">
+                <ScheduledDeliveriesCard
+                  scheduledDeliveries={scheduledDeliveries}
+                  onUpdateStatus={onStatusUpdate}
+                />
+              </div>
+            )}
+
             {/* Ordens Ativas - Layout Principal */}
             <div className="card-container">
               <SuperActiveOrderCard
@@ -399,7 +430,7 @@ const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
         {/* Aba Calendário */}
         {activeTab === 'calendar' && (
           <div className="content-card">
-            <TechnicianMainCalendarView technicianId={technicianId} />
+            <TechnicianMainCalendarView userId={user?.id || ''} />
           </div>
         )}
 

@@ -13,9 +13,12 @@ export const serviceOrderImageService = {
    */
   async uploadImage(imageFile: File): Promise<ServiceOrderImage | null> {
     try {
+      console.log('🚀 [ImageService] Iniciando upload...');
+      console.log('📁 [ImageService] Arquivo:', imageFile.name, imageFile.size, 'bytes', imageFile.type);
+
       // Validate input
       if (!imageFile) {
-        console.error('Arquivo de imagem inválido');
+        console.error('❌ [ImageService] Arquivo de imagem inválido');
         toast.error('Arquivo de imagem inválido.');
         return null;
       }
@@ -24,7 +27,10 @@ export const serviceOrderImageService = {
       const fileExt = imageFile.name.split('.').pop();
       const fileName = `${generateUUID()}.${fileExt}`;
       const filePath = `${fileName}`;
+      console.log('📝 [ImageService] Nome do arquivo:', fileName);
+      console.log('📂 [ImageService] Caminho:', filePath);
 
+      console.log('☁️ [ImageService] Fazendo upload para Supabase...');
       // Upload the file to Supabase storage bucket
       const { data, error } = await supabase
         .storage
@@ -34,28 +40,41 @@ export const serviceOrderImageService = {
           upsert: false
         });
 
+      console.log('☁️ [ImageService] Resultado do upload:', { data, error });
+
       if (error) {
-        console.error('Erro no upload para Supabase:', error);
+        console.error('❌ [ImageService] Erro no upload para Supabase:', error);
+        console.error('❌ [ImageService] Detalhes do erro:', JSON.stringify(error, null, 2));
         throw error;
       }
 
+      console.log('✅ [ImageService] Upload realizado com sucesso:', data);
+
+      console.log('🔗 [ImageService] Obtendo URL pública...');
       // Get the public URL of the file
       const { data: urlData } = supabase
         .storage
         .from('service_order_images')
         .getPublicUrl(filePath);
 
+      console.log('🔗 [ImageService] URL Data:', urlData);
+
       if (!urlData || !urlData.publicUrl) {
+        console.error('❌ [ImageService] Não foi possível obter URL pública');
         throw new Error('Não foi possível obter a URL pública da imagem');
       }
 
-      return {
+      const result = {
         id: generateUUID(),
         url: urlData.publicUrl,
         name: imageFile.name
       };
+
+      console.log('✅ [ImageService] Upload concluído com sucesso:', result);
+      return result;
     } catch (error) {
-      console.error('Erro ao fazer upload da imagem:', error);
+      console.error('❌ [ImageService] Erro ao fazer upload da imagem:', error);
+      console.error('❌ [ImageService] Stack trace:', error instanceof Error ? error.stack : 'No stack');
       toast.error('Erro ao fazer upload da imagem.');
       return null;
     }

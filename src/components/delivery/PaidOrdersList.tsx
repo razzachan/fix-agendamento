@@ -58,7 +58,7 @@ export function PaidOrdersList() {
             payment_date
           )
         `)
-        .eq('status', 'paid')
+        .eq('payment_status', 'completed')
         .order('created_at', { ascending: false });
 
       if (error) {

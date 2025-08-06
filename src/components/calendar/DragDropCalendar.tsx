@@ -48,12 +48,50 @@ interface DroppableSlotProps {
 // Função para obter cores do evento (movida para fora para reutilização)
 const getEventColor = (status: string) => {
   switch (status) {
-    case 'confirmed': return 'bg-blue-100 border-blue-300 text-blue-800';
-    case 'completed': return 'bg-green-100 border-green-300 text-green-800';
-    case 'in_progress': return 'bg-orange-100 border-orange-300 text-orange-800';
-    case 'suggested': return 'bg-yellow-100 border-yellow-300 text-yellow-800';
-    case 'cancelled': return 'bg-red-100 border-red-300 text-red-800';
-    default: return 'bg-gray-100 border-gray-300 text-gray-800';
+    // 🔵 AZUL - Agendado/Confirmado
+    case 'scheduled':
+    case 'confirmed':
+      return 'bg-blue-100 border-blue-300 text-blue-800';
+
+    // 🟣 ROXO - Em trânsito/coleta
+    case 'on_the_way':
+    case 'in_progress':
+      return 'bg-purple-100 border-purple-300 text-purple-800';
+
+    // 🟠 LARANJA - Na oficina (recebido)
+    case 'at_workshop':
+      return 'bg-orange-100 border-orange-300 text-orange-800';
+
+    // 🔵 CIANO - Em diagnóstico
+    case 'diagnosis':
+      return 'bg-cyan-100 border-cyan-300 text-cyan-800';
+
+    // 🟡 AMARELO - Aguardando aprovação do cliente
+    case 'awaiting_approval':
+      return 'bg-yellow-100 border-yellow-300 text-yellow-800';
+
+    // 🟢 VERDE - Orçamento aprovado / Em reparo
+    case 'in_repair':
+      return 'bg-green-100 border-green-300 text-green-800';
+
+    // 🔷 AZUL ESCURO - Pronto para entrega
+    case 'ready_delivery':
+      return 'bg-indigo-100 border-indigo-300 text-indigo-800';
+
+    // ✅ VERDE ESCURO - Concluído
+    case 'completed':
+      return 'bg-emerald-100 border-emerald-300 text-emerald-800';
+
+    // 🔴 VERMELHO - Cancelado
+    case 'cancelled':
+      return 'bg-red-100 border-red-300 text-red-800';
+
+    // 🟡 AMARELO CLARO - Sugerido
+    case 'suggested':
+      return 'bg-amber-100 border-amber-300 text-amber-800';
+
+    default:
+      return 'bg-gray-100 border-gray-300 text-gray-800';
   }
 };
 
@@ -90,6 +128,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, onEventClick }) 
         ${getEventColor(event.status)}
         ${isDragging ? 'scale-105 rotate-1 shadow-2xl border-blue-400' : 'hover:scale-[1.02]'}
       `}
+      title={`${event.equipment}${event.problem ? ` - ${event.problem}` : ''} - ${event.clientName} - ${format(event.startTime, 'HH:mm')}`}
       onClick={(e) => {
         e.stopPropagation();
         if (!isDragging) {
@@ -106,26 +145,45 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, onEventClick }) 
             {format(event.startTime, 'HH:mm')}
           </span>
           <Badge variant="outline" className="text-xs">
-            {event.status === 'confirmed' ? 'Conf.' :
-             event.status === 'completed' ? 'Conc.' :
+            {event.status === 'scheduled' ? 'Agend.' :
+             event.status === 'confirmed' ? 'Conf.' :
+             event.status === 'on_the_way' ? 'Caminho' :
              event.status === 'in_progress' ? 'Prog.' :
-             event.status === 'suggested' ? 'Sug.' :
+             event.status === 'at_workshop' ? 'Oficina' :
+             event.status === 'diagnosis' ? 'Diagn.' :
+             event.status === 'awaiting_approval' ? 'Aguard.' :
+             event.status === 'in_repair' ? 'Reparo' :
+             event.status === 'ready_delivery' ? 'Pronto' :
+             event.status === 'completed' ? 'Conc.' :
              event.status === 'cancelled' ? 'Canc.' : 'Desc.'}
           </Badge>
         </div>
+
+        {/* 1. Nome do Equipamento */}
         <div className="text-xs font-semibold truncate">
-          {event.clientName}
-        </div>
-        <div className="text-xs text-gray-600 truncate">
           {event.equipment}
         </div>
+
+        {/* 2. Problema do equipamento (logo após o equipamento) */}
+        {event.problem && (
+          <div className="text-xs text-gray-600 truncate bg-gray-50 px-1 py-0.5 rounded">
+            {event.problem}
+          </div>
+        )}
+
+        {/* 3. Nome do Cliente (menor destaque) */}
+        <div className="text-xs text-gray-500 truncate">
+          {event.clientName}
+        </div>
+
+        {/* 4. Técnico */}
         {event.technicianName && (
           <div className="text-xs text-blue-600 truncate">
             {event.technicianName}
           </div>
         )}
 
-        {/* ✅ Telefone do Cliente - Compacto */}
+        {/* 5. Telefone do Cliente - Compacto */}
         {event.clientPhone && (
           <div className="flex items-center gap-1 text-xs text-blue-600 truncate">
             <Phone className="h-2.5 w-2.5" />
@@ -285,9 +343,21 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
       return;
     }
 
-    // Calcular nova data/hora
-    const newStartTime = new Date(date);
-    newStartTime.setHours(hour, 0, 0, 0);
+    // Calcular nova data/hora - CORREÇÃO UTC
+    // Usar o ano, mês e dia da data de destino, mas manter timezone local
+    const newStartTime = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      hour,
+      0,
+      0,
+      0
+    );
+
+    console.warn(`🕐 [DRAG END] Data original: ${date.toISOString()}`);
+    console.warn(`🕐 [DRAG END] Nova data calculada: ${newStartTime.toISOString()}`);
+    console.warn(`🕐 [DRAG END] Hora: ${hour}`);
 
     // Verificar se é diferente da hora atual
     if (newStartTime.getTime() === activeEvent.startTime.getTime()) {
@@ -327,27 +397,44 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
     }
 
     const changeCount = pendingChanges.size;
-    console.log(`🔄 [DRAG&DROP] Salvando ${changeCount} mudança(s)...`);
+    console.warn(`💾 [SAVE] === INICIANDO SALVAMENTO ===`);
+    console.warn(`💾 [SAVE] Total de mudanças: ${changeCount}`);
 
     // Manter mudanças pendentes para mostrar na interface durante o salvamento
     const changesToSave = new Map(pendingChanges);
 
+    // 🔧 CORREÇÃO: Limpar pending changes IMEDIATAMENTE para evitar conflito com atualização otimista
+    setPendingChanges(new Map());
+    console.warn('🧹 [SAVE] Pending changes limpos ANTES do salvamento para evitar conflito');
+
+    // Log detalhado de cada mudança
+    for (const [eventId, newStartTime] of changesToSave.entries()) {
+      console.warn(`📝 [SAVE] Mudança pendente:`);
+      console.warn(`📝 [SAVE]   - Event ID: ${eventId}`);
+      console.warn(`📝 [SAVE]   - Começa com 'order-': ${eventId.startsWith('order-')}`);
+      console.warn(`📝 [SAVE]   - Nova data: ${newStartTime.toISOString()}`);
+      console.warn(`📝 [SAVE]   - Data formatada: ${format(newStartTime, 'dd/MM HH:mm')}`);
+    }
+
     try {
       // Salvar mudanças uma por uma para melhor controle
       for (const [eventId, newStartTime] of changesToSave.entries()) {
-        console.warn(`📝 [SAVE] Salvando ${eventId} -> ${format(newStartTime, 'dd/MM HH:mm')}`);
-        await onEventUpdate(eventId, newStartTime);
+        console.warn(`📝 [SAVE] === SALVANDO EVENTO ===`);
+        console.warn(`📝 [SAVE] Event ID: ${eventId}`);
+        console.warn(`📝 [SAVE] Data: ${format(newStartTime, 'dd/MM HH:mm')}`);
+
+        try {
+          await onEventUpdate(eventId, newStartTime);
+          console.warn(`✅ [SAVE] Evento ${eventId} salvo com sucesso!`);
+        } catch (eventError) {
+          console.error(`❌ [SAVE] Erro ao salvar evento ${eventId}:`, eventError);
+          // 🔧 CORREÇÃO: Em caso de erro, restaurar pending changes
+          setPendingChanges(changesToSave);
+          throw eventError; // Re-throw para parar o processo
+        }
       }
 
       console.warn('✅ [SAVE] Todas as mudanças salvas!');
-
-      // Aguardar um pouco para garantir que a atualização otimista seja processada
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // AGORA limpar pending changes E forçar re-render
-      setPendingChanges(new Map());
-      setForceRender(prev => prev + 1);
-      console.warn('🧹 [SAVE] Pending changes limpos + forceRender - grid deve atualizar agora');
 
       // Toast de sucesso simples
       toast.success(`✅ ${changeCount} agendamento(s) salvo(s)!`, {
@@ -355,9 +442,6 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
       });
     } catch (error) {
       console.error('❌ [DRAG&DROP] Erro ao salvar:', error);
-
-      // Em caso de erro, manter as mudanças pendentes
-      // (não precisa restaurar pois nunca limpamos)
 
       toast.error('❌ Erro ao atualizar agendamento no banco de dados', {
         duration: 4000
@@ -594,10 +678,10 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
                   📅 {format(activeEvent.startTime, 'HH:mm')}
                 </div>
                 <div className="text-sm font-black truncate">
-                  {activeEvent.clientName}
+                  {activeEvent.equipment}
                 </div>
                 <div className="text-xs truncate">
-                  {activeEvent.equipment}
+                  {activeEvent.clientName}
                 </div>
                 <div className="text-xs font-bold text-blue-600 mt-1">
                   🔄 Arrastando...

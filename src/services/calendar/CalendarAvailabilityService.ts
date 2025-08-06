@@ -28,17 +28,17 @@ class CalendarAvailabilityService {
         console.log(`🔍 DEBUG: Todas as ordens de João Santos no banco:`, allJoaoOrders);
       }
 
-      // Buscar ordens de serviço agendadas para este técnico nesta data
-      console.log(`🔍 Buscando ordens de serviço para técnico ${technicianId} na data ${date}`);
-      console.log(`🔍 Parâmetros da busca: technician_id="${technicianId}", scheduled_date="${date}"`);
+      // 🎯 NOVA ARQUITETURA: Buscar eventos no calendário (fonte única da verdade)
+      console.log(`🔍 Buscando eventos do calendário para técnico ${technicianId} na data ${date}`);
+      console.log(`🔍 Parâmetros da busca: technician_id="${technicianId}", date="${date}"`);
 
-      const { data: serviceOrders, error } = await supabase
-        .from('service_orders')
-        .select('id, client_name, scheduled_date, technician_id, status')
+      const { data: calendarEvents, error } = await supabase
+        .from('calendar_events')
+        .select('id, client_name, start_time, technician_id, status')
         .eq('technician_id', technicianId)
-        .gte('scheduled_date', `${date}T00:00:00`)
-        .lt('scheduled_date', `${date}T23:59:59`)
-        .not('scheduled_date', 'is', null);
+        .gte('start_time', `${date}T00:00:00`)
+        .lt('start_time', `${date}T23:59:59`)
+        .not('status', 'eq', 'cancelled');
 
       // DEBUG: Buscar também sem filtro de técnico para ver se há ordens na data
       const { data: allOrdersOnDate, error: debugError2 } = await supabase

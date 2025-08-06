@@ -37,6 +37,13 @@ import {
 } from 'lucide-react';
 import { DisplayNumber } from '@/components/common/DisplayNumber';
 import { useNavigate } from 'react-router-dom';
+import FinancialAlertsWidget from '@/components/finance/FinancialAlertsWidget';
+import FinancialSyncWidget from '@/components/finance/FinancialSyncWidget';
+import GoogleAdsConversionsExport from '@/components/analytics/GoogleAdsConversionsExport';
+import ConversionDetailsReport from '@/components/analytics/ConversionDetailsReport';
+import AdvancedBIDashboard from '@/components/analytics/AdvancedBIDashboard';
+import ConversionTestRunner from '@/components/testing/ConversionTestRunner';
+import RealTimeMonitoringDashboard from '@/components/monitoring/RealTimeMonitoringDashboard';
 
 interface AdminDashboardProps {
   serviceOrders: ServiceOrder[];
@@ -422,6 +429,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </CardContent>
             </Card>
           </div>
+
+          {/* Widget de Alertas Financeiros */}
+          <div className="mt-6">
+            <FinancialAlertsWidget maxHeight="300px" showActions={true} />
+          </div>
+
+          {/* Widget de Sincronização Financeira */}
+          <div className="mt-6">
+            <FinancialSyncWidget showActions={true} />
+          </div>
         </TabsContent>
 
         {/* Tab: Ordens Recentes */}
@@ -625,7 +642,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {/* Tab: Analytics */}
         <TabsContent value="analytics" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-3">
+          {/* Sub-navegação Analytics */}
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+              <TabsTrigger value="conversions">Conversões Google Ads</TabsTrigger>
+              <TabsTrigger value="detailed">Relatório Detalhado</TabsTrigger>
+              <TabsTrigger value="bi">Dashboard BI</TabsTrigger>
+              <TabsTrigger value="monitoring">Monitoramento</TabsTrigger>
+              <TabsTrigger value="tests">Testes</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6 mt-6">
+              <div className="grid gap-6 lg:grid-cols-3">
             {/* Métricas de Crescimento */}
             <Card className="border-0 shadow-lg lg:col-span-2">
               <CardHeader>
@@ -723,6 +752,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </CardContent>
             </Card>
           </div>
+
+            </TabsContent>
+
+            <TabsContent value="conversions" className="space-y-6 mt-6">
+              <GoogleAdsConversionsExport />
+            </TabsContent>
+
+            <TabsContent value="detailed" className="space-y-6 mt-6">
+              <ConversionDetailsReport />
+            </TabsContent>
+
+            <TabsContent value="bi" className="space-y-6 mt-6">
+              <AdvancedBIDashboard />
+            </TabsContent>
+
+            <TabsContent value="monitoring" className="space-y-6 mt-6">
+              <RealTimeMonitoringDashboard />
+            </TabsContent>
+
+            <TabsContent value="tests" className="space-y-6 mt-6">
+              <ConversionTestRunner />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>

@@ -90,8 +90,8 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
       const trackingUrl = `${baseUrl}/track/${qrCodeText}`;
 
       const qrCodeDataURL = await QRCodeLib.toDataURL(trackingUrl, {
-        width: 200,
-        margin: 2,
+        width: 120, // Tamanho reduzido para etiqueta
+        margin: 1,  // Margem menor
         color: {
           dark: '#000000',
           light: '#FFFFFF'
@@ -230,14 +230,14 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
           </Button>
 
           {showQRCode && qrCodeImage && (
-            <div className="bg-white p-4 border rounded-lg inline-block">
-              <img 
-                src={qrCodeImage} 
-                alt="QR Code de Rastreamento" 
-                className="mx-auto"
+            <div className="bg-white p-2 border rounded-lg inline-block max-w-[140px]">
+              <img
+                src={qrCodeImage}
+                alt="QR Code de Rastreamento"
+                className="mx-auto w-full h-auto max-w-[120px]"
               />
-              <p className="text-xs text-muted-foreground mt-2">
-                Escaneie para rastrear o equipamento
+              <p className="text-xs text-muted-foreground mt-1 text-center">
+                Escaneie para rastrear
               </p>
             </div>
           )}

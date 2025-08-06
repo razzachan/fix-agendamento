@@ -32,6 +32,8 @@ export const getStatusColor = (status: string) => {
       return 'bg-teal-100 text-teal-800 border-teal-400';
     case 'quote_sent':
       return 'bg-orange-100 text-orange-800 border-orange-400';
+    case 'awaiting_quote_approval':
+      return 'bg-amber-100 text-amber-800 border-amber-400';
     case 'quote_approved':
       return 'bg-green-100 text-green-800 border-green-400';
     case 'quote_rejected':
@@ -78,6 +80,8 @@ export const getStatusIcon = (status: string) => {
       return <Stethoscope className="h-3 w-3" />;
     case 'quote_sent':
       return <CreditCard className="h-3 w-3" />;
+    case 'awaiting_quote_approval':
+      return <Clock className="h-3 w-3" />;
     case 'quote_approved':
       return <Check className="h-3 w-3" />;
     case 'quote_rejected':
@@ -88,6 +92,8 @@ export const getStatusIcon = (status: string) => {
       return <Building className="h-3 w-3" />;
     case 'ready_for_delivery':
       return <ClipboardCheck className="h-3 w-3" />;
+    case 'delivery_scheduled':
+      return <Calendar className="h-3 w-3" />;
     case 'collected_for_delivery':
       return <PackageCheck className="h-3 w-3" />;
     case 'on_the_way_to_deliver':
@@ -128,6 +134,8 @@ export const getStatusLabel = (status: string) => {
       return 'Diagnóstico Concluído';
     case 'quote_sent':
       return 'Orçamento Enviado';
+    case 'awaiting_quote_approval':
+      return 'Aguardando Aprovação do Orçamento';
     case 'quote_approved':
       return 'Orçamento Aprovado';
     case 'quote_rejected':
@@ -138,6 +146,8 @@ export const getStatusLabel = (status: string) => {
       return 'Necessita Oficina';
     case 'ready_for_delivery':
       return 'Pronto para Entrega';
+    case 'delivery_scheduled':
+      return 'Entrega Agendada';
     case 'collected_for_delivery':
       return 'Coletado para Entrega';
     case 'on_the_way_to_deliver':

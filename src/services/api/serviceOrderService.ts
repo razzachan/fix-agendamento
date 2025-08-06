@@ -2,41 +2,9 @@
  * Serviço para gerenciar ordens de serviço
  */
 import apiClient from './apiClient';
+import { ServiceOrder } from '@/types';
 
-// Tipos
-export interface ServiceOrder {
-  id: string;
-  clientId: string;
-  clientName: string;
-  clientEmail?: string;
-  clientPhone?: string;
-  clientCpfCnpj?: string;
-  clientAddress?: string;
-  clientAddressComplement?: string;
-  clientAddressReference?: string;
-  clientCity?: string;
-  clientState?: string;
-  clientZipCode?: string;
-  technicianId?: string;
-  technicianName?: string;
-  status: string;
-  createdAt: string;
-  scheduledDate?: string;
-  scheduledTime?: string;
-  completedDate?: string;
-  description: string;
-  equipmentType: string;
-  equipmentModel?: string;
-  equipmentSerial?: string;
-  needsPickup: boolean;
-  pickupAddress?: string;
-  pickupCity?: string;
-  pickupState?: string;
-  pickupZipCode?: string;
-  archived: boolean;
-  cancellationReason?: string;
-  lastProgressId?: string;
-}
+// Tipos adicionais específicos para a API
 
 export interface ServiceOrderProgress {
   id: string;

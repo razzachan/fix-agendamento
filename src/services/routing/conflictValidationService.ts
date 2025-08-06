@@ -270,7 +270,7 @@ class ConflictValidationService {
   }
 
   /**
-   * Valida se um horário está disponível para agendamento
+   * 🎯 NOVA ARQUITETURA: Valida disponibilidade usando calendar_events (fonte única da verdade)
    */
   async validateTimeSlotAvailability(
     date: string,
@@ -278,11 +278,14 @@ class ConflictValidationService {
     technicianId?: string
   ): Promise<boolean> {
     try {
+      // Construir datetime para verificação
+      const datetime = `${date}T${time}:00`;
+
+      // 🎯 VERIFICAR NA NOVA TABELA calendar_events
       let query = supabase
-        .from('service_orders')
+        .from('calendar_events')
         .select('id')
-        .eq('scheduled_date', date)
-        .eq('scheduled_time', time)
+        .eq('start_time', datetime)
         .neq('status', 'cancelled');
 
       if (technicianId) {
@@ -292,11 +295,17 @@ class ConflictValidationService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('Erro ao verificar disponibilidade:', error);
+        console.error('Erro ao verificar disponibilidade no calendário:', error);
         return false;
       }
 
-      return !data || data.length === 0;
+      const isAvailable = !data || data.length === 0;
+
+      if (!isAvailable) {
+        console.log(`⚠️ Horário ${datetime} ocupado no calendário`);
+      }
+
+      return isAvailable;
     } catch (error) {
       console.error('Erro na validação de disponibilidade:', error);
       return false;

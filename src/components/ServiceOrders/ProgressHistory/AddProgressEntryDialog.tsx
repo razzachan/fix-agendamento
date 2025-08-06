@@ -123,18 +123,22 @@ export function AddProgressEntryDialog({
                     <SelectContent>
                       <SelectItem value="pending">Pendente</SelectItem>
                       <SelectItem value="scheduled">Agendado</SelectItem>
+                      <SelectItem value="scheduled_collection">Coleta Agendada</SelectItem>
+                      <SelectItem value="on_the_way">A Caminho</SelectItem>
                       <SelectItem value="in_progress">Em Andamento</SelectItem>
-                      <SelectItem value="pickup_scheduled">Coleta Agendada</SelectItem>
-                      <SelectItem value="picked_up">Coletado</SelectItem>
+                      <SelectItem value="collected">Coletado</SelectItem>
+                      <SelectItem value="collected_for_diagnosis">Coletado para Diagnóstico</SelectItem>
                       <SelectItem value="at_workshop">Na Oficina</SelectItem>
-                      <SelectItem value="diagnosed">Diagnosticado</SelectItem>
-                      <SelectItem value="awaiting_approval">Aguardando Aprovação</SelectItem>
-                      <SelectItem value="approved">Aprovado</SelectItem>
-                      <SelectItem value="parts_ordered">Peças Encomendadas</SelectItem>
-                      <SelectItem value="under_repair">Em Reparo</SelectItem>
-                      <SelectItem value="repaired">Reparado</SelectItem>
+                      <SelectItem value="received_at_workshop">Recebido na Oficina</SelectItem>
+                      <SelectItem value="diagnosis_completed">Diagnóstico Concluído</SelectItem>
+                      <SelectItem value="awaiting_quote_approval">Aguardando Aprovação do Orçamento</SelectItem>
+                      <SelectItem value="quote_approved">Orçamento Aprovado</SelectItem>
+                      <SelectItem value="quote_rejected">Orçamento Rejeitado</SelectItem>
+                      <SelectItem value="ready_for_delivery">Pronto para Entrega</SelectItem>
                       <SelectItem value="delivery_scheduled">Entrega Agendada</SelectItem>
-                      <SelectItem value="delivered">Entregue</SelectItem>
+                      <SelectItem value="collected_for_delivery">Coletado para Entrega</SelectItem>
+                      <SelectItem value="on_the_way_to_deliver">Em Rota de Entrega</SelectItem>
+                      <SelectItem value="payment_pending">Aguardando Pagamento</SelectItem>
                       <SelectItem value="completed">Concluído</SelectItem>
                       <SelectItem value="cancelled">Cancelado</SelectItem>
                     </SelectContent>

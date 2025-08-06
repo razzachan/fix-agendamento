@@ -352,16 +352,11 @@ class RouteApplicationService {
         // Criar notificação para o cliente
         const notification = {
           user_id: '00000000-0000-0000-0000-000000000001', // Admin por enquanto
-          title: 'Agendamento Confirmado',
-          message: `Seu agendamento foi confirmado para ${slot.date} às ${slot.startTime}`,
-          type: 'agendamento_confirmado',
-          data: {
-            agendamentoId: slot.agendamentoId,
-            technicianId: slot.technicianId,
-            scheduledTime: slot.startTime,
-            address: slot.address
-          },
-          created_at: new Date().toISOString()
+          title: '📅 Agendamento Confirmado',
+          description: `Seu agendamento foi confirmado para ${slot.date} às ${slot.startTime}. Endereço: ${slot.address}`,
+          type: 'success',
+          read: false,
+          time: new Date().toISOString()
         };
 
         await supabase

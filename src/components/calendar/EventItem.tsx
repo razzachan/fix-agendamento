@@ -25,30 +25,38 @@ const EventItem: React.FC<EventItemProps> = ({
   const navigate = useNavigate();
   const badgeData = getStatusBadge(service.status);
   const [finalCost, setFinalCost] = useState<number | null>(service.finalCost || null);
+  const [equipmentInfo, setEquipmentInfo] = useState<{equipmentType: string, equipmentModel?: string} | null>(null);
 
-  // ✅ Buscar valor da OS se não estiver disponível
+  // ✅ Buscar informações da OS se não estiver disponível
   useEffect(() => {
-    const fetchServiceOrderValue = async () => {
-      if (!service.serviceOrderId || service.finalCost) return;
+    const fetchServiceOrderInfo = async () => {
+      if (!service.serviceOrderId) return;
 
       try {
         const { data, error } = await supabase
           .from('service_orders')
-          .select('final_cost')
+          .select('final_cost, equipment_type, equipment_model')
           .eq('id', service.serviceOrderId)
           .single();
 
         if (error) return;
 
-        if (data?.final_cost) {
+        if (data?.final_cost && !service.finalCost) {
           setFinalCost(data.final_cost);
+        }
+
+        if (data?.equipment_type) {
+          setEquipmentInfo({
+            equipmentType: data.equipment_type,
+            equipmentModel: data.equipment_model
+          });
         }
       } catch (error) {
         // Silencioso - não é crítico
       }
     };
 
-    fetchServiceOrderValue();
+    fetchServiceOrderInfo();
   }, [service.serviceOrderId, service.finalCost]);
   
   const handleClick = () => {
@@ -67,8 +75,21 @@ const EventItem: React.FC<EventItemProps> = ({
     >
       <div className="flex justify-between items-start">
         <div className="space-y-2">
-          <h3 className="font-semibold text-lg">{service.description}</h3>
-          
+          {/* Equipamento primeiro */}
+          {equipmentInfo && (
+            <div className="flex items-center gap-1.5 text-lg font-semibold text-gray-900">
+              <Wrench className="h-5 w-5 text-[#e5b034]" />
+              <span>{equipmentInfo.equipmentType}{equipmentInfo.equipmentModel && ` - ${equipmentInfo.equipmentModel}`}</span>
+            </div>
+          )}
+
+          {/* Problema/Descrição */}
+          <div className="bg-gray-50 p-3 rounded-lg border">
+            <div className="text-sm font-medium text-gray-600 mb-1">Problema Relatado:</div>
+            <div className="text-sm text-gray-800">{service.description}</div>
+          </div>
+
+          {/* Cliente */}
           <div className="flex items-center gap-1.5 text-sm text-gray-600">
             <UserCheck className="h-4 w-4 text-gray-500" />
             <span>Cliente: <span className="font-medium">{service.clientName}</span></span>

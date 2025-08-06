@@ -107,12 +107,14 @@ export interface CalendarEvent {
   equipment: string;
   problem: string;
   address: string;
-  status: 'confirmed' | 'suggested' | 'completed' | 'cancelled' | 'in_progress';
+  status: 'scheduled' | 'on_the_way' | 'in_progress' | 'completed' | 'cancelled' | 'at_workshop' | 'diagnosis' | 'awaiting_approval' | 'in_repair' | 'ready_delivery';
   isUrgent?: boolean;
   serviceOrderId?: string;
   logisticsGroup?: 'A' | 'B' | 'C';
   finalCost?: number; // ✅ Valor da OS
   clientPhone?: string; // ✅ Telefone do cliente
+  eventType?: 'service' | 'delivery' | 'collection' | 'diagnosis'; // ✅ Tipo do evento
+  parentEventId?: string; // ✅ Relacionamento pai/filho
 }
 
 // Tipos para disponibilidade de técnicos

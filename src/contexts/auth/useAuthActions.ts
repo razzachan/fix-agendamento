@@ -17,8 +17,16 @@ export function useAuthActions(
     setIsLoading(true);
     try {
       const userData = await authService.login(credentials.email, credentials.password);
-      
+
+      console.log('🔍 [useAuthActions] Dados retornados do login:', userData);
+
       if (userData) {
+        console.log('🔍 [useAuthActions] Definindo usuário no estado:', {
+          name: userData.name,
+          email: userData.email,
+          role: userData.role
+        });
+
         setUser(userData);
         toast.success('Login realizado com sucesso!');
 
@@ -32,6 +40,9 @@ export function useAuthActions(
         if (userData.role === 'client') {
           console.log('🚀 [Auth] Redirecionando para portal do cliente');
           navigate('/client/portal');
+        } else if (userData.role === 'workshop') {
+          console.log('🚀 [Auth] Redirecionando para dashboard de oficina');
+          navigate('/dashboard');
         } else {
           console.log('🚀 [Auth] Redirecionando para dashboard');
           navigate('/dashboard');

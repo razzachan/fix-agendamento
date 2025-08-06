@@ -175,9 +175,9 @@ const EquipmentDropdown: React.FC<EquipmentDropdownProps> = ({
     return isAwaitingApproval && needsApprovalStep;
   });
 
-  // Equipamentos em progresso: após aprovação OU coleta_conserto direto
+  // Equipamentos em progresso: APENAS após aprovação OU coleta_conserto direto
   const inProgress = workshopOrders.filter(order => {
-    // Equipamentos em progresso: orçamento aprovado ou em reparo
+    // Equipamentos em progresso: APENAS orçamento aprovado ou em reparo (NÃO awaiting_quote_approval)
     const isInProgressStatus = order.status === 'in_progress' || order.status === 'quote_approved';
 
     // coleta_conserto vai direto para reparo após recebimento
@@ -239,7 +239,14 @@ const EquipmentDropdown: React.FC<EquipmentDropdownProps> = ({
       return 'Pronto para Entrega';
     }
     if (inProgress.includes(order)) {
-      // Diferente texto para coleta_conserto vs coleta_diagnostico
+      // Mostrar status real baseado no status da ordem
+      if (order.status === 'quote_approved') {
+        return 'Orçamento Aprovado';
+      }
+      if (order.status === 'in_progress') {
+        return 'Em Reparo';
+      }
+      // Para coleta_conserto direto
       if (order.serviceAttendanceType === 'coleta_conserto') {
         return 'Pronto para Reparo';
       }

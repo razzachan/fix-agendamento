@@ -92,12 +92,18 @@ export function RepairProgressDialog({
 
         // 3. Criar notificação para início do reparo
         try {
+          // Usar função de formatação para número da ordem
+          const orderNumber = order.order_number || `#${order.id.substring(0, 3).toUpperCase()}`;
+          const equipmentInfo = order.equipment_model
+            ? `${order.equipment_type} ${order.equipment_model}`
+            : order.equipment_type;
+
           const { error: notificationError } = await supabase
             .from('notifications')
             .insert({
               user_id: '00000000-0000-0000-0000-000000000001',
               title: '🔧 Reparo Iniciado',
-              description: `O reparo do equipamento ${order.equipment_type} de ${order.client_name} foi iniciado na oficina. OS #${order.id.substring(0, 8)}`,
+              description: `O reparo do equipamento ${equipmentInfo} de ${order.client_name} foi iniciado na oficina. OS ${orderNumber}`,
               type: 'info',
               read: false,
               time: new Date().toISOString()

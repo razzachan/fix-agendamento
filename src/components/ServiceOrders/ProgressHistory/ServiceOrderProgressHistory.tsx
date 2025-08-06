@@ -21,12 +21,16 @@ interface ServiceOrderProgressHistoryProps {
   serviceOrderId: string;
   currentStatus: string;
   onStatusChange?: (newStatus: string) => void;
+  showActions?: boolean; // Controla se mostra botões de ação (adicionar/refresh)
+  title?: string; // Permite customizar o título
 }
 
-export function ServiceOrderProgressHistory({ 
-  serviceOrderId, 
+export function ServiceOrderProgressHistory({
+  serviceOrderId,
   currentStatus,
-  onStatusChange 
+  onStatusChange,
+  showActions = true,
+  title = "Histórico de Progresso"
 }: ServiceOrderProgressHistoryProps) {
   const [progressEntries, setProgressEntries] = useState<ProgressEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,15 +99,21 @@ export function ServiceOrderProgressHistory({
       'collected_for_diagnosis': 'Coletado para Diagnóstico',
       'collected_for_repair': 'Coletado para Conserto',
       'at_workshop': 'Na Oficina',
+      'received_at_workshop': 'Recebido na Oficina',
       'diagnosis_pending': 'Aguardando Diagnóstico',
       'diagnosis_completed': 'Diagnóstico Concluído',
+      'awaiting_quote_approval': 'Aguardando Aprovação do Orçamento',
       'quote_pending': 'Aguardando Orçamento',
+      'quote_sent': 'Orçamento Enviado',
       'quote_approved': 'Orçamento Aprovado',
       'quote_rejected': 'Orçamento Rejeitado',
+      'ready_for_delivery': 'Pronto para Entrega',
+      'delivery_scheduled': 'Entrega Agendada',
+      'collected_for_delivery': 'Coletado para Entrega',
+      'on_the_way_to_deliver': 'Em Rota de Entrega',
       'repair_in_progress': 'Conserto em Andamento',
       'repair_completed': 'Conserto Concluído',
       'payment_pending': 'Aguardando Pagamento',
-      'ready_for_delivery': 'Pronto para Entrega',
       'delivered': 'Entregue',
       'completed': 'Concluído',
       'cancelled': 'Cancelado',
@@ -120,7 +130,7 @@ export function ServiceOrderProgressHistory({
     // Traduzir status dentro das notas
     let translatedNotes = notes;
 
-    // Padrão: "Status alterado de X para Y"
+    // Padrão: "Status alterado de X para Y" (sem aspas)
     const statusChangePattern = /Status alterado de (\w+) para (\w+)/g;
     translatedNotes = translatedNotes.replace(statusChangePattern, (match, fromStatus, toStatus) => {
       return `Status alterado de "${translateStatus(fromStatus)}" para "${translateStatus(toStatus)}"`;
@@ -132,6 +142,24 @@ export function ServiceOrderProgressHistory({
       return `Status revertido de "${fromStatus}" para "${toStatus}"`;
     });
 
+    // Padrão: "Status alterado para: X" (formato mais comum)
+    const statusChangedToPattern = /Status alterado para: (\w+)/g;
+    translatedNotes = translatedNotes.replace(statusChangedToPattern, (match, status) => {
+      return `Status alterado para: ${translateStatus(status)}`;
+    });
+
+    // Padrão: "Status changed to X" (inglês)
+    const statusChangedToEnglishPattern = /Status changed to (\w+)/g;
+    translatedNotes = translatedNotes.replace(statusChangedToEnglishPattern, (match, status) => {
+      return `Status alterado para: ${translateStatus(status)}`;
+    });
+
+    // Padrão: apenas o nome do status em inglês (ex: "diagnosis_completed")
+    const statusOnlyPattern = /^(pending|scheduled|on_the_way|in_progress|collected|collected_for_diagnosis|collected_for_repair|at_workshop|received_at_workshop|diagnosis_pending|diagnosis_completed|awaiting_quote_approval|quote_pending|quote_sent|quote_approved|quote_rejected|ready_for_delivery|delivery_scheduled|collected_for_delivery|on_the_way_to_deliver|repair_in_progress|repair_completed|payment_pending|delivered|completed|cancelled|archived)$/;
+    if (statusOnlyPattern.test(translatedNotes.trim())) {
+      translatedNotes = translateStatus(translatedNotes.trim());
+    }
+
     // Traduzir outras frases comuns
     translatedNotes = translatedNotes.replace(/pelo técnico/g, 'pelo técnico');
 
@@ -142,20 +170,22 @@ export function ServiceOrderProgressHistory({
     <Card className="w-full">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
-          <CardTitle>Histórico de Progresso</CardTitle>
+          <CardTitle>{title}</CardTitle>
           <CardDescription>
             Acompanhe o histórico de atualizações desta ordem
           </CardDescription>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={handleRefresh} title="Atualizar">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar
-          </Button>
-        </div>
+        {showActions && (
+          <div className="flex gap-2">
+            <Button variant="outline" size="icon" onClick={handleRefresh} title="Atualizar">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -199,12 +229,14 @@ export function ServiceOrderProgressHistory({
           </ScrollArea>
         )}
       </CardContent>
-      <AddProgressEntryDialog 
-        open={dialogOpen} 
-        onOpenChange={setDialogOpen}
-        onSubmit={handleAddEntry}
-        currentStatus={currentStatus}
-      />
+      {showActions && (
+        <AddProgressEntryDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSubmit={handleAddEntry}
+          currentStatus={currentStatus}
+        />
+      )}
     </Card>
   );
 }

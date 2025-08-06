@@ -9,17 +9,19 @@ const scheduledServiceController = {
       const { page = 0, limit = 20, startDate = null, endDate = null, technicianId = null } = req.query;
       const offset = page * limit;
 
+      // 🎯 NOVA ARQUITETURA: Buscar de calendar_events (fonte única da verdade)
+      // MANTÉM 100% COMPATIBILIDADE com apps externos
       let query = supabase
-        .from('scheduled_services')
+        .from('calendar_events')
         .select('*')
-        .order('scheduled_date', { ascending: true });
+        .order('start_time', { ascending: true });
 
       if (startDate) {
-        query = query.gte('scheduled_date', startDate);
+        query = query.gte('start_time', startDate);
       }
 
       if (endDate) {
-        query = query.lte('scheduled_date', endDate);
+        query = query.lte('start_time', endDate);
       }
 
       if (technicianId) {
@@ -102,8 +104,13 @@ const scheduledServiceController = {
       const id = scheduledServiceData.id || uuidv4();
       const createdAt = new Date().toISOString();
 
+      // 🎯 NOVA ARQUITETURA: Criar em calendar_events (fonte única da verdade)
+      // MANTÉM 100% COMPATIBILIDADE com apps externos
+      const startTime = `${scheduledServiceData.scheduledDate}T${scheduledServiceData.scheduledTime}:00`;
+      const endTime = new Date(new Date(startTime).getTime() + (scheduledServiceData.durationMinutes || 60) * 60000).toISOString();
+
       const { data, error } = await supabase
-        .from('scheduled_services')
+        .from('calendar_events')
         .insert({
           id,
           service_order_id: scheduledServiceData.serviceOrderId,
@@ -111,14 +118,15 @@ const scheduledServiceController = {
           client_name: scheduledServiceData.clientName,
           technician_id: scheduledServiceData.technicianId || null,
           technician_name: scheduledServiceData.technicianName || null,
-          scheduled_date: scheduledServiceData.scheduledDate,
-          scheduled_time: scheduledServiceData.scheduledTime,
-          duration_minutes: scheduledServiceData.durationMinutes || 60,
-          service_type: scheduledServiceData.serviceType,
+          start_time: startTime,
+          end_time: endTime,
+          address: scheduledServiceData.address || '',
+          description: scheduledServiceData.serviceType || '',
           status: scheduledServiceData.status || 'scheduled',
-          notes: scheduledServiceData.notes || null,
-          created_at: createdAt,
-          created_by: req.user?.id || 'system'
+          equipment_type: scheduledServiceData.serviceType,
+          client_phone: scheduledServiceData.clientPhone || null,
+          final_cost: scheduledServiceData.finalCost || null,
+          created_at: createdAt
         })
         .select()
         .single();
@@ -251,13 +259,13 @@ const scheduledServiceController = {
         });
       }
 
+      // 🎯 NOVA ARQUITETURA: Atualizar em calendar_events (fonte única da verdade)
       const { data, error } = await supabase
-        .from('scheduled_services')
+        .from('calendar_events')
         .update({
           status,
-          notes: notes || null,
-          updated_at: updatedAt,
-          updated_by: req.user?.id || 'system'
+          description: notes ? `${data?.description || ''}\n${notes}` : data?.description,
+          updated_at: updatedAt
         })
         .eq('id', id)
         .select()
@@ -292,18 +300,19 @@ const scheduledServiceController = {
       const { technicianId } = req.params;
       const { startDate = null, endDate = null } = req.query;
 
+      // 🎯 NOVA ARQUITETURA: Buscar de calendar_events (fonte única da verdade)
       let query = supabase
-        .from('scheduled_services')
+        .from('calendar_events')
         .select('*')
         .eq('technician_id', technicianId)
-        .order('scheduled_date', { ascending: true });
+        .order('start_time', { ascending: true });
 
       if (startDate) {
-        query = query.gte('scheduled_date', startDate);
+        query = query.gte('start_time', startDate);
       }
 
       if (endDate) {
-        query = query.lte('scheduled_date', endDate);
+        query = query.lte('start_time', endDate);
       }
 
       const { data, error } = await query;
@@ -336,18 +345,19 @@ const scheduledServiceController = {
       const { clientId } = req.params;
       const { startDate = null, endDate = null } = req.query;
 
+      // 🎯 NOVA ARQUITETURA: Buscar de calendar_events (fonte única da verdade)
       let query = supabase
-        .from('scheduled_services')
+        .from('calendar_events')
         .select('*')
         .eq('client_id', clientId)
-        .order('scheduled_date', { ascending: true });
+        .order('start_time', { ascending: true });
 
       if (startDate) {
-        query = query.gte('scheduled_date', startDate);
+        query = query.gte('start_time', startDate);
       }
 
       if (endDate) {
-        query = query.lte('scheduled_date', endDate);
+        query = query.lte('start_time', endDate);
       }
 
       const { data, error } = await query;
@@ -386,12 +396,13 @@ const scheduledServiceController = {
         });
       }
 
+      // 🎯 NOVA ARQUITETURA: Buscar de calendar_events (fonte única da verdade)
       const { data, error } = await supabase
-        .from('scheduled_services')
+        .from('calendar_events')
         .select('*')
-        .gte('scheduled_date', startDate)
-        .lte('scheduled_date', endDate)
-        .order('scheduled_date', { ascending: true });
+        .gte('start_time', startDate)
+        .lte('start_time', endDate)
+        .order('start_time', { ascending: true });
 
       if (error) {
         return res.status(400).json({

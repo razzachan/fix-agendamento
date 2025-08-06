@@ -41,6 +41,8 @@ export async function getAllServiceOrders(includeArchived: boolean = false): Pro
     // Log detalhado para depuração do tipo de atendimento
     data.forEach(order => {
       console.log(`Ordem ${order.id} (${order.client_name}): tipo=${order.service_attendance_type}, status=${order.status}`);
+
+
     });
 
     const orders = data.map(order => mapServiceOrder(order));

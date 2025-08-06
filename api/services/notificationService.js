@@ -13,43 +13,75 @@ export class NotificationService {
     try {
       console.log(`🔔 [API NotificationService] Criando notificação para mudança: ${previousStatus} → ${newStatus}`);
 
+      // Função para formatar número da ordem
+      const getOrderNumber = (order) => {
+        if (order.order_number) {
+          return order.order_number;
+        }
+        return `#${order.id?.substring(0, 3).toUpperCase() || 'N/A'}`;
+      };
+
+      // Função para formatar equipamento
+      const getEquipmentInfo = (order) => {
+        const type = order.equipment_type || 'Equipamento';
+        const model = order.equipment_model || order.model || '';
+        return model ? `${type} ${model}` : type;
+      };
+
+      // Função para formatar nome do cliente
+      const getClientName = (order) => {
+        return order.client_name || order.customer_name || 'Cliente';
+      };
+
+      const orderNumber = getOrderNumber(serviceOrder);
+      const equipmentInfo = getEquipmentInfo(serviceOrder);
+      const clientName = getClientName(serviceOrder);
+
       // Mapear status para eventos e mensagens
       const statusMessages = {
         'scheduled': {
           title: '📅 Serviço Agendado',
-          description: `Seu ${serviceOrder.equipment_type} ${serviceOrder.equipment_model} foi agendado para atendimento.`
+          description: `Olá ${clientName}! Seu ${equipmentInfo} foi agendado para atendimento. ${orderNumber}`
         },
         'in_progress': {
           title: '🔧 Serviço Iniciado',
-          description: `O técnico iniciou o atendimento do seu ${serviceOrder.equipment_type} ${serviceOrder.equipment_model}.`
+          description: `Olá ${clientName}! O técnico iniciou o atendimento do seu ${equipmentInfo}. ${orderNumber}`
         },
         'diagnosis': {
           title: '🔍 Diagnóstico em Andamento',
-          description: `Seu ${serviceOrder.equipment_type} ${serviceOrder.equipment_model} está sendo diagnosticado.`
+          description: `Olá ${clientName}! Seu ${equipmentInfo} está sendo diagnosticado. ${orderNumber}`
         },
         'awaiting_approval': {
           title: '⏳ Aguardando Aprovação',
-          description: `Diagnóstico concluído para seu ${serviceOrder.equipment_type} ${serviceOrder.equipment_model}. Aguardando sua aprovação.`
+          description: `Olá ${clientName}! Diagnóstico concluído para seu ${equipmentInfo}. Aguardando sua aprovação. ${orderNumber}`
         },
         'repair': {
           title: '🔨 Em Reparo',
-          description: `Seu ${serviceOrder.equipment_type} ${serviceOrder.equipment_model} está sendo reparado.`
+          description: `Seu ${equipmentInfo} está sendo reparado. OS #${orderNumber}`
         },
         'testing': {
           title: '🧪 Em Teste',
-          description: `Reparo concluído! Seu ${serviceOrder.equipment_type} ${serviceOrder.equipment_model} está sendo testado.`
+          description: `Reparo concluído! Seu ${equipmentInfo} está sendo testado. OS #${orderNumber}`
         },
         'completed': {
           title: '✅ Serviço Concluído',
-          description: `Seu ${serviceOrder.equipment_type} ${serviceOrder.equipment_model} foi reparado com sucesso!`
+          description: `Seu ${equipmentInfo} foi reparado com sucesso! OS #${orderNumber}`
         },
         'delivered': {
           title: '🎉 Equipamento Entregue',
-          description: `Seu ${serviceOrder.equipment_type} ${serviceOrder.equipment_model} foi entregue com sucesso!`
+          description: `Seu ${equipmentInfo} foi entregue com sucesso! OS #${orderNumber}`
         },
         'canceled': {
           title: '❌ Serviço Cancelado',
-          description: `O serviço para seu ${serviceOrder.equipment_type} ${serviceOrder.equipment_model} foi cancelado.`
+          description: `O serviço para seu ${equipmentInfo} foi cancelado. OS #${orderNumber}`
+        },
+        'ready_for_delivery': {
+          title: '📦 Pronto para Entrega',
+          description: `Seu ${equipmentInfo} está pronto para entrega! OS #${orderNumber}`
+        },
+        'collected_for_diagnosis': {
+          title: '🚚 Equipamento Coletado',
+          description: `Seu ${equipmentInfo} foi coletado para diagnóstico. OS #${orderNumber}`
         }
       };
 

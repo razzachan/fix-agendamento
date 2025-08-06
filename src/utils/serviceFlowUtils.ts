@@ -87,6 +87,30 @@ const pickupRepairServiceFlow: ServiceFlowStep[] = [
     color: 'cyan',
   },
   {
+    status: 'received_at_workshop',
+    label: 'Recebido na Oficina',
+    description: 'Equipamento confirmado como recebido pela oficina',
+    color: 'blue',
+  },
+  {
+    status: 'diagnosis_completed',
+    label: 'Diagnóstico Concluído',
+    description: 'Diagnóstico realizado, orçamento enviado',
+    color: 'orange',
+  },
+  {
+    status: 'awaiting_quote_approval',
+    label: 'Aguardando Aprovação do Orçamento',
+    description: 'Aguardando aprovação do orçamento pelo cliente',
+    color: 'amber',
+  },
+  {
+    status: 'quote_approved',
+    label: 'Orçamento Aprovado',
+    description: 'Cliente aprovou o orçamento, iniciando reparo',
+    color: 'green',
+  },
+  {
     status: 'in_repair',
     label: 'Em Reparo',
     description: 'Serviço sendo executado',
@@ -95,13 +119,19 @@ const pickupRepairServiceFlow: ServiceFlowStep[] = [
   {
     status: 'ready_for_delivery',
     label: 'Pronto para Entrega',
-    description: 'Reparo concluído, aguardando coleta para entrega',
+    description: 'Reparo concluído, aguardando agendamento de entrega',
     color: 'teal',
   },
   {
+    status: 'delivery_scheduled',
+    label: 'Entrega Agendada',
+    description: 'Entrega agendada, aguardando coleta na oficina',
+    color: 'blue',
+  },
+  {
     status: 'collected_for_delivery',
-    label: 'Coletado na Oficina',
-    description: 'Equipamento coletado na oficina para entrega',
+    label: 'Coletado para Entrega',
+    description: 'Equipamento coletado na oficina, em rota de entrega',
     color: 'emerald',
   },
   {
@@ -112,7 +142,7 @@ const pickupRepairServiceFlow: ServiceFlowStep[] = [
   },
   {
     status: 'payment_pending',
-    label: 'Pagamento Pendente',
+    label: 'Pagamento',
     description: 'Aguardando confirmação do pagamento',
     color: 'orange',
   },
@@ -167,19 +197,37 @@ const pickupDiagnosisServiceFlow: ServiceFlowStep[] = [
   {
     status: 'diagnosis_completed',
     label: 'Diagnóstico Concluído',
-    description: 'Diagnóstico realizado, aguardando aprovação do cliente',
+    description: 'Diagnóstico realizado, orçamento enviado',
     color: 'orange',
+  },
+  {
+    status: 'awaiting_quote_approval',
+    label: 'Aguardando Aprovação do Orçamento',
+    description: 'Aguardando aprovação do orçamento pelo cliente',
+    color: 'amber',
+  },
+  {
+    status: 'quote_approved',
+    label: 'Orçamento Aprovado',
+    description: 'Cliente aprovou o orçamento, iniciando reparo',
+    color: 'green',
   },
   {
     status: 'ready_for_delivery',
     label: 'Pronto para Entrega',
-    description: 'Diagnóstico concluído, aguardando coleta para entrega',
+    description: 'Reparo concluído, aguardando agendamento de entrega',
     color: 'teal',
   },
   {
+    status: 'delivery_scheduled',
+    label: 'Entrega Agendada',
+    description: 'Entrega agendada, aguardando coleta na oficina',
+    color: 'blue',
+  },
+  {
     status: 'collected_for_delivery',
-    label: 'Coletado na Oficina',
-    description: 'Equipamento coletado na oficina para entrega',
+    label: 'Coletado para Entrega',
+    description: 'Equipamento coletado na oficina, em rota de entrega',
     color: 'emerald',
   },
   {
@@ -190,7 +238,7 @@ const pickupDiagnosisServiceFlow: ServiceFlowStep[] = [
   },
   {
     status: 'payment_pending',
-    label: 'Pagamento Pendente',
+    label: 'Pagamento',
     description: 'Aguardando confirmação do pagamento',
     color: 'orange',
   },

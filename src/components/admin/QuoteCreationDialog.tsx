@@ -21,8 +21,6 @@ interface QuoteCreationDialogProps {
     diagnosis: {
       diagnosis_details: string;
       recommended_service: string;
-      estimated_cost: number;
-      estimated_completion_date: string;
     };
   } | null;
   onSuccess: () => void;
@@ -54,7 +52,7 @@ export function QuoteCreationDialog({
       validUntilDate.setDate(validUntilDate.getDate() + 30);
       
       setFormData({
-        laborCost: diagnosis.diagnosis.estimated_cost.toString(),
+        laborCost: '0',
         partsCost: '0',
         estimatedDays: '5',
         notes: '',
@@ -80,7 +78,7 @@ export function QuoteCreationDialog({
     setIsCreating(true);
     try {
       const success = await quoteService.createQuote(
-        diagnosis.id,
+        diagnosis.id, // Este é o serviceOrderId, não o diagnosis.id
         user.id,
         {
           laborCost: parseFloat(formData.laborCost),

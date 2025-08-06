@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAppData } from '@/hooks/useAppData';
 import { useDashboardUtils } from '@/hooks/useDashboardUtils';
 import { useTechnicianOrders } from '@/hooks/useTechnicianOrders';
+import { useTechnicianOrdersTest } from '@/hooks/useTechnicianOrdersTest';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import LoadingState from '@/components/dashboard/LoadingState';
 import AdminDashboard from '@/components/dashboard/AdminDashboard';
@@ -12,19 +13,29 @@ import TechnicianDashboard from '@/components/dashboard/TechnicianDashboard';
 import WorkshopDashboard from '@/components/dashboard/WorkshopDashboard';
 import WorkshopAdvancedDashboard from '@/components/workshop/WorkshopAdvancedDashboard';
 
+
 const Dashboard: React.FC = () => {
+  console.log('🚀 [Dashboard] COMPONENTE RENDERIZADO!');
   const { user } = useAuth();
   const { serviceOrders, financialTransactions, clients, technicians, isLoading, updateServiceOrder } = useAppData();
   const { getStatusColor, getStatusLabel, formatDate, formatCurrency } = useDashboardUtils();
 
-  // Hook específico para técnicos
-  const technicianData = useTechnicianOrders();
 
-  // Determinar tipo de usuário
+
+  // Determinar tipo de usuário primeiro
   const isAdmin = user?.role === 'admin';
   const isTechnician = user?.role === 'technician';
   const isWorkshop = user?.role === 'workshop';
   const userRole = user?.role || '';
+
+  console.log('🔍 [Dashboard] User role debug:', { user: user?.email, role: user?.role, isTechnician });
+  console.log('🔍 [Dashboard] TESTE - Usuário atual:', user);
+
+  // Hook específico para técnicos - SEMPRE EXECUTAR PARA DEBUG
+  console.log('🔍 [Dashboard] Executando hooks de técnico...');
+  const technicianData = useTechnicianOrders();
+  const technicianDataTest = useTechnicianOrdersTest();
+  console.log('🔍 [Dashboard] Hooks executados:', { technicianData, technicianDataTest });
 
   if (isLoading || (isTechnician && technicianData.isLoading)) {
     return <LoadingState />;
@@ -35,12 +46,20 @@ const Dashboard: React.FC = () => {
     o.status === 'pending' || o.status === 'scheduled' || o.status === 'scheduled_collection'
   ).length;
   
-  const inProgressOrders = serviceOrders.filter(order => 
-    order.status === 'in_progress' || 
-    order.status === 'collected' || 
+  const inProgressOrders = serviceOrders.filter(order =>
+    order.status === 'in_progress' ||
+    order.status === 'collected' ||
     order.status === 'collected_for_diagnosis' ||
     order.status === 'at_workshop' ||
-    order.status === 'diagnosis_completed'
+    order.status === 'received_at_workshop' ||
+    order.status === 'diagnosis_completed' ||
+    order.status === 'awaiting_quote_approval' ||
+    order.status === 'quote_approved' ||
+    order.status === 'ready_for_delivery' ||
+    order.status === 'delivery_scheduled' ||
+    order.status === 'collected_for_delivery' ||
+    order.status === 'on_the_way_to_deliver' ||
+    order.status === 'payment_pending'
   ).length;
   
   const completedOrders = serviceOrders.filter(order => 
@@ -92,6 +111,7 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       <DashboardHeader userRole={userRole} />
 
+
       {isAdmin ? (
         <AdminDashboard
           serviceOrders={serviceOrders}
@@ -111,8 +131,8 @@ const Dashboard: React.FC = () => {
         />
       ) : isTechnician ? (
         <TechnicianDashboard
-          technicianOrders={technicianData.technicianOrders}
-          technicianId={technicianData.technicianId || ''}
+          technicianOrders={technicianData.orders || []}
+          technicianId={user?.id || ''}
           onStatusUpdate={handleStatusUpdate}
         />
       ) : isWorkshop ? (

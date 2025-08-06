@@ -19,7 +19,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DisplayNumber } from '@/components/common/DisplayNumber';
 import NextStatusButton from '@/components/ServiceOrders/ProgressTracker/NextStatusButton';
-import { cardPresets, cardText, statusBadge, alertClasses } from '@/lib/cardStyles';
+import { cardPresets, cardText, statusBadge, alertClasses, cardSurface } from '@/lib/cardStyles';
 
 interface CollectedEquipmentCardProps {
   collectedOrders: ServiceOrder[];

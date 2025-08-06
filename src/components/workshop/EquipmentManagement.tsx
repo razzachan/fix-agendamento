@@ -113,8 +113,14 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({
       });
     }
 
+    // Verificar se é coleta diagnóstico aguardando aprovação
+    if (order.serviceAttendanceType === 'coleta_diagnostico' && order.status === 'awaiting_quote_approval') {
+      // Mostrar apenas status de aguardando
+      return actions; // Não adicionar botões de reparo
+    }
+
     // Iniciar/Atualizar Reparo
-    if ((order.status === 'quote_approved') || 
+    if ((order.status === 'quote_approved') ||
         (order.serviceAttendanceType === 'coleta_conserto' && order.status === 'received_at_workshop') ||
         (order.status === 'in_progress')) {
       actions.push({
@@ -125,8 +131,9 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({
       });
     }
 
-    // Concluir Reparo
-    if (order.status === 'in_progress') {
+    // Concluir Reparo - APENAS se não for coleta diagnóstico aguardando aprovação
+    if (order.status === 'in_progress' &&
+        !(order.serviceAttendanceType === 'coleta_diagnostico' && order.status === 'awaiting_quote_approval')) {
       actions.push({
         label: 'Concluir Reparo',
         icon: CheckCircle,
@@ -265,18 +272,32 @@ const EquipmentManagement: React.FC<EquipmentManagementProps> = ({
                   </div>
 
                   <div className="flex flex-col gap-2 ml-4">
-                    {getAvailableActions(order).map((action, index) => (
-                      <Button
-                        key={index}
-                        size="sm"
-                        variant={action.variant}
-                        onClick={action.action}
-                        className="flex items-center gap-2"
-                      >
-                        <action.icon className="h-4 w-4" />
-                        {action.label}
-                      </Button>
-                    ))}
+                    {/* Mensagem especial para coleta diagnóstico aguardando aprovação */}
+                    {order.serviceAttendanceType === 'coleta_diagnostico' && order.status === 'awaiting_quote_approval' ? (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
+                        <div className="flex items-center justify-center gap-2 text-yellow-700 mb-1">
+                          <Clock className="h-4 w-4" />
+                          <span className="font-medium text-sm">Aguardando Confirmação</span>
+                        </div>
+                        <p className="text-xs text-yellow-600">
+                          Orçamento enviado para aprovação do cliente
+                        </p>
+                      </div>
+                    ) : (
+                      // Botões normais para outros casos
+                      getAvailableActions(order).map((action, index) => (
+                        <Button
+                          key={index}
+                          size="sm"
+                          variant={action.variant}
+                          onClick={action.action}
+                          className="flex items-center gap-2"
+                        >
+                          <action.icon className="h-4 w-4" />
+                          {action.label}
+                        </Button>
+                      ))
+                    )}
                   </div>
                 </div>
               </CardContent>

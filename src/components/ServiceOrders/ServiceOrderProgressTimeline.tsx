@@ -66,6 +66,8 @@ const ServiceOrderProgressTimeline: React.FC<ServiceOrderProgressTimelineProps> 
         return <Wrench className="h-5 w-5 text-purple-600" />;
       case 'ready_for_delivery':
         return <Package className="h-5 w-5 text-green-500" />;
+      case 'delivery_scheduled':
+        return <Calendar className="h-5 w-5 text-blue-500" />;
       case 'payment_pending':
         return <AlertTriangle className="h-5 w-5 text-amber-500" />;
       case 'completed':
@@ -95,6 +97,7 @@ const ServiceOrderProgressTimeline: React.FC<ServiceOrderProgressTimelineProps> 
       'ready_for_return': 'Pronto para Devolução',
       'needs_workshop': 'Necessita Oficina',
       'ready_for_delivery': 'Pronto para Entrega',
+      'delivery_scheduled': 'Entrega Agendada',
       'collected_for_delivery': 'Coletado para Entrega',
       'on_the_way_to_deliver': 'A Caminho para Entrega',
       'payment_pending': 'Pagamento Pendente',

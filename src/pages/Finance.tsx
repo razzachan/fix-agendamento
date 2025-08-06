@@ -7,6 +7,7 @@ import { DollarSign, TrendingUp, TrendingDown, AlertCircle, BarChart3 } from 'lu
 import { Button } from '@/components/ui/button';
 import { useAppData } from '@/hooks/useAppData';
 import { FinancialAnalytics } from '@/components/finance/FinancialAnalytics';
+import FinancialInconsistencyReport from '@/components/finance/FinancialInconsistencyReport';
 
 const Finance: React.FC = () => {
   const { financialTransactions, isLoading } = useAppData();
@@ -98,6 +99,10 @@ const Finance: React.FC = () => {
             Analytics
           </TabsTrigger>
           <TabsTrigger value="transactions">Transações</TabsTrigger>
+          <TabsTrigger value="inconsistencies">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            Inconsistências
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           {/* Cards de métricas - conteúdo existente */}
@@ -295,6 +300,10 @@ const Finance: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="inconsistencies">
+          <FinancialInconsistencyReport />
         </TabsContent>
       </Tabs>
     </div>

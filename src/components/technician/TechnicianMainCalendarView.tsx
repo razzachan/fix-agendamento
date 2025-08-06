@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,8 +22,9 @@ import {
 import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, addMonths, subMonths, subDays, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useMainCalendar } from '@/hooks/calendar/useMainCalendar';
+import { useUnifiedCalendar } from '@/hooks/calendar/useUnifiedCalendar';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { CalendarEvent, CalendarViewMode } from '@/types/calendar';
 import { toast } from 'sonner';
@@ -38,15 +39,16 @@ import { serviceOrderService } from '@/services/serviceOrder';
 import { ServiceOrder } from '@/types';
 
 interface TechnicianMainCalendarViewProps {
-  technicianId: string;
+  userId: string;
   className?: string;
 }
 
-const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({ 
-  technicianId, 
-  className = '' 
+const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
+  userId,
+  className = ''
 }) => {
   const { user } = useAuth();
+  const [technicianId, setTechnicianId] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>('day');
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -56,6 +58,35 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDragDropEnabled, setIsDragDropEnabled] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // 🔍 Buscar technicianId baseado no userId
+  useEffect(() => {
+    const fetchTechnicianId = async () => {
+      if (!userId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('technicians')
+          .select('id')
+          .eq('user_id', userId)
+          .single();
+
+        if (error) {
+          console.error('❌ Erro ao buscar technician_id:', error);
+          return;
+        }
+
+        if (data) {
+          console.log(`✅ Técnico encontrado: user_id ${userId} → technician_id ${data.id}`);
+          setTechnicianId(data.id);
+        }
+      } catch (error) {
+        console.error('❌ Erro na busca do técnico:', error);
+      }
+    };
+
+    fetchTechnicianId();
+  }, [userId]);
 
   // Calcular datas baseadas na visualização atual
   const getDateRange = useCallback(() => {
@@ -88,22 +119,29 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
     }
   }, [currentDate, viewMode]);
 
-  const { startDate, endDate } = getDateRange();
+  const { startDate, endDate } = useMemo(() => getDateRange(), [getDateRange]);
 
   const {
     events,
     technicians,
-    isLoading,
+    loading: isLoading,
     refreshEvents,
     updateEvent,
-    getEventsForDay,
     getEventsByTimeSlot
-  } = useMainCalendar({
+  } = useUnifiedCalendar({
     startDate,
     endDate,
-    technicianId, // Força o filtro para o técnico específico
-    user
+    technicianId: technicianId || undefined, // Só filtra quando technicianId estiver disponível
+    user,
+    enabled: !!technicianId // Só executa quando technicianId estiver disponível
   });
+
+
+
+  // Função de compatibilidade para getEventsForDay
+  const getEventsForDay = useCallback((date: Date) => {
+    return events.filter(event => isSameDay(event.startTime, date));
+  }, [events]);
 
   // Efeito para garantir carregamento inicial quando o componente é montado
   useEffect(() => {
@@ -354,6 +392,18 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
     }
   }, [viewMode, currentDate]);
 
+  // 🔄 Loading enquanto busca o technicianId
+  if (!technicianId) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-gray-600">Carregando calendário do técnico...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <TooltipProvider>
       <div className={`space-y-1 sm:space-y-4 pb-16 sm:pb-20 ${className} ${isFullscreen ? 'fixed inset-0 z-50 bg-white p-1 sm:p-4 overflow-auto' : ''}`}>
@@ -524,6 +574,7 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
                   currentDate={currentDate}
                   events={events}
                   onEventClick={handleEventClick}
+                  getEventsByTimeSlot={getEventsByTimeSlot}
                 />
               </>
             )}
@@ -607,33 +658,50 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
                                       className={`
                                         p-1 rounded-md border-l-4 cursor-pointer transition-all duration-200
                                         hover:shadow-md hover:scale-[1.02] text-xs relative z-20
-                                        ${event.status === 'confirmed' ? 'bg-blue-100 border-blue-300 text-blue-800' :
-                                          event.status === 'completed' ? 'bg-green-100 border-green-300 text-green-800' :
+                                        ${event.status === 'scheduled' || event.status === 'confirmed' ? 'bg-blue-100 border-blue-300 text-blue-800' :
+                                          event.status === 'on_the_way' || event.status === 'in_progress' ? 'bg-purple-100 border-purple-300 text-purple-800' :
+                                          event.status === 'at_workshop' ? 'bg-orange-100 border-orange-300 text-orange-800' :
+                                          event.status === 'diagnosis' ? 'bg-cyan-100 border-cyan-300 text-cyan-800' :
+                                          event.status === 'awaiting_approval' ? 'bg-yellow-100 border-yellow-300 text-yellow-800' :
+                                          event.status === 'in_repair' ? 'bg-green-100 border-green-300 text-green-800' :
+                                          event.status === 'ready_delivery' ? 'bg-indigo-100 border-indigo-300 text-indigo-800' :
+                                          event.status === 'completed' ? 'bg-emerald-100 border-emerald-300 text-emerald-800' :
                                           event.status === 'cancelled' ? 'bg-red-100 border-red-300 text-red-800' :
-                                          event.status === 'in_progress' ? 'bg-orange-100 border-orange-300 text-orange-800' :
-                                          'bg-yellow-100 border-yellow-300 text-yellow-800'}
+                                          'bg-gray-100 border-gray-300 text-gray-800'}
                                       `}
                                       onClick={() => handleEventClick(event)}
-                                      title={`${event.clientName} - ${event.equipment} - ${format(event.startTime, 'HH:mm')}`}
+                                      title={`${event.equipment}${event.problem ? ` - ${event.problem}` : ''} - ${event.clientName} - ${format(event.startTime, 'HH:mm')}`}
                                       style={{
-                                        minHeight: '35px',
-                                        marginBottom: '1px'
+                                        minHeight: '50px',
+                                        marginBottom: '2px'
                                       }}
                                     >
                                       <div className="flex items-start justify-between">
                                         <div className="flex-1 min-w-0">
+                                          {/* Equipamento com ícone de urgência */}
                                           <div className="flex items-center gap-1 mb-1">
                                             {event.isUrgent && <AlertCircle className="h-3 w-3 text-red-500" />}
-                                            <span className="font-medium truncate">
-                                              {event.clientName}
+                                            <span className="font-medium truncate text-xs">
+                                              {event.equipment}
                                             </span>
                                           </div>
-                                          <div className="text-xs opacity-75 truncate">
-                                            {event.equipment}
+
+                                          {/* Problema do equipamento */}
+                                          {event.problem && (
+                                            <div className="text-xs opacity-75 truncate mb-1 text-gray-600">
+                                              {event.problem}
+                                            </div>
+                                          )}
+
+                                          {/* Cliente (menor destaque) */}
+                                          <div className="text-xs opacity-60 truncate mb-1">
+                                            {event.clientName}
                                           </div>
-                                          <div className="flex items-center gap-1 mt-1">
+
+                                          {/* Horário */}
+                                          <div className="flex items-center gap-1">
                                             <Clock className="h-3 w-3" />
-                                            <span className="text-xs">
+                                            <span className="text-xs font-medium">
                                               {format(event.startTime, 'HH:mm')}
                                             </span>
                                           </div>
@@ -723,17 +791,29 @@ const TechnicianMainCalendarView: React.FC<TechnicianMainCalendarViewProps> = ({
                         <Badge
                           variant="outline"
                           className={
-                            selectedEvent.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                            selectedEvent.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            selectedEvent.status === 'scheduled' || selectedEvent.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                            selectedEvent.status === 'on_the_way' || selectedEvent.status === 'in_progress' ? 'bg-purple-100 text-purple-800' :
+                            selectedEvent.status === 'at_workshop' ? 'bg-orange-100 text-orange-800' :
+                            selectedEvent.status === 'diagnosis' ? 'bg-cyan-100 text-cyan-800' :
+                            selectedEvent.status === 'awaiting_approval' ? 'bg-yellow-100 text-yellow-800' :
+                            selectedEvent.status === 'in_repair' ? 'bg-green-100 text-green-800' :
+                            selectedEvent.status === 'ready_delivery' ? 'bg-indigo-100 text-indigo-800' :
+                            selectedEvent.status === 'completed' ? 'bg-emerald-100 text-emerald-800' :
                             selectedEvent.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                            selectedEvent.status === 'in_progress' ? 'bg-orange-100 text-orange-800' :
-                            'bg-yellow-100 text-yellow-800'
+                            'bg-gray-100 text-gray-800'
                           }
                         >
-                          {selectedEvent.status === 'confirmed' ? 'Confirmado' :
+                          {selectedEvent.status === 'scheduled' ? 'Agendado' :
+                           selectedEvent.status === 'confirmed' ? 'Confirmado' :
+                           selectedEvent.status === 'on_the_way' ? 'A Caminho' :
+                           selectedEvent.status === 'in_progress' ? 'Em Andamento' :
+                           selectedEvent.status === 'at_workshop' ? 'Na Oficina' :
+                           selectedEvent.status === 'diagnosis' ? 'Em Diagnóstico' :
+                           selectedEvent.status === 'awaiting_approval' ? 'Aguardando Aprovação' :
+                           selectedEvent.status === 'in_repair' ? 'Em Reparo' :
+                           selectedEvent.status === 'ready_delivery' ? 'Pronto p/ Entrega' :
                            selectedEvent.status === 'completed' ? 'Concluído' :
-                           selectedEvent.status === 'cancelled' ? 'Cancelado' :
-                           selectedEvent.status === 'in_progress' ? 'Em Progresso' : 'Sugerido'}
+                           selectedEvent.status === 'cancelled' ? 'Cancelado' : 'Desconhecido'}
                         </Badge>
                       </div>
                     </div>

@@ -161,10 +161,10 @@ const Header: React.FC = () => {
                             {notification.title}
                           </h4>
                           <p className="text-xs text-gray-600 mt-1 break-words whitespace-pre-wrap">
-                            {notification.message}
+                            {notification.description}
                           </p>
                           <p className="text-xs text-gray-400 mt-1">
-                            {formatRelativeTime(notification.created_at)}
+                            {formatRelativeTime(notification.time)}
                           </p>
                         </div>
                         {!notification.read && (

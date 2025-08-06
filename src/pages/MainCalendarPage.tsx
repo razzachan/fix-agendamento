@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import MainCalendarView from '@/components/calendar/MainCalendarView';
+import TechnicianMainCalendarView from '@/components/technician/TechnicianMainCalendarView';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
@@ -30,6 +31,10 @@ const MainCalendarPage: React.FC = () => {
     );
   }
 
+  // 🔧 CORREÇÃO: Usar calendário específico baseado no papel do usuário
+  const isAdmin = user.role === 'admin';
+  const isTechnician = user.role === 'technician';
+
   return (
     <motion.div
       className="container mx-auto px-4 py-6"
@@ -37,7 +42,13 @@ const MainCalendarPage: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <MainCalendarView />
+      {isAdmin ? (
+        <MainCalendarView />
+      ) : isTechnician ? (
+        <TechnicianMainCalendarView userId={user.id} />
+      ) : (
+        <MainCalendarView />
+      )}
     </motion.div>
   );
 };

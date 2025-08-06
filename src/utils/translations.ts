@@ -9,7 +9,6 @@ export const translateStatus = (status: string): string => {
   const statusTranslations: Record<string, string> = {
     'pending': 'Em Aberto',
     'scheduled': 'Agendado',
-    'confirmed': 'Confirmado',
     'on_the_way': 'A Caminho',
     'collected': 'Coletado',
     'collected_for_diagnosis': 'Coletado para Diagnóstico',
@@ -19,6 +18,7 @@ export const translateStatus = (status: string): string => {
     'quote_approved': 'Orçamento Aprovado',
     'in_progress': 'Em Reparo',
     'ready_for_delivery': 'Pronto para Entrega',
+    'delivery_scheduled': 'Entrega Agendada',
     'collected_for_delivery': 'Coletado para Entrega',
     'scheduled_for_delivery': 'Agendado para Entrega',
     'out_for_delivery': 'Saiu para Entrega',

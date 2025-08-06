@@ -26,7 +26,7 @@ export const equipmentReceiptService = {
 
       // 1. Buscar informações da oficina
       const { data: workshopUser, error: workshopError } = await supabase
-        .from('users')
+        .from('profiles')
         .select('name')
         .eq('id', workshopUserId)
         .eq('role', 'workshop')
@@ -38,12 +38,14 @@ export const equipmentReceiptService = {
       }
 
       // 2. Atualizar status da ordem de serviço e associar à oficina
+      // Nota: Não definimos workshop_id devido à constraint FK que referencia tabela users
+      // Usamos apenas workshop_name para identificar a oficina
       const { error: updateError } = await supabase
         .from('service_orders')
         .update({
           status: 'received_at_workshop',
-          workshop_id: workshopUserId,
-          workshop_name: workshopUser.name
+          workshop_name: workshopUser.name,
+          current_location: 'workshop'
         })
         .eq('id', serviceOrderId);
 
@@ -111,9 +113,9 @@ export const equipmentReceiptService = {
     try {
       console.log('🎯 [equipmentReceiptService] Buscando equipamentos pendentes para oficina:', workshopUserId);
 
-      // Por enquanto, buscar todas as ordens com status 'at_workshop'
-      // TODO: Implementar associação específica de oficinas quando o sistema estiver mais maduro
-      const { data: orders, error } = await supabase
+      // Buscar ordens com status 'at_workshop' que foram associadas a esta oficina
+      // Primeiro, buscar pelo workshop_id se existir
+      let query = supabase
         .from('service_orders')
         .select(`
           id,
@@ -124,18 +126,39 @@ export const equipmentReceiptService = {
           status,
           created_at,
           scheduled_date,
-          description
+          description,
+          workshop_id,
+          workshop_name,
+          notes
         `)
         .eq('status', 'at_workshop')
         .eq('current_location', 'workshop');
+
+      // Filtrar por oficina específica se workshop_id estiver definido
+      const { data: orders, error } = await query.or(`workshop_id.eq.${workshopUserId},workshop_id.is.null`);
 
       if (error) {
         console.error('❌ Erro ao buscar equipamentos pendentes:', error);
         throw error;
       }
 
-      console.log(`✅ [equipmentReceiptService] ${orders?.length || 0} equipamentos pendentes encontrados`);
-      return orders || [];
+      // Se workshop_id for null, verificar nas notes se a oficina foi mencionada
+      const filteredOrders = orders?.filter(order => {
+        if (order.workshop_id === workshopUserId) {
+          return true; // Associação direta
+        }
+
+        // Se não tem workshop_id, verificar nas notes
+        if (!order.workshop_id && order.notes) {
+          return order.notes.includes(workshopUserId);
+        }
+
+        // Se não tem workshop_id nem notes, mostrar para todas as oficinas (comportamento atual)
+        return !order.workshop_id;
+      }) || [];
+
+      console.log(`✅ [equipmentReceiptService] ${filteredOrders.length} equipamentos pendentes encontrados para esta oficina`);
+      return filteredOrders;
 
     } catch (error) {
       console.error('❌ Erro ao buscar equipamentos pendentes:', error);

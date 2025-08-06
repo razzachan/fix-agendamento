@@ -70,8 +70,19 @@ export function ReportFilters({ reportType, className }: ReportFiltersProps) {
    * Status de ordens de serviço
    */
   const orderStatuses = [
+    { value: 'pending', label: 'Pendente' },
     { value: 'scheduled', label: 'Agendado' },
     { value: 'in_progress', label: 'Em Andamento' },
+    { value: 'collected', label: 'Coletado' },
+    { value: 'at_workshop', label: 'Na Oficina' },
+    { value: 'ready_for_delivery', label: 'Pronto para Entrega' },
+    { value: 'delivery_scheduled', label: 'Entrega Agendada' },
+    { value: 'collected_for_delivery', label: 'Coletado para Entrega' },
+    { value: 'diagnosis_completed', label: 'Diagnóstico Concluído' },
+    { value: 'awaiting_quote_approval', label: 'Aguardando Aprovação do Orçamento' },
+    { value: 'quote_approved', label: 'Orçamento Aprovado' },
+    { value: 'ready_for_delivery', label: 'Pronto para Entrega' },
+    { value: 'payment_pending', label: 'Pagamento Pendente' },
     { value: 'completed', label: 'Concluído' },
     { value: 'cancelled', label: 'Cancelado' }
   ];

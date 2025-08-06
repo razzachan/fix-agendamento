@@ -6,6 +6,112 @@ import { ServiceOrder } from '@/types';
 import { technicianService, scheduledServiceService } from '@/services';
 import { statusSyncService } from '@/services/synchronization/statusSyncService';
 import { isToday, parseISO, format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { formatUTCStringAsLocal } from '@/utils/timezoneUtils';
+
+/**
+ * 🎯 NOVA ABORDAGEM: Busca ordens diretamente do calendar_events (fonte da verdade)
+ * Converte eventos do calendário em formato ServiceOrder para compatibilidade
+ */
+const fetchOrdersFromCalendar = async (technicianId: string): Promise<ServiceOrder[]> => {
+  try {
+    console.log('🎯 [fetchOrdersFromCalendar] Buscando ordens do calendário para técnico:', technicianId);
+
+    const { data: calendarEvents, error } = await supabase
+      .from('calendar_events')
+      .select(`
+        id,
+        service_order_id,
+        technician_id,
+        technician_name,
+        client_id,
+        client_name,
+        client_phone,
+        equipment_type,
+        start_time,
+        end_time,
+        address,
+        description,
+        status,
+        event_type,
+        created_at
+      `)
+      .eq('technician_id', technicianId)
+      .not('status', 'eq', 'cancelled')
+      .order('start_time', { ascending: true });
+
+    if (error) {
+      console.error('❌ [fetchOrdersFromCalendar] Erro ao buscar eventos:', error);
+      return [];
+    }
+
+    console.log('📅 [fetchOrdersFromCalendar] Eventos encontrados:', calendarEvents?.length || 0);
+
+    // Converter eventos do calendário para formato ServiceOrder
+    const orders: ServiceOrder[] = (calendarEvents || []).map(event => {
+      const order: ServiceOrder = {
+        id: event.service_order_id || event.id, // Usar service_order_id se disponível, senão usar id do evento
+        clientName: event.client_name || 'Cliente não informado',
+        clientPhone: event.client_phone || '',
+        clientFullAddress: event.address || '',
+        pickupAddress: event.address || '',
+        equipmentType: event.equipment_type || 'Equipamento não especificado',
+        description: event.description || '',
+        status: mapCalendarStatusToServiceOrderStatus(event.status),
+        scheduledDate: event.start_time,
+        technicianId: event.technician_id,
+        technicianName: event.technician_name || 'Técnico',
+        clientId: event.client_id || null,
+        createdAt: event.created_at,
+        updatedAt: event.created_at,
+        priority: 'medium',
+        serviceAttendanceType: mapEventTypeToAttendanceType(event.event_type),
+        // Campos específicos do calendário
+        _calendarEventId: event.id,
+        _isFromCalendar: true
+      };
+
+      console.log(`📋 [fetchOrdersFromCalendar] Convertido: ${event.client_name} - ${event.start_time}`);
+      return order;
+    });
+
+    return orders;
+  } catch (error) {
+    console.error('❌ [fetchOrdersFromCalendar] Erro:', error);
+    return [];
+  }
+};
+
+/**
+ * Mapeia status do calendar_events para status do service_orders
+ */
+const mapCalendarStatusToServiceOrderStatus = (calendarStatus: string): string => {
+  const statusMap: Record<string, string> = {
+    'scheduled': 'scheduled',
+    'confirmed': 'scheduled',
+    'in_progress': 'in_progress',
+    'completed': 'completed',
+    'cancelled': 'cancelled',
+    'on_the_way': 'on_the_way',
+    'collected': 'collected_for_diagnosis'
+  };
+
+  return statusMap[calendarStatus] || 'scheduled';
+};
+
+/**
+ * Mapeia event_type do calendar_events para serviceAttendanceType
+ */
+const mapEventTypeToAttendanceType = (eventType: string | null): string => {
+  const typeMap: Record<string, string> = {
+    'diagnosis': 'coleta_diagnostico',
+    'collection': 'coleta_conserto',
+    'service': 'visita_tecnica',
+    'delivery': 'entrega'
+  };
+
+  return typeMap[eventType || ''] || 'visita_tecnica';
+};
 
 /**
  * Ordena as ordens do técnico por horário de agendamento do dia atual
@@ -47,102 +153,109 @@ const sortOrdersByScheduledTime = (orders: ServiceOrder[]): ServiceOrder[] => {
 
 export const useTechnicianOrders = () => {
   const { user } = useAuth();
-  const { serviceOrders, updateServiceOrder, isLoading } = useAppData();
+  const { updateServiceOrder, isLoading } = useAppData();
   const [technicianOrders, setTechnicianOrders] = useState<ServiceOrder[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [isPageLoading, setIsPageLoading] = useState(true);
-  const [technicianId, setTechnicianId] = useState<string | null>(null);
   const [scheduledServices, setScheduledServices] = useState<any[]>([]);
 
-  // Load technician data
+  // 🎯 NOVA IMPLEMENTAÇÃO: Buscar ordens do calendário usando useEffect
   useEffect(() => {
-    const loadTechnicianData = async () => {
-      if (!user?.id) {
-        console.log('❌ [useTechnicianOrders] Sem user.id:', user);
-        return;
-      }
+    if (!user?.id) {
+      console.log('🎯 [useTechnicianOrders] Usuário não disponível ainda');
+      return;
+    }
 
+    const fetchCalendarOrders = async () => {
       try {
-        console.log('🔍 [useTechnicianOrders] Buscando técnico para user.id:', user.id);
-        const technicianRecord = await technicianService.getByUserId(user.id);
-        console.log('👤 [useTechnicianOrders] Technician record encontrado:', technicianRecord);
+        console.log('🎯 [useTechnicianOrders] Buscando ordens do calendário para user:', user.email);
 
-        if (technicianRecord) {
-          console.log('✅ [useTechnicianOrders] Técnico encontrado! ID:', technicianRecord.id);
-          setTechnicianId(technicianRecord.id);
+        // 1. Buscar o technician_id na tabela technicians usando user.id
+        const { data: technicianData, error: technicianError } = await supabase
+          .from('technicians')
+          .select('id, name, user_id')
+          .eq('user_id', user.id)
+          .single();
 
-          // Carregar serviços agendados do técnico
-          console.log('📅 [useTechnicianOrders] Carregando serviços agendados...');
-          const services = await scheduledServiceService.getByTechnicianId(technicianRecord.id);
-          console.log('📅 [useTechnicianOrders] Serviços agendados carregados:', services.length);
-          setScheduledServices(services);
-        } else {
-          console.log('❌ [useTechnicianOrders] Nenhum técnico encontrado para user.id:', user.id);
+        if (technicianError) {
+          console.error('🚨 [useTechnicianOrders] Erro ao buscar technician:', technicianError);
+          setIsPageLoading(false);
+          return;
         }
+
+        if (!technicianData) {
+          console.log('🚨 [useTechnicianOrders] Nenhum técnico encontrado para user_id:', user.id);
+          setTechnicianOrders([]);
+          setIsPageLoading(false);
+          return;
+        }
+
+        console.log('🎯 [useTechnicianOrders] Técnico encontrado:', technicianData.name);
+        const technicianId = technicianData.id;
+
+        // 2. Buscar calendar_events usando o technician_id correto
+        const { data, error } = await supabase
+          .from('calendar_events')
+          .select('*')
+          .eq('technician_id', technicianId)
+          .eq('event_type', 'service')
+          .order('start_time', { ascending: true });
+
+        if (error) {
+          console.error('🚨 [useTechnicianOrders] Erro ao buscar calendar_events:', error);
+          setIsPageLoading(false);
+          return;
+        }
+
+        console.log('🎯 [useTechnicianOrders] Calendar events encontrados:', data?.length || 0);
+
+        // 3. Converter calendar events para ServiceOrders
+        if (data && data.length > 0) {
+          const serviceOrders: ServiceOrder[] = data.map((event: any) => ({
+            id: event.service_order_id || event.id,
+            clientName: event.client_name,
+            clientPhone: event.client_phone,
+            clientId: event.client_id,
+            technicianId: event.technician_id,
+            technicianName: event.technician_name,
+            scheduledDate: event.start_time,
+            scheduledTime: event.start_time,
+            address: event.address,
+            addressComplement: event.address_complement,
+            description: event.description,
+            equipmentType: event.equipment_type,
+            status: event.status,
+            isUrgent: event.is_urgent || false,
+            finalCost: event.final_cost,
+            createdAt: event.created_at,
+            updatedAt: event.updated_at,
+            // Campos adicionais
+            serviceAttendanceType: 'em_domicilio',
+            notes: '',
+            estimatedDuration: 60,
+          }));
+
+          console.log('✅ [useTechnicianOrders] ServiceOrders carregadas:', serviceOrders.length);
+          setTechnicianOrders(serviceOrders);
+        } else {
+          console.log('ℹ️ [useTechnicianOrders] Nenhum calendar event encontrado');
+          setTechnicianOrders([]);
+        }
+
+        setIsPageLoading(false);
+
       } catch (error) {
-        console.error('❌ [useTechnicianOrders] Erro ao carregar dados do técnico:', error);
-      } finally {
+        console.error('🚨 [useTechnicianOrders] Erro na busca:', error);
         setIsPageLoading(false);
       }
     };
 
-    loadTechnicianData();
+    fetchCalendarOrders();
   }, [user?.id]);
 
-  // Filter orders for the current technician
-  useEffect(() => {
-    if (technicianId) {
-      console.log('🔍 [useTechnicianOrders] === FILTRAGEM DE ORDENS ===');
-      console.log('🔍 [useTechnicianOrders] Current user ID:', user?.id);
-      console.log('🔍 [useTechnicianOrders] Current technician ID:', technicianId);
-      console.log('🔍 [useTechnicianOrders] Total service orders disponíveis:', serviceOrders.length);
 
-      // Log detalhado de todas as ordens
-      serviceOrders.forEach((order, index) => {
-        console.log(`📋 [useTechnicianOrders] Ordem ${index + 1}:`, {
-          id: order.id.substring(0, 8),
-          clientName: order.clientName,
-          technicianId: order.technicianId,
-          technicianName: order.technicianName,
-          status: order.status
-        });
-      });
 
-      const filteredOrders = serviceOrders.filter(order => {
-        const match = order.technicianId === technicianId;
-        console.log(`🔍 [useTechnicianOrders] Ordem ${order.clientName}: ${order.technicianId} === ${technicianId} ? ${match}`);
-        return match;
-      });
-
-      // Ordenar por horário de agendamento (dia atual primeiro, depois por horário)
-      const sortedOrders = sortOrdersByScheduledTime(filteredOrders);
-
-      console.log('✅ [useTechnicianOrders] Ordens filtradas e ordenadas por horário:', sortedOrders.length);
-      sortedOrders.forEach((order, index) => {
-        const scheduledInfo = order.scheduledDate
-          ? format(new Date(order.scheduledDate), 'dd/MM/yyyy HH:mm')
-          : 'Sem agendamento';
-        const isOrderToday = order.scheduledDate ? isToday(new Date(order.scheduledDate)) : false;
-
-        console.log(`✅ [useTechnicianOrders] ${index + 1}º lugar:`, {
-          id: order.id.substring(0, 8),
-          clientName: order.clientName,
-          status: order.status,
-          scheduled: scheduledInfo,
-          isToday: isOrderToday ? '🔥 HOJE' : '📅 Outro dia'
-        });
-      });
-
-      setTechnicianOrders(sortedOrders);
-
-      if (!selectedOrderId && sortedOrders.length > 0) {
-        setSelectedOrderId(sortedOrders[0].id);
-        console.log('✅ [useTechnicianOrders] Primeira ordem selecionada (por horário):', sortedOrders[0].id.substring(0, 8));
-      }
-    } else {
-      console.log('❌ [useTechnicianOrders] Sem technicianId para filtrar ordens');
-    }
-  }, [serviceOrders, technicianId, user?.id]);
+  // ✅ Lógica de busca de ordens movida para o primeiro useEffect
 
   // Handle order status updates with synchronization
   const handleUpdateOrderStatus = async (orderId: string, newStatus: string, notes?: string) => {
@@ -178,12 +291,12 @@ export const useTechnicianOrders = () => {
   const selectedOrder = technicianOrders.find(order => order.id === selectedOrderId);
 
   return {
-    technicianOrders,
+    orders: technicianOrders,
     selectedOrder,
     selectedOrderId,
     setSelectedOrderId,
     isLoading: isLoading || isPageLoading,
     handleUpdateOrderStatus,
-    technicianId
+    scheduledServices
   };
 };

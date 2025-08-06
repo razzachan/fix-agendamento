@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,13 +29,14 @@ import {
 import { format, addWeeks, subWeeks, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, addMonths, subMonths, subDays, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useMainCalendar } from '@/hooks/calendar/useMainCalendar';
+import { useCalendarEvents } from '@/hooks/calendar/useCalendarEvents';
 import { useAuth } from '@/contexts/AuthContext';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { CalendarEvent, CalendarViewMode } from '@/types/calendar';
 import { SLOT_COLORS } from '@/types/calendar';
 import { toast } from 'sonner';
 import CalendarViewSelector from './CalendarViewSelector';
+import CalendarLegend from './CalendarLegend';
 import MonthView from './MonthView';
 import DayView from './DayView';
 import ListView from './ListView';
@@ -44,6 +45,8 @@ import CalendarNotifications from './CalendarNotifications';
 import DragDropCalendar from './DragDropCalendar';
 import { EditOrderValueModal } from './EditOrderValueModal';
 import { scheduledServiceService } from '@/services/scheduledService';
+import '@/utils/testDragDrop'; // 🧪 Carregar testes de drag and drop
+import '@/utils/debugCalendar'; // 🔍 Carregar debug do calendário
 
 interface MainCalendarViewProps {
   className?: string;
@@ -52,8 +55,26 @@ interface MainCalendarViewProps {
 const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) => {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<CalendarViewMode>('day');
+
+  // Ler modo de visualização da URL ou usar 'month' como padrão
+  const getInitialViewMode = (): CalendarViewMode => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewParam = urlParams.get('view') as CalendarViewMode;
+    return ['month', 'week', 'day', 'list'].includes(viewParam) ? viewParam : 'month';
+  };
+
+  const [viewMode, setViewMode] = useState<CalendarViewMode>(getInitialViewMode());
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('all');
+
+  // Função para atualizar modo de visualização e URL
+  const handleViewModeChange = useCallback((newViewMode: CalendarViewMode) => {
+    setViewMode(newViewMode);
+
+    // Atualizar URL sem recarregar a página
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', newViewMode);
+    window.history.replaceState({}, '', url.toString());
+  }, []);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isEditValueModalOpen, setIsEditValueModalOpen] = useState(false);
@@ -82,8 +103,9 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
         };
       case 'list':
         return {
-          startDate: subDays(currentDate, 30),
-          endDate: addDays(currentDate, 30)
+          // 🔧 CORREÇÃO: Expandir range para incluir mais eventos
+          startDate: subDays(currentDate, 60),
+          endDate: addDays(currentDate, 60)
         };
       default:
         return {
@@ -93,28 +115,49 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
     }
   }, [currentDate, viewMode]);
 
-  const { startDate, endDate } = getDateRange();
+  const { startDate, endDate } = useMemo(() => getDateRange(), [getDateRange]);
 
+  // 🎯 NOVA ARQUITETURA - Fonte única da verdade
   const {
     events,
-    technicians,
-    isLoading,
+    loading: isLoading,
     refreshEvents,
     updateEvent,
-    getEventsForDay,
     getEventsByTimeSlot
-  } = useMainCalendar({
+  } = useCalendarEvents({
     startDate,
     endDate,
-    technicianId: selectedTechnicianId,
-    user
+    technicianId: selectedTechnicianId
   });
+
+  // Buscar técnicos separadamente (apenas para admins)
+  const [technicians, setTechnicians] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadTechnicians = async () => {
+      if (user?.role === 'admin') {
+        try {
+          const techsData = await technicianService.getAll();
+          setTechnicians(techsData);
+        } catch (error) {
+          console.error('Erro ao carregar técnicos:', error);
+        }
+      }
+    };
+
+    loadTechnicians();
+  }, [user?.role]);
+
+  // Função de compatibilidade para getEventsForDay
+  const getEventsForDay = useCallback((date: Date) => {
+    return events.filter(event => isSameDay(event.startTime, date));
+  }, [events]);
 
   // Horários de trabalho (6h às 18h, incluindo slot do almoço para separação visual)
   const workHours = [
     6, 7, 8, 9, 10, 11, // Manhã (expandido para incluir 6h e 7h)
     12, // Almoço (separação visual)
-    13, 14, 15, 16, 17 // Tarde
+    13, 14, 15, 16, 17, 18 // Tarde (incluindo 18h para eventos UTC)
   ];
 
   // Dias da semana atual
@@ -162,52 +205,31 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
 
   // Função para atualizar evento (drag & drop)
   const handleEventUpdate = useCallback(async (eventId: string, newStartTime: Date) => {
-    console.warn(`🔄 [MAIN UPDATE] Atualizando ${eventId} para ${newStartTime.toISOString()}`);
-
-    // 1. ATUALIZAÇÃO OTIMISTA - Atualizar interface imediatamente
-    const newEndTime = new Date(newStartTime.getTime() + 60 * 60 * 1000); // +1 hora
-    updateEvent(eventId, {
-      startTime: newStartTime,
-      endTime: newEndTime
-    });
-    console.warn(`🔄 [MAIN UPDATE] Interface atualizada otimisticamente`);
-
-    // Forçar re-render do calendário
-    setRefreshKey(prev => prev + 1);
+    console.log(`🔄 [MainCalendarView] Atualizando evento ${eventId} para ${newStartTime.toISOString()}`);
 
     try {
-      // 2. SALVAR NO BANCO DE DADOS
-      const updatedService = await scheduledServiceService.updateServiceDateTime(eventId, newStartTime);
+      // Calcular horário de fim (1 hora depois)
+      const newEndTime = new Date(newStartTime.getTime() + 60 * 60 * 1000);
 
-      if (!updatedService) {
-        throw new Error('Falha ao atualizar serviço no banco de dados');
-      }
+      console.log(`🔄 [MainCalendarView] Horários: ${newStartTime.toISOString()} até ${newEndTime.toISOString()}`);
 
-      console.warn('✅ [MAIN UPDATE] Serviço atualizado no banco!');
+      // 🎯 NOVA ARQUITETURA - useCalendarEvents salva no banco e recarrega
+      await updateEvent(eventId, {
+        startTime: newStartTime,
+        endTime: newEndTime
+      });
 
-      // 3. SINCRONIZAR COM BACKEND (em background)
-      setTimeout(async () => {
-        try {
-          await refreshEvents();
-          console.warn('✅ [MAIN UPDATE] Dados sincronizados com backend');
-        } catch (syncError) {
-          console.warn('⚠️ [MAIN UPDATE] Erro na sincronização (interface já atualizada):', syncError);
-        }
-      }, 1000);
+      console.log('✅ [MainCalendarView] Evento atualizado com sucesso');
 
-      console.warn('✅ [MAIN UPDATE] Update completed - INTERFACE E BANCO ATUALIZADOS!');
+      // Forçar re-render do calendário para garantir atualização visual
+      setRefreshKey(prev => prev + 1);
+
     } catch (error) {
-      console.error('❌ [MAIN UPDATE] Erro ao atualizar agendamento:', error);
-
-      // 4. REVERTER ATUALIZAÇÃO OTIMISTA EM CASO DE ERRO
-      console.warn('🔄 [MAIN UPDATE] Revertendo mudança na interface...');
-      await refreshEvents(); // Recarregar dados originais
-
-      // Mostrar toast de erro
-      toast.error('❌ Erro ao atualizar agendamento no banco de dados');
-      throw error; // Re-throw para que o DragDropCalendar saiba que houve erro
+      console.error('❌ [MainCalendarView] Erro ao atualizar evento:', error);
+      // O erro já foi tratado pelo useCalendarEvents
+      throw error;
     }
-  }, [refreshEvents, updateEvent]);
+  }, [updateEvent]);
 
   // Abrir modal de evento
   const handleEventClick = (event: CalendarEvent) => {
@@ -236,7 +258,7 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
 
   // Atalhos de teclado
   useKeyboardShortcuts({
-    onViewChange: setViewMode,
+    onViewChange: handleViewModeChange,
     onNavigate: (direction) => {
       switch (direction) {
         case 'prev':
@@ -295,12 +317,39 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
 
   // Renderizar evento no calendário
   const renderCalendarEvent = (event: CalendarEvent, index: number) => {
+
     const statusColors = {
-      confirmed: 'bg-blue-100 border-blue-300 text-blue-800',
-      suggested: 'bg-yellow-100 border-yellow-300 text-yellow-800',
-      completed: 'bg-green-100 border-green-300 text-green-800',
-      cancelled: 'bg-red-100 border-red-300 text-red-800',
-      in_progress: 'bg-orange-100 border-orange-300 text-orange-800'
+      // 🔵 AZUL - Agendado/Confirmado
+      scheduled: 'bg-blue-200 border-blue-400 text-blue-900',
+      confirmed: 'bg-blue-200 border-blue-400 text-blue-900',
+
+      // 🟣 ROXO - Em trânsito/coleta ("À caminho")
+      on_the_way: 'bg-purple-200 border-purple-400 text-purple-900',
+      in_progress: 'bg-purple-200 border-purple-400 text-purple-900',
+
+      // 🟠 LARANJA - Na oficina (recebido)
+      at_workshop: 'bg-orange-200 border-orange-400 text-orange-900',
+
+      // 🔵 CIANO - Em diagnóstico
+      diagnosis: 'bg-cyan-200 border-cyan-400 text-cyan-900',
+
+      // 🟡 AMARELO - Aguardando aprovação do cliente
+      awaiting_approval: 'bg-yellow-200 border-yellow-400 text-yellow-900',
+
+      // 🟢 VERDE - Orçamento aprovado / Em reparo
+      in_repair: 'bg-green-200 border-green-400 text-green-900',
+
+      // 🔷 AZUL ESCURO - Pronto para entrega
+      ready_delivery: 'bg-indigo-200 border-indigo-400 text-indigo-900',
+
+      // ✅ VERDE ESCURO - Concluído
+      completed: 'bg-emerald-200 border-emerald-400 text-emerald-900',
+
+      // 🔴 VERMELHO - Cancelado
+      cancelled: 'bg-red-200 border-red-400 text-red-900',
+
+      // 🟡 AMARELO CLARO - Sugerido
+      suggested: 'bg-amber-200 border-amber-400 text-amber-900'
     };
 
     const urgencyIcon = event.isUrgent ? (
@@ -313,10 +362,10 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
         className={`
           p-1 rounded-md border-l-4 cursor-pointer transition-all duration-200
           hover:shadow-md hover:scale-[1.02] text-xs relative z-20
-          ${statusColors[event.status] || statusColors.confirmed}
+          ${statusColors[event.status] || statusColors.scheduled}
         `}
         onClick={() => handleEventClick(event)}
-        title={`${event.clientName} - ${event.equipment} - ${format(event.startTime, 'HH:mm')}`}
+        title={`${event.equipment} - ${event.clientName} - ${format(event.startTime, 'HH:mm')}`}
         style={{
           minHeight: '35px',
           marginBottom: '1px'
@@ -330,6 +379,17 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
                 {event.clientName}
               </span>
             </div>
+
+            {/* ✅ Telefone do Cliente - Logo após o nome */}
+            {event.clientPhone && (
+              <div className="flex items-center gap-1 mb-1">
+                <Phone className="h-3 w-3 text-blue-600" />
+                <span className="text-xs font-medium text-blue-700">
+                  {event.clientPhone}
+                </span>
+              </div>
+            )}
+
             <div className="text-xs opacity-75 truncate">
               {event.equipment}
             </div>
@@ -346,16 +406,6 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
                 <DollarSign className="h-3 w-3 text-emerald-600" />
                 <span className="text-xs font-semibold text-emerald-700">
                   R$ {event.finalCost.toFixed(2)}
-                </span>
-              </div>
-            )}
-
-            {/* ✅ Telefone do Cliente - Design Limpo */}
-            {event.clientPhone && (
-              <div className="flex items-center gap-1 mt-1">
-                <Phone className="h-3 w-3 text-blue-600" />
-                <span className="text-xs font-medium text-blue-700">
-                  {event.clientPhone}
                 </span>
               </div>
             )}
@@ -390,7 +440,7 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
                 {/* Seletor de visualização */}
                 <CalendarViewSelector
                   currentView={viewMode}
-                  onViewChange={setViewMode}
+                  onViewChange={handleViewModeChange}
                 />
 
                 {/* Seletor de técnico */}
@@ -492,6 +542,9 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
             </div>
           </CardHeader>
         </Card>
+
+        {/* Legenda de cores */}
+        <CalendarLegend />
 
         {/* Analytics (se habilitado) */}
         <AnimatePresence>
@@ -597,6 +650,7 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
                 currentDate={currentDate}
                 events={events}
                 onEventClick={handleEventClick}
+                getEventsByTimeSlot={getEventsByTimeSlot}
               />
             )}
 
@@ -845,17 +899,28 @@ const MainCalendarView: React.FC<MainCalendarViewProps> = ({ className = '' }) =
                 <Badge
                   variant="outline"
                   className={
-                    selectedEvent.status === 'confirmed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                    selectedEvent.status === 'scheduled' || selectedEvent.status === 'confirmed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                     selectedEvent.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
-                    selectedEvent.status === 'suggested' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                    selectedEvent.status === 'in_progress' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                    'bg-red-50 text-red-700 border-red-200'
+                    selectedEvent.status === 'on_the_way' || selectedEvent.status === 'in_progress' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                    selectedEvent.status === 'at_workshop' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                    selectedEvent.status === 'awaiting_approval' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                    selectedEvent.status === 'in_repair' ? 'bg-green-50 text-green-700 border-green-200' :
+                    selectedEvent.status === 'ready_delivery' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                    selectedEvent.status === 'cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
+                    'bg-gray-50 text-gray-700 border-gray-200'
                   }
                 >
-                  {selectedEvent.status === 'confirmed' ? 'Confirmado' :
+                  {selectedEvent.status === 'scheduled' ? 'Agendado' :
+                   selectedEvent.status === 'confirmed' ? 'Confirmado' :
+                   selectedEvent.status === 'on_the_way' ? 'A Caminho' :
+                   selectedEvent.status === 'in_progress' ? 'Em Andamento' :
+                   selectedEvent.status === 'at_workshop' ? 'Na Oficina' :
+                   selectedEvent.status === 'diagnosis' ? 'Em Diagnóstico' :
+                   selectedEvent.status === 'awaiting_approval' ? 'Aguardando Aprovação' :
+                   selectedEvent.status === 'in_repair' ? 'Em Reparo' :
+                   selectedEvent.status === 'ready_delivery' ? 'Pronto p/ Entrega' :
                    selectedEvent.status === 'completed' ? 'Concluído' :
-                   selectedEvent.status === 'suggested' ? 'Sugerido' :
-                   selectedEvent.status === 'in_progress' ? 'Em Progresso' : 'Cancelado'}
+                   selectedEvent.status === 'cancelled' ? 'Cancelado' : 'Desconhecido'}
                 </Badge>
 
                 {selectedEvent.isUrgent && (

@@ -40,8 +40,8 @@ export function ClientPortal() {
     <ClientLayout>
       <div className="space-y-8">
         <WelcomeSection user={user} orders={orders} />
-        <QuickActions />
         <RecentOrders orders={orders} />
+        <QuickActions />
       </div>
     </ClientLayout>
   );

@@ -1,0 +1,25 @@
+/* Modal z-index overrides para evitar conflitos */
+
+/* Forçar z-index alto para todos os modais que contenham "Capturar Fotos" */
+[data-radix-dialog-content]:has([data-testid="photo-capture-content"]) {
+  z-index: 9999 !important;
+}
+
+/* Overlay correspondente */
+[data-radix-dialog-overlay]:has(+ [data-radix-dialog-content] [data-testid="photo-capture-content"]) {
+  z-index: 9998 !important;
+}
+
+/* Fallback - qualquer modal com título contendo "Capturar Fotos" */
+[data-radix-dialog-content]:has(h2:contains("Capturar Fotos")) {
+  z-index: 9999 !important;
+}
+
+/* Solução mais direta - forçar z-index em modais de foto */
+.photo-capture-modal [data-radix-dialog-overlay] {
+  z-index: 9998 !important;
+}
+
+.photo-capture-modal [data-radix-dialog-content] {
+  z-index: 9999 !important;
+}

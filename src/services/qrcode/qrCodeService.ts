@@ -155,11 +155,11 @@ export class QRCodeService {
   /**
    * Gera imagem do QR Code
    */
-  static async generateQRCodeImage(qrCode: string, size: number = 200): Promise<string> {
+  static async generateQRCodeImage(qrCode: string, size: number = 120): Promise<string> {
     try {
       const qrDataUrl = await QRCode.toDataURL(qrCode, {
         width: size,
-        margin: 2,
+        margin: 1, // Reduzir margem para economizar espaço
         color: {
           dark: '#000000',
           light: '#FFFFFF'

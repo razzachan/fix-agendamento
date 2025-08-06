@@ -26,6 +26,20 @@ import {
 } from 'lucide-react';
 import { ClientOrder } from '@/types/client';
 import { toast } from 'sonner';
+import { ServiceOrderProgressHistory } from '@/components/ServiceOrders/ProgressHistory/ServiceOrderProgressHistory';
+import { useState } from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import QuoteApprovalCard from './QuoteApprovalCard';
 
 interface OrderDetailsModalProps {
   order: ClientOrder | null;
@@ -34,7 +48,51 @@ interface OrderDetailsModalProps {
 }
 
 export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalProps) {
+  const [isProcessing, setIsProcessing] = useState(false);
+
   if (!order) return null;
+
+  // Verificar se é um orçamento pendente de aprovação
+  const isAwaitingQuoteApproval = order.status === 'awaiting_quote_approval';
+
+  // Dados do orçamento (mock - depois vamos buscar da API)
+  const quoteData = {
+    diagnosticFee: 50.00, // Taxa de diagnóstico
+    laborCost: 120.00,    // Mão de obra
+    partsCost: 80.00,     // Peças
+    totalCost: 150.00,    // Total (diagnóstico + labor + peças - diagnóstico como mão de obra)
+    description: "Necessário substituir capacitor do motor e limpeza geral do equipamento. O diagnóstico será descontado do valor total como mão de obra.",
+    details: [
+      { item: "Taxa de diagnóstico", value: 50.00, note: "Será descontada do total" },
+      { item: "Capacitor do motor", value: 80.00, note: "Peça original" },
+      { item: "Mão de obra (limpeza e instalação)", value: 120.00, note: "Inclui desconto do diagnóstico" }
+    ]
+  };
+
+  const handleQuoteApproval = async (approved: boolean) => {
+    setIsProcessing(true);
+    try {
+      // Aqui vamos implementar a chamada para a API
+      console.log(`Orçamento ${approved ? 'aprovado' : 'rejeitado'} para ordem ${order.id}`);
+
+      // Simular delay da API
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      toast.success(
+        approved
+          ? 'Orçamento aprovado com sucesso! Iniciaremos o reparo em breve.'
+          : 'Orçamento rejeitado. Entraremos em contato para discutir outras opções.'
+      );
+
+      // Fechar modal após aprovação/rejeição
+      onClose();
+
+    } catch (error) {
+      toast.error('Erro ao processar resposta do orçamento. Tente novamente.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -195,34 +253,21 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
             </Card>
           )}
 
-          {/* Timeline de Progresso */}
-          {order.timeline && order.timeline.length > 0 && (
-            <Card>
-              <CardContent className="p-6">
-                <h4 className="font-semibold mb-4 flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-[#E5B034]" />
-                  Histórico do Serviço
-                </h4>
-                <div className="space-y-4">
-                  {order.timeline.map((event, index) => (
-                    <div key={index} className="flex items-start gap-4">
-                      <div className="flex-shrink-0 w-3 h-3 bg-[#E5B034] rounded-full mt-2"></div>
-                      <div className="flex-1">
-                        <p className="font-medium">{event.description}</p>
-                        <p className="text-sm text-gray-600">
-                          {new Date(event.date).toLocaleDateString('pt-BR')} às{' '}
-                          {new Date(event.date).toLocaleTimeString('pt-BR', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+          {/* Seção de Orçamento - Apenas quando aguardando aprovação */}
+          {isAwaitingQuoteApproval && (
+            <QuoteApprovalCard
+              order={order as any}
+              onQuoteResponse={handleQuoteApproval}
+            />
           )}
+
+          {/* Histórico de Progresso usando componente reutilizável */}
+          <ServiceOrderProgressHistory
+            serviceOrderId={order.id}
+            currentStatus={order.status}
+            showActions={false}
+            title="Histórico do Equipamento"
+          />
 
           {/* Informações de Custo */}
           {order.finalCost && order.finalCost > 0 && (

@@ -149,22 +149,44 @@ export function useNotificationsRealtime() {
     let userId = user.id;
 
     if (user.id === 'admin-demo-id') {
-      const { data: adminUser } = await supabase
-        .from('users')
+      // Tentar profiles primeiro, depois users como fallback
+      let { data: adminUser } = await supabase
+        .from('profiles')
         .select('id')
         .eq('role', 'admin')
         .limit(1)
         .single();
 
+      if (!adminUser) {
+        const { data: adminUserFallback } = await supabase
+          .from('users')
+          .select('id')
+          .eq('role', 'admin')
+          .limit(1)
+          .single();
+        adminUser = adminUserFallback;
+      }
+
       userId = adminUser?.id || '00000000-0000-0000-0000-000000000001';
     } else if (user.role === 'client' || user.id.includes('betoni-demo-id')) {
-      // Para clientes, buscar o user_id correspondente na tabela users
-      const { data: clientUser } = await supabase
-        .from('users')
+      // Para clientes, buscar o user_id correspondente na tabela profiles primeiro
+      let { data: clientUser } = await supabase
+        .from('profiles')
         .select('id')
         .eq('email', user.email)
         .eq('role', 'client')
         .single();
+
+      // Fallback para users se não encontrar em profiles
+      if (!clientUser) {
+        const { data: clientUserFallback } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', user.email)
+          .eq('role', 'client')
+          .single();
+        clientUser = clientUserFallback;
+      }
 
       if (clientUser) {
         userId = clientUser.id;
@@ -284,7 +306,7 @@ export function useNotificationsRealtime() {
       if (user.id === 'admin-demo-id') {
         // Buscar admin real do banco
         const { data: adminUser, error: adminError } = await supabase
-          .from('users')
+          .from('profiles')
           .select('id')
           .eq('role', 'admin')
           .limit(1)
@@ -297,9 +319,9 @@ export function useNotificationsRealtime() {
           userId = adminUser.id;
         }
       } else if (user.role === 'client' || user.id.includes('betoni-demo-id')) {
-        // Para clientes, buscar o user_id correspondente na tabela users
+        // Para clientes, buscar o user_id correspondente na tabela profiles
         const { data: clientUser } = await supabase
-          .from('users')
+          .from('profiles')
           .select('id')
           .eq('email', user.email)
           .eq('role', 'client')
@@ -352,7 +374,7 @@ export function useNotificationsRealtime() {
       if (user.id === 'admin-demo-id') {
         // Buscar admin real do banco
         const { data: adminUser, error: adminError } = await supabase
-          .from('users')
+          .from('profiles')
           .select('id')
           .eq('role', 'admin')
           .limit(1)
@@ -365,9 +387,9 @@ export function useNotificationsRealtime() {
           userId = adminUser.id;
         }
       } else if (user.role === 'client' || user.id.includes('betoni-demo-id')) {
-        // Para clientes, buscar o user_id correspondente na tabela users
+        // Para clientes, buscar o user_id correspondente na tabela profiles
         const { data: clientUser } = await supabase
-          .from('users')
+          .from('profiles')
           .select('id')
           .eq('email', user.email)
           .eq('role', 'client')

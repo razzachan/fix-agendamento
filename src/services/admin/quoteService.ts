@@ -95,16 +95,23 @@ export const quoteService = {
         labor_cost: quoteData.laborCost,
         parts_cost: quoteData.partsCost,
         total_cost: quoteData.totalCost,
+        estimated_cost: quoteData.totalCost, // ✅ Adicionar estimated_cost
         estimated_days: quoteData.estimatedDays,
         notes: quoteData.notes || '',
         valid_until: quoteData.validUntil,
         created_by: adminUserId
       });
 
+      console.log('🔍 [quoteService] Dados do orçamento a serem salvos:', {
+        serviceOrderId,
+        quoteDescription,
+        totalCost: quoteData.totalCost
+      });
+
       const { error: eventError } = await supabase
         .rpc('insert_service_event', {
           p_service_order_id: serviceOrderId,
-          p_type: 'quote_created',
+          p_type: 'diagnosis', // ✅ Mudar para 'diagnosis' para ser encontrado pelo clientOrderService
           p_created_by: adminUserId,
           p_description: quoteDescription
         });
@@ -114,15 +121,44 @@ export const quoteService = {
         throw eventError;
       }
 
-      // 2. Atualizar status da ordem para 'quote_sent'
-      const { error: updateError } = await supabase
+      // 2. Atualizar status da ordem para 'awaiting_quote_approval'
+      const { data: updatedOrder, error: updateError } = await supabase
         .from('service_orders')
-        .update({ status: 'quote_sent' })
-        .eq('id', serviceOrderId);
+        .update({
+          status: 'awaiting_quote_approval',
+          final_cost: quoteData.totalCost // ✅ Salvar também no final_cost
+        })
+        .eq('id', serviceOrderId)
+        .select()
+        .single();
 
       if (updateError) {
         console.error('❌ Erro ao atualizar status da ordem:', updateError);
         throw updateError;
+      }
+
+      // 3. Disparar notificações de orçamento enviado
+      if (updatedOrder) {
+        const { notificationTriggers } = await import('@/services/notifications/notificationTriggers');
+        const { mapServiceOrder } = await import('@/services/serviceOrder/queries/mapServiceOrder');
+
+        const serviceOrder = mapServiceOrder(updatedOrder);
+
+        // Adicionar dados do orçamento ao contexto
+        const quoteContext = {
+          totalCost: quoteData.totalCost,
+          estimatedDays: quoteData.estimatedDays,
+          laborCost: quoteData.laborCost,
+          partsCost: quoteData.partsCost,
+          validUntil: quoteData.validUntil
+        };
+
+        await notificationTriggers.onStatusChanged(
+          serviceOrder,
+          'diagnosis_completed',
+          'awaiting_quote_approval',
+          quoteContext
+        );
       }
 
       console.log('✅ [quoteService] Orçamento criado com sucesso');
@@ -142,7 +178,7 @@ export const quoteService = {
     try {
       console.log('🎯 [quoteService] Buscando orçamentos pendentes');
 
-      // Buscar ordens com status 'quote_sent'
+      // Buscar ordens com status 'awaiting_quote_approval'
       const { data: orders, error } = await supabase
         .from('service_orders')
         .select(`
@@ -155,7 +191,7 @@ export const quoteService = {
           created_at,
           description
         `)
-        .eq('status', 'quote_sent');
+        .eq('status', 'awaiting_quote_approval');
 
       if (error) {
         console.error('❌ Erro ao buscar orçamentos pendentes:', error);
@@ -203,7 +239,8 @@ export const quoteService = {
   async approveQuoteManually(
     serviceOrderId: string,
     adminUserId: string,
-    notes: string
+    notes: string,
+    estimatedCompletionDate?: string
   ): Promise<boolean> {
     try {
       console.log('🎯 [quoteService] Aprovando orçamento manualmente:', {
@@ -213,7 +250,13 @@ export const quoteService = {
       });
 
       // 1. Criar evento de aprovação manual
-      const approvalDescription = `Orçamento aprovado manualmente pelo admin. ${notes}`;
+      const approvalData = {
+        approval_notes: notes,
+        estimated_completion_date: estimatedCompletionDate || null,
+        approved_by: adminUserId,
+        approval_date: new Date().toISOString()
+      };
+      const approvalDescription = JSON.stringify(approvalData);
 
       const { error: eventError } = await supabase
         .rpc('insert_service_event', {

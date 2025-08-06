@@ -47,13 +47,46 @@ const MonthView: React.FC<MonthViewProps> = ({
     return events.filter(event => isSameDay(event.startTime, date));
   };
 
-  const getEventColor = (status: string) => {
+  const getEventColor = (status: string, eventType?: string) => {
+    // Cores específicas por tipo de evento
+    if (eventType === 'delivery') {
+      switch (status) {
+        case 'scheduled': return 'bg-blue-100 text-blue-700 border-blue-200';
+        case 'on_the_way': return 'bg-blue-200 text-blue-800 border-blue-300';
+        case 'completed': return 'bg-blue-300 text-blue-900 border-blue-400';
+        default: return 'bg-blue-50 text-blue-600 border-blue-100';
+      }
+    }
+
+    if (eventType === 'collection') {
+      switch (status) {
+        case 'scheduled': return 'bg-green-100 text-green-700 border-green-200';
+        case 'on_the_way': return 'bg-green-200 text-green-800 border-green-300';
+        case 'completed': return 'bg-green-300 text-green-900 border-green-400';
+        default: return 'bg-green-50 text-green-600 border-green-100';
+      }
+    }
+
+    if (eventType === 'diagnosis') {
+      switch (status) {
+        case 'scheduled': return 'bg-purple-100 text-purple-700 border-purple-200';
+        case 'in_progress': return 'bg-purple-200 text-purple-800 border-purple-300';
+        case 'completed': return 'bg-purple-300 text-purple-900 border-purple-400';
+        default: return 'bg-purple-50 text-purple-600 border-purple-100';
+      }
+    }
+
+    // Cores padrão por status (para eventos de serviço)
     switch (status) {
-      case 'confirmed': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'completed': return 'bg-green-100 text-green-700 border-green-200';
-      case 'suggested': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      case 'scheduled': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'on_the_way': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'in_progress': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'completed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
       case 'cancelled': return 'bg-red-100 text-red-700 border-red-200';
-      case 'in_progress': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'at_workshop': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'awaiting_approval': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      case 'in_repair': return 'bg-green-100 text-green-700 border-green-200';
+      case 'ready_delivery': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
@@ -122,7 +155,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                             transition={{ delay: eventIndex * 0.1 }}
                             className={`
                               text-xs p-1 rounded cursor-pointer truncate transition-all duration-200 hover:scale-105
-                              ${getEventColor(event.status)}
+                              ${getEventColor(event.status, event.eventType)}
                             `}
                             onClick={(e) => {
                               e.stopPropagation();

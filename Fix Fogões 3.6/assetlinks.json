@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "br.com.fixfogoes.app.twa",
+        "sha256_cert_fingerprints": ["F4:A4:CC:98:E7:8A:72:26:5F:CD:FA:20:25:68:AF:B1:FD:20:95:0F:53:DA:A0:48:C2:24:0A:D9:84:51:A9:45"]
+      }
+    }]

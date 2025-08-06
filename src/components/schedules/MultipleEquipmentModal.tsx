@@ -30,6 +30,7 @@ import {
 import { toast } from 'sonner';
 import { conflictValidationService, ConflictValidationResult } from '@/services/routing/conflictValidationService';
 import { orderLifecycleService } from '@/services/orderLifecycle/OrderLifecycleService';
+import { useGoogleAdsTracking } from '@/hooks/useGoogleAdsTracking';
 
 interface EquipmentGroup {
   equipments: string[];
@@ -68,6 +69,7 @@ const MultipleEquipmentModal: React.FC<MultipleEquipmentModalProps> = ({
   const [equipmentGroups, setEquipmentGroups] = useState<EquipmentGroup[]>([]);
   const [validationResult, setValidationResult] = useState<ConflictValidationResult | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const { recordSchedulingConversion } = useGoogleAdsTracking();
 
   // Parse equipamentos e problemas
   const parseEquipamentos = (equipamentos: any): string[] => {
@@ -230,7 +232,7 @@ const MultipleEquipmentModal: React.FC<MultipleEquipmentModalProps> = ({
       } else {
         // Usar orderLifecycleService diretamente
         const firstGroup = equipmentGroups[0];
-        await orderLifecycleService.createServiceOrderFromAgendamento(
+        const result = await orderLifecycleService.createServiceOrderFromAgendamento(
           agendamento.id,
           firstGroup?.attendanceType || 'em_domicilio',
           scheduledDate,
@@ -241,6 +243,14 @@ const MultipleEquipmentModal: React.FC<MultipleEquipmentModalProps> = ({
         );
 
         toast.success('Ordem de serviço criada com sucesso!');
+
+        // Registrar conversão de agendamento no Google Ads
+        if (result?.serviceOrder) {
+          await recordSchedulingConversion(
+            result.serviceOrder.id,
+            firstGroup?.estimatedValue || 0
+          );
+        }
 
         if (onOrdersCreated) {
           onOrdersCreated();

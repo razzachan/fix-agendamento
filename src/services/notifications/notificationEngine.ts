@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ServiceOrder, UserRole } from '@/types';
 import { translateServiceType, formatDateBR } from '@/utils/translations';
+import { getDisplayNumber } from '@/utils/orderNumberUtils';
 
 export interface NotificationTemplate {
   id: string;
@@ -23,7 +24,9 @@ export type NotificationEvent =
   | 'equipment_collected'
   | 'equipment_at_workshop'
   | 'diagnosis_completed'
+  | 'quote_sent'
   | 'quote_approved'
+  | 'quote_rejected'
   | 'repair_completed'
   | 'payment_received'
   | 'order_completed'
@@ -137,6 +140,28 @@ export class NotificationEngine {
       channels: ['in_app']
     },
 
+    // Orçamento enviado (aguardando aprovação)
+    {
+      id: 'quote_sent_admin',
+      event: 'quote_sent',
+      roles: ['admin'],
+      title: '💰 Orçamento aguardando aprovação',
+      description: 'Orçamento para {clientName} - {equipmentType} {equipmentModel} está aguardando aprovação do cliente. Valor: R$ {totalCost}. Prazo: {estimatedDays} dias. OS #{serviceOrderId}',
+      type: 'warning',
+      priority: 'high',
+      channels: ['in_app']
+    },
+    {
+      id: 'quote_sent_client',
+      event: 'quote_sent',
+      roles: ['client'],
+      title: '💰 Orçamento disponível',
+      description: 'Orçamento para seu {equipmentType} {equipmentModel} está pronto. Valor: R$ {totalCost}. Prazo: {estimatedDays} dias. Acesse para aprovar ou rejeitar. OS #{serviceOrderId}',
+      type: 'info',
+      priority: 'high',
+      channels: ['in_app', 'sms', 'email']
+    },
+
     // Orçamento aprovado
     {
       id: 'quote_approved_workshop',
@@ -144,6 +169,30 @@ export class NotificationEngine {
       roles: ['workshop'],
       title: 'Orçamento aprovado',
       description: 'Orçamento para {equipmentType} {equipmentModel} de {clientName} foi aprovado. Valor: R$ {approvedAmount}. Iniciar reparo imediatamente. OS #{serviceOrderId}',
+      type: 'success',
+      priority: 'high',
+      channels: ['in_app', 'email']
+    },
+
+    // Orçamento rejeitado
+    {
+      id: 'quote_rejected_workshop',
+      event: 'quote_rejected',
+      roles: ['workshop'],
+      title: 'Orçamento rejeitado',
+      description: 'Orçamento para {equipmentType} {equipmentModel} de {clientName} foi rejeitado pelo cliente. Feche o equipamento para entrega. OS #{serviceOrderId}',
+      type: 'warning',
+      priority: 'high',
+      channels: ['in_app', 'email']
+    },
+
+    // Equipamento pronto para entrega
+    {
+      id: 'equipment_ready_delivery_admin',
+      event: 'equipment_ready_delivery',
+      roles: ['admin'],
+      title: '📦 Equipamento pronto para entrega',
+      description: 'Equipamento {equipmentType} {equipmentModel} de {clientName} está pronto para entrega. Agende a entrega com o cliente. OS #{serviceOrderId}',
       type: 'success',
       priority: 'high',
       channels: ['in_app', 'email']
@@ -436,19 +485,46 @@ export class NotificationEngine {
     const order = context.serviceOrder;
 
     return message
-      .replace(/{clientName}/g, order.clientName || 'Cliente')
-      .replace(/{equipmentType}/g, order.equipmentType || 'Equipamento')
-      .replace(/{equipmentModel}/g, order.equipmentModel || '')
+      .replace(/{clientName}/g, (() => {
+        // Tentar diferentes campos de nome do cliente
+        const clientName = order.clientName || order.client_name || order.customer_name || 'Cliente';
+        return clientName;
+      })())
+      .replace(/{equipmentType}/g, (() => {
+        // Tentar diferentes campos de tipo de equipamento
+        const equipmentType = order.equipmentType || order.equipment_type || order.service_type || 'Equipamento';
+        return equipmentType;
+      })())
+      .replace(/{equipmentModel}/g, (() => {
+        // Tentar diferentes campos de modelo do equipamento
+        const equipmentModel = order.equipmentModel || order.equipment_model || order.model || '';
+        return equipmentModel ? ` ${equipmentModel}` : '';
+      })())
       .replace(/{technicianName}/g, context.technicianName || order.technicianName || 'Técnico')
       .replace(/{workshopName}/g, context.workshopName || order.workshopName || 'Oficina')
-      .replace(/{serviceOrderId}/g, order.id?.substring(0, 8) || 'N/A')
+      .replace(/{serviceOrderId}/g, (() => {
+        // Usar a função getDisplayNumber para formatação consistente
+        const displayNumber = getDisplayNumber(order);
+
+        // Se retornou um número válido, remover o prefixo para usar apenas o número
+        if (displayNumber && displayNumber !== '#---' && displayNumber !== 'OS #---') {
+          return displayNumber.replace(/^(OS\s*#?|AG\s*#?|#)/, '');
+        }
+
+        // Fallback: usar ID abreviado mais amigável
+        return order.id?.substring(0, 8).toUpperCase() || 'N/A';
+      })())
       .replace(/{serviceType}/g, translateServiceType(order.serviceAttendanceType))
       .replace(/{clientAddress}/g, order.clientAddress || 'Endereço não informado')
       .replace(/{problemDescription}/g, order.description || 'Não informado')
       .replace(/{scheduledDate}/g, order.scheduledDate ? formatDateBR(order.scheduledDate) : 'A definir')
       .replace(/{totalAmount}/g, order.totalAmount?.toFixed(2) || '0.00')
       .replace(/{approvedAmount}/g, context.additionalData?.approvedAmount?.toFixed(2) || '0.00')
-      .replace(/{paymentAmount}/g, context.paymentAmount?.toFixed(2) || '0.00');
+      .replace(/{paymentAmount}/g, context.paymentAmount?.toFixed(2) || '0.00')
+      .replace(/{totalCost}/g, context.additionalData?.totalCost?.toFixed(2) || '0.00')
+      .replace(/{estimatedDays}/g, context.additionalData?.estimatedDays?.toString() || 'N/A')
+      .replace(/{laborCost}/g, context.additionalData?.laborCost?.toFixed(2) || '0.00')
+      .replace(/{partsCost}/g, context.additionalData?.partsCost?.toFixed(2) || '0.00');
   }
 
 

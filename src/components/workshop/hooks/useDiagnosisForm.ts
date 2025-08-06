@@ -44,8 +44,6 @@ export function useDiagnosisForm({ serviceOrderId, onSuccess }: UseDiagnosisForm
       const diagnosisData = {
         diagnosis_details: values.diagnosis_details,
         recommended_service: values.recommended_service || '',
-        estimated_cost: parseFloat(values.estimated_cost) || 0,
-        estimated_completion_date: values.estimated_completion_date || null,
         parts_purchase_link: values.parts_purchase_link || null,
       };
 

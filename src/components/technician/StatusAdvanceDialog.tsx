@@ -10,10 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Camera, CreditCard, CheckCircle, AlertTriangle, DollarSign, ArrowRight, ArrowLeft, QrCode } from 'lucide-react';
 import { PaymentStageService, PaymentStageConfig } from '@/services/payments/paymentStageService';
-import PhotoCaptureDialog from '@/components/ServiceOrders/OrdersTable/PhotoCapture/PhotoCaptureDialog';
+import { PhotoCaptureDialog } from '@/components/ServiceOrders/OrdersTable/PhotoCaptureDialog';
 import QRCodeGenerator from '@/components/qrcode/QRCodeGenerator';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useGoogleAdsTracking } from '@/hooks/useGoogleAdsTracking';
 
 interface ServiceOrder {
   id: string;
@@ -25,6 +26,7 @@ interface ServiceOrder {
   service_attendance_type: string;
   status: string;
   final_cost?: number;
+  initial_cost?: number;
   pickup_address?: string;
 }
 
@@ -70,6 +72,7 @@ export function StatusAdvanceDialog({
 
   // 🔧 MODAL QR CODE: Separar useEffect para evitar reset desnecessário do step
   const [isInitialized, setIsInitialized] = useState(false);
+  const { recordCompletionConversion, recordSecondPhaseConversion } = useGoogleAdsTracking();
 
   useEffect(() => {
     if (open && serviceOrder && !isInitialized) {
@@ -168,25 +171,47 @@ export function StatusAdvanceDialog({
   };
 
   const handlePhotoSuccess = () => {
+    console.log('🎯 [StatusAdvanceDialog] Foto capturada com sucesso');
     setPhotoCompleted(true);
     setShowPhotoDialog(false);
     toast.success('Foto adicionada com sucesso!');
 
-    // Avançar para próximo step
-    if (requiresPayment && !paymentCompleted) {
-      setStep('payment');
-    } else {
-      setStep('confirm');
-    }
+    // Reabrir modal principal após sucesso
+    setTimeout(() => {
+      console.log('🎯 [StatusAdvanceDialog] Reabrindo modal principal');
+      onOpenChange(true);
+
+      // Avançar para próximo step
+      if (requiresPayment && !paymentCompleted) {
+        setStep('payment');
+      } else {
+        setStep('confirm');
+      }
+    }, 300);
   };
 
   const handleQRCodeGenerated = () => {
-    setQrCodeCompleted(true);
-    toast.success('QR Code gerado com sucesso!');
+    console.log('🎯 [StatusAdvanceDialog] === INÍCIO handleQRCodeGenerated ===');
+    console.log('🎯 [StatusAdvanceDialog] Estado ANTES:', { qrCodeCompleted });
 
-    // NÃO avançar automaticamente - deixar o usuário ver e imprimir a etiqueta
-    // O usuário clicará em "Continuar" quando estiver pronto
-    console.log('✅ [StatusAdvanceDialog] QR Code marcado como concluído, aguardando ação do usuário');
+    try {
+      setQrCodeCompleted(true);
+      console.log('🎯 [StatusAdvanceDialog] setQrCodeCompleted(true) executado');
+
+      toast.success('QR Code gerado com sucesso! Clique em "Continuar" quando estiver pronto.');
+      console.log('🎯 [StatusAdvanceDialog] Toast exibido');
+
+      // Forçar re-render
+      setTimeout(() => {
+        console.log('🎯 [StatusAdvanceDialog] Estado DEPOIS (timeout):', { qrCodeCompleted: true });
+      }, 100);
+
+      console.log('✅ [StatusAdvanceDialog] QR Code marcado como concluído');
+    } catch (error) {
+      console.error('❌ [StatusAdvanceDialog] ERRO em handleQRCodeGenerated:', error);
+    }
+
+    console.log('🎯 [StatusAdvanceDialog] === FIM handleQRCodeGenerated ===');
   };
 
   const calculateFinalAmount = () => {
@@ -258,6 +283,38 @@ export function StatusAdvanceDialog({
 
           if (statusUpdateSuccess) {
             toast.success(`Pagamento confirmado e ordem concluída automaticamente!`);
+
+            // Verificar se é segunda fase (conserto após diagnóstico)
+            const isSecondPhase = serviceOrder.service_attendance_type === 'coleta_conserto' &&
+                                 serviceOrder.status === 'payment_pending';
+
+            if (isSecondPhase) {
+              // Para segunda fase, atualizar conversão existente
+              await recordSecondPhaseConversion(
+                serviceOrder.id,
+                serviceOrder.id, // Por enquanto usar mesmo ID, depois implementar busca da ordem pai
+                serviceOrder.final_cost || serviceOrder.initial_cost || 0,
+                serviceOrder.equipment_type,
+                {
+                  equipmentBrand: serviceOrder.equipment_brand,
+                  equipmentModel: serviceOrder.equipment_model,
+                  problemDescription: serviceOrder.client_description,
+                  clientName: serviceOrder.client_name,
+                  clientPhone: serviceOrder.client_phone,
+                  serviceAttendanceType: serviceOrder.service_attendance_type,
+                  initialCost: serviceOrder.initial_cost,
+                  technicianName: technicianName
+                }
+              );
+            } else {
+              // Conversão normal
+              await recordCompletionConversion(
+                serviceOrder.id,
+                serviceOrder.final_cost || serviceOrder.initial_cost || 0,
+                serviceOrder.equipment_type
+              );
+            }
+
             onOpenChange(false);
 
             // Reset state
@@ -412,7 +469,16 @@ export function StatusAdvanceDialog({
         )}
 
         {requiresPhoto && (!requiresQRCode || qrCodeCompleted) && !photoCompleted && (
-          <Button onClick={() => setShowPhotoDialog(true)}>
+          <Button onClick={() => {
+            console.log('🎯 [StatusAdvanceDialog] Fechando modal principal e abrindo foto');
+            // Fechar modal principal primeiro para evitar sobreposição
+            onOpenChange(false);
+            // Aguardar fechamento completo e abrir modal de foto
+            setTimeout(() => {
+              console.log('🎯 [StatusAdvanceDialog] Abrindo modal de foto');
+              setShowPhotoDialog(true);
+            }, 500);
+          }}>
             <Camera className="h-4 w-4 mr-2" />
             {hasExistingPhotos ? 'Adicionar Foto' : 'Tirar Foto'}
           </Button>
@@ -455,15 +521,40 @@ export function StatusAdvanceDialog({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-green-50 p-4 rounded-lg">
-              <p className="text-sm text-green-700 mb-2">{paymentConfig.description}</p>
-              <div className="flex justify-between items-center">
-                <span className="font-medium">Valor a Receber:</span>
-                <span className="text-xl font-bold text-green-600">
-                  R$ {paymentConfig.amount.toFixed(2)}
-                </span>
+            {/* Discriminação de valores para coleta_diagnostico */}
+            {serviceOrder?.service_attendance_type === 'coleta_diagnostico' && (
+              <div className="bg-white p-4 rounded-lg border">
+                <h5 className="font-medium text-gray-800 mb-3">💰 Discriminação de Valores:</h5>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Valor total do serviço:</span>
+                    <span className="font-medium">R$ {(serviceOrder.final_cost || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-green-600">
+                    <span>(-) Sinal já pago na coleta:</span>
+                    <span className="font-medium">- R$ {(serviceOrder.initial_cost || 350).toFixed(2)}</span>
+                  </div>
+                  <hr className="my-2" />
+                  <div className="flex justify-between text-lg font-bold text-blue-600">
+                    <span>Valor a receber na entrega:</span>
+                    <span>R$ {paymentConfig.amount.toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Para outros tipos de serviço */}
+            {serviceOrder?.service_attendance_type !== 'coleta_diagnostico' && (
+              <div className="bg-green-50 p-4 rounded-lg">
+                <p className="text-sm text-green-700 mb-2">{paymentConfig.description}</p>
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Valor a Receber:</span>
+                  <span className="text-xl font-bold text-green-600">
+                    R$ {paymentConfig.amount.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-4">
               {/* Método de Pagamento */}
@@ -858,16 +949,15 @@ export function StatusAdvanceDialog({
             workshopId: null,
             workshopName: null
                 }}
-                onQRCodeGenerated={(() => {
-                  // 🔧 MODAL CALENDÁRIO: Callback com tratamento de erro robusto
-                  try {
-                    console.log('✅ [StatusAdvanceDialog] QR Code gerado com sucesso no modal do calendário');
-                    handleQRCodeGenerated();
-                  } catch (error) {
-                    console.error('❌ [StatusAdvanceDialog] Erro no callback QR Code:', error);
-                    toast.error('Erro ao processar QR Code gerado');
-                  }
-                })}
+                onQRCodeGenerated={(qrCode) => {
+                  console.log('🎯 [StatusAdvanceDialog] onQRCodeGenerated CHAMADO com:', qrCode);
+                  console.log('🎯 [StatusAdvanceDialog] Estado atual qrCodeCompleted:', qrCodeCompleted);
+
+                  // Chamar handleQRCodeGenerated diretamente
+                  handleQRCodeGenerated();
+
+                  console.log('🎯 [StatusAdvanceDialog] handleQRCodeGenerated executado');
+                }}
               />
             </div>
           </div>
@@ -881,20 +971,63 @@ export function StatusAdvanceDialog({
           <Button variant="outline" onClick={() => setStep('requirements')}>
             Voltar
           </Button>
-          {qrCodeCompleted && (
-            <Button onClick={() => {
-              if (requiresPhoto && !photoCompleted) {
-                setShowPhotoDialog(true);
-              } else if (requiresPayment && !paymentCompleted) {
-                setStep('payment');
-              } else {
-                setStep('confirm');
-              }
-            }}>
-              <ArrowRight className="h-4 w-4 mr-2" />
-              Continuar
-            </Button>
+
+          {/* Debug info em desenvolvimento */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="flex flex-col gap-2">
+              <div className="text-xs text-gray-500">
+                QR: {qrCodeCompleted ? '✅' : '❌'} | Photo: {photoCompleted ? '✅' : '❌'} | Payment: {paymentCompleted ? '✅' : '❌'}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  console.log('🧪 [DEBUG] Forçando qrCodeCompleted = true');
+                  setQrCodeCompleted(true);
+                  toast.success('DEBUG: QR Code forçado como completo');
+                }}
+                className="text-xs"
+              >
+                🧪 DEBUG: Forçar QR Completo
+              </Button>
+            </div>
           )}
+
+          <Button
+            onClick={() => {
+              console.log('🎯 [StatusAdvanceDialog] === BOTÃO CONTINUAR CLICADO ===');
+              console.log('🎯 [StatusAdvanceDialog] qrCodeCompleted:', qrCodeCompleted);
+              console.log('🎯 [StatusAdvanceDialog] requiresPhoto:', requiresPhoto);
+              console.log('🎯 [StatusAdvanceDialog] photoCompleted:', photoCompleted);
+              console.log('🎯 [StatusAdvanceDialog] requiresPayment:', requiresPayment);
+              console.log('🎯 [StatusAdvanceDialog] paymentCompleted:', paymentCompleted);
+
+              try {
+                if (requiresPhoto && !photoCompleted) {
+                  console.log('🎯 [StatusAdvanceDialog] → Fechando modal e abrindo dialog de foto');
+                  onOpenChange(false);
+                  setTimeout(() => {
+                    console.log('🎯 [StatusAdvanceDialog] → Abrindo dialog de foto');
+                    setShowPhotoDialog(true);
+                  }, 500);
+                } else if (requiresPayment && !paymentCompleted) {
+                  console.log('🎯 [StatusAdvanceDialog] → Indo para pagamento');
+                  setStep('payment');
+                } else {
+                  console.log('🎯 [StatusAdvanceDialog] → Indo para confirmação');
+                  setStep('confirm');
+                }
+                console.log('🎯 [StatusAdvanceDialog] === AÇÃO EXECUTADA COM SUCESSO ===');
+              } catch (error) {
+                console.error('❌ [StatusAdvanceDialog] ERRO no botão Continuar:', error);
+              }
+            }}
+            disabled={!qrCodeCompleted}
+            className={qrCodeCompleted ? 'bg-green-600 hover:bg-green-700' : 'opacity-50 cursor-not-allowed'}
+          >
+            <ArrowRight className="h-4 w-4 mr-2" />
+            {qrCodeCompleted ? 'Continuar ✅' : 'Aguardando QR Code...'}
+          </Button>
         </div>
       </div>
     );
@@ -1048,7 +1181,18 @@ export function StatusAdvanceDialog({
       {/* Dialog de foto reutilizado */}
       <PhotoCaptureDialog
         open={showPhotoDialog}
-        onOpenChange={setShowPhotoDialog}
+        onOpenChange={(open) => {
+          console.log('🎯 [StatusAdvanceDialog] PhotoCaptureDialog onOpenChange:', open);
+          setShowPhotoDialog(open);
+
+          // Se fechou sem sucesso, reabrir modal principal
+          if (!open) {
+            setTimeout(() => {
+              console.log('🎯 [StatusAdvanceDialog] Reabrindo modal principal (cancelado)');
+              onOpenChange(true);
+            }, 300);
+          }
+        }}
         orderId={serviceOrder?.id || ''}
         onSuccess={handlePhotoSuccess}
       />

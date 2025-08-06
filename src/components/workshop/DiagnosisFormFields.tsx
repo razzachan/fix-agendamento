@@ -16,8 +16,6 @@ import { Link } from 'lucide-react';
 interface FormValues {
   diagnosis_details: string;
   recommended_service: string;
-  estimated_cost: string;
-  estimated_completion_date: string;
   parts_purchase_link: string;
 }
 
@@ -56,33 +54,9 @@ export function DiagnosisFormFields({ form }: DiagnosisFormFieldsProps) {
         )}
       />
 
-      <FormField
-        control={form.control}
-        name="estimated_cost"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Custo Estimado (R$)</FormLabel>
-            <FormControl>
-              <Input {...field} type="number" step="0.01" placeholder="0.00" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
 
-      <FormField
-        control={form.control}
-        name="estimated_completion_date"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Data Estimada de Conclusão</FormLabel>
-            <FormControl>
-              <Input {...field} type="date" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+
+
 
       <FormField
         control={form.control}

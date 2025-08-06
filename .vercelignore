@@ -1,0 +1,53 @@
+# Arquivos de desenvolvimento
+node_modules/
+src/
+public/test-*
+public/debug-*
+public/mobile-order-popup.html
+public/mobile-orders.html
+
+# Arquivos de teste na dist
+dist/test-*
+dist/debug-*
+dist/mobile-order-popup.html
+dist/mobile-orders.html
+
+# Arquivos de configuração desnecessários
+*.md
+*.txt
+*.bat
+*.sh
+*.py
+*.sql
+*.zip
+*.log
+
+# Documentação
+docs/
+README*
+CHANGELOG*
+LICENSE*
+
+# Arquivos temporários
+.env*
+.cache/
+.temp/
+temp/
+
+# Arquivos de backup
+backup*/
+*backup*
+*.bak
+
+# Arquivos específicos grandes
+public/icons/logos.zip
+dist/icons/logos.zip
+setup-https.js
+quick-https-setup.bat
+whatsapp-mcp.zip
+essential-icons.zip
+icons-upload.zip
+
+# Configurações do Vercel (não vão para produção)
+dist/.vercel/
+dist/vercel.json

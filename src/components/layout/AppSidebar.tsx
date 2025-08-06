@@ -169,7 +169,7 @@ const AppSidebar: React.FC = () => {
     { to: '/orders', icon: FileText, label: 'Ordens de Serviço' },
     { to: '/quotes', icon: CreditCard, label: 'Orçamentos' },
     { to: '/repairs', icon: Wrench, label: 'Reparos & Entregas' },
-    { to: '/main-calendar', icon: Calendar, label: 'Calendário' },
+    { to: '/calendar', icon: Calendar, label: 'Calendário' }, // ✅ CORREÇÃO: Usar /calendar em vez de /main-calendar
     { to: '/schedules', icon: Clock, label: 'Pré-Agendamentos' },
     { to: '/clients', icon: Users, label: 'Clientes' },
     { to: '/technicians', icon: Wrench, label: 'Técnicos' },
@@ -249,7 +249,7 @@ const AppSidebar: React.FC = () => {
 
       {/* Sidebar */}
       <aside className={`
-        sidebar ${isCollapsed ? 'collapsed' : ''}
+        sidebar ${isCollapsed ? 'collapsed' : ''} border-r border-gray-200 dark:border-gray-700
       `}>
         {/* Sidebar Header */}
         <div className="sidebar-header">
@@ -270,7 +270,7 @@ const AppSidebar: React.FC = () => {
         </div>
 
         {/* Sidebar Content */}
-        <div className="sidebar-content flex-1 p-4 overflow-y-auto">
+        <div className="sidebar-content flex-1 p-4 overflow-y-auto max-h-[calc(100vh-80px)]">
           {/* Search Form */}
           <div
             className={`search-form flex items-center gap-3 p-3 mb-6 bg-gray-100 dark:bg-gray-800 rounded-lg transition-all cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 ${isCollapsed ? 'justify-center' : ''}`}
@@ -328,7 +328,7 @@ const AppSidebar: React.FC = () => {
                       menu-link w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 group
                       ${active
                         ? 'bg-[#e5b034] text-white shadow-md'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        : 'text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                       }
                       ${isCollapsed ? 'justify-center' : 'justify-start'}
                     `}

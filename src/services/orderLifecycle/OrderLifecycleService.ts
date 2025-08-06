@@ -62,6 +62,15 @@ export class OrderLifecycleService {
 
       // 4. Criar a ordem de serviço
       const now = new Date().toISOString();
+
+      // Combinar scheduled_date e scheduled_time se fornecidos
+      let finalScheduledDate = agendamento.data_agendada || now;
+      if (serviceOrderData.scheduled_date && serviceOrderData.scheduled_time) {
+        finalScheduledDate = `${serviceOrderData.scheduled_date}T${serviceOrderData.scheduled_time}:00`;
+      } else if (serviceOrderData.scheduled_date) {
+        finalScheduledDate = serviceOrderData.scheduled_date;
+      }
+
       const osData = {
         client_name: agendamento.nome,
         client_phone: agendamento.telefone,
@@ -70,7 +79,7 @@ export class OrderLifecycleService {
         equipment_type: serviceOrderData.equipment || 'Equipamento não especificado',
         description: serviceOrderData.problem_description || 'Problema não especificado',
         status: 'scheduled',
-        scheduled_date: agendamento.data_agendada || now,
+        scheduled_date: finalScheduledDate,
         technician_id: tecnicoId,
         created_at: now,
         updated_at: now,
@@ -79,7 +88,11 @@ export class OrderLifecycleService {
         origem_agendamento_id: agendamento.id,
         logistics_group: agendamento.logistica,
         service_type: agendamento.tipo_servico,
-        ...serviceOrderData
+        // Não incluir scheduled_date e scheduled_time do serviceOrderData para evitar sobrescrita
+        priority: serviceOrderData.priority,
+        notes: serviceOrderData.notes,
+        service_attendance_type: serviceOrderData.service_attendance_type,
+        estimated_cost: serviceOrderData.estimated_cost
       };
 
       console.log('📝 Criando ordem de serviço:', osData);
@@ -97,7 +110,41 @@ export class OrderLifecycleService {
 
       console.log(`✅ Ordem de serviço criada com sucesso: ${serviceOrder.id}`);
 
-      // 4. Marcar o agendamento como convertido
+      // 5. Criar evento no calendário se tiver técnico e horário agendado
+      if (tecnicoId && finalScheduledDate && finalScheduledDate !== now) {
+        try {
+          const startTime = new Date(finalScheduledDate);
+          const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // +1 hora
+
+          const { error: calendarError } = await supabase
+            .from('calendar_events')
+            .insert({
+              service_order_id: serviceOrder.id,
+              technician_id: tecnicoId,
+              technician_name: serviceOrder.technician_name || 'Técnico',
+              client_id: clientId,
+              client_name: agendamento.nome,
+              equipment_type: serviceOrderData.equipment || 'Equipamento não especificado',
+              start_time: startTime.toISOString(),
+              end_time: endTime.toISOString(),
+              address: agendamento.endereco,
+              description: `${serviceOrderData.equipment || 'Equipamento'} - ${agendamento.nome}`,
+              status: 'scheduled',
+              event_type: serviceOrderData.attendanceType === 'coleta_diagnostico' ? 'diagnosis' :
+                         serviceOrderData.attendanceType === 'coleta_conserto' ? 'collection' : 'service'
+            });
+
+          if (calendarError) {
+            console.error('❌ Erro ao criar evento no calendário:', calendarError);
+          } else {
+            console.log(`✅ Evento criado no calendário para OS ${serviceOrder.id}`);
+          }
+        } catch (calendarError) {
+          console.error('❌ Erro ao processar evento do calendário:', calendarError);
+        }
+      }
+
+      // 6. Marcar o agendamento como convertido
       const updatedAgendamento = await agendamentosService.markAsConverted(
         agendamentoId,
         serviceOrder.id,
@@ -483,156 +530,6 @@ export class OrderLifecycleService {
       ...group,
       reasoning: `Agrupamento por tipo de atendimento: ${type} (${group.equipments.length} equipamento${group.equipments.length > 1 ? 's' : ''})`
     }));
-  }
-
-  /**
-   * Cria múltiplas ordens de serviço a partir de um pré-agendamento
-   * com múltiplos equipamentos e tipos de atendimento
-   */
-  async createMultipleServiceOrdersFromAgendamento(
-    agendamentoId: string | number,
-    equipmentGroups: Array<{
-      equipments: string[];
-      problems: string[];
-      attendanceType: 'em_domicilio' | 'coleta_conserto' | 'coleta_diagnostico';
-      technicianId?: string;
-      notes?: string;
-      estimatedValue?: number;
-    }>,
-    scheduledDate?: string,
-    scheduledTime?: string
-  ): Promise<{ serviceOrders: ServiceOrder[]; updatedAgendamento: any }> {
-    try {
-      console.log(`🚀 [createMultipleServiceOrdersFromAgendamento] Iniciando criação de múltiplas OS`);
-      console.log(`🔍 [createMultipleServiceOrdersFromAgendamento] agendamentoId:`, agendamentoId, 'tipo:', typeof agendamentoId);
-      console.log(`🔍 [createMultipleServiceOrdersFromAgendamento] equipmentGroups:`, equipmentGroups);
-
-      // Validar agendamentoId
-      if (!agendamentoId || agendamentoId === 'NaN' || (typeof agendamentoId === 'string' && agendamentoId === 'NaN')) {
-        console.error(`❌ [createMultipleServiceOrdersFromAgendamento] ID do agendamento inválido:`, agendamentoId);
-        throw new Error(`ID do agendamento inválido: ${agendamentoId}`);
-      }
-
-      // 1. Buscar o agendamento original
-      console.log(`🔍 [createMultipleServiceOrdersFromAgendamento] Buscando agendamento...`);
-      const agendamento = await agendamentosService.getById(agendamentoId);
-      if (!agendamento) {
-        console.error(`❌ [createMultipleServiceOrdersFromAgendamento] Agendamento não encontrado:`, agendamentoId);
-        throw new Error(`Agendamento ${agendamentoId} não encontrado`);
-      }
-
-      console.log(`✅ [createMultipleServiceOrdersFromAgendamento] Agendamento encontrado:`, agendamento.nome);
-
-      // 2. Validar se o agendamento pode ser convertido
-      if (agendamento.processado) {
-        throw new Error(`Agendamento ${agendamentoId} já foi processado`);
-      }
-
-      // 3. Criar ou atualizar cliente (com login automático se tiver email)
-      let clientId: string | null = null;
-      if (agendamento.nome) {
-        try {
-          const clientData = {
-            name: agendamento.nome,
-            email: agendamento.email || null,
-            phone: agendamento.telefone || null,
-            address: agendamento.endereco || null,
-            city: agendamento.cidade || null,
-            state: agendamento.estado || null,
-            zipCode: agendamento.cep || null
-          };
-
-          clientId = await createOrUpdateClient(clientData);
-          if (clientId) {
-            console.log(`✅ [createMultipleServiceOrdersFromAgendamento] Cliente criado/atualizado com ID: ${clientId}`);
-          }
-        } catch (clientError) {
-          console.error('❌ [createMultipleServiceOrdersFromAgendamento] Erro ao criar/atualizar cliente:', clientError);
-          // Continuar com a criação das OS mesmo se falhar a criação do cliente
-        }
-      }
-
-      const createdOrders: ServiceOrder[] = [];
-      const now = new Date().toISOString();
-
-      // 4. Criar uma OS para cada grupo de equipamentos
-      for (let i = 0; i < equipmentGroups.length; i++) {
-        const group = equipmentGroups[i];
-
-        console.log(`📋 Criando OS ${i + 1}/${equipmentGroups.length} para grupo:`, group);
-
-        // Preparar dados da OS
-        const osData = {
-          client_name: agendamento.nome,
-          client_phone: agendamento.telefone,
-          pickup_address: agendamento.endereco,
-          client_email: agendamento.email || null,
-          client_cpf_cnpj: agendamento.cpf || null,
-          client_id: clientId, // Vincular com o cliente criado
-          equipment_type: group.equipments.length > 1
-            ? `Múltiplos equipamentos (${group.equipments.length})`
-            : group.equipments[0],
-          description: group.problems.length > 1
-            ? group.problems.join('; ')
-            : group.problems[0],
-          status: 'scheduled',
-          scheduled_date: scheduledDate || agendamento.data_agendada || now,
-          technician_id: group.technicianId || null,
-          service_attendance_type: group.attendanceType,
-          needs_pickup: group.attendanceType.startsWith('coleta')
-        };
-
-        // Inserir OS no banco
-        const { data: newOrder, error: orderError } = await supabase
-          .from('service_orders')
-          .insert([osData])
-          .select()
-          .single();
-
-        if (orderError) {
-          throw new Error(`Erro ao criar OS ${i + 1}: ${orderError.message}`);
-        }
-
-        console.log(`✅ OS ${i + 1} criada com sucesso:`, newOrder.id);
-        createdOrders.push(newOrder as ServiceOrder);
-
-        // Salvar valor estimado na descrição da OS (não interfere no fluxo de diagnóstico)
-        if (group.estimatedValue && group.estimatedValue > 0) {
-          const paymentInfo = this.calculateFinalCostForAttendanceType(group.attendanceType, group.estimatedValue);
-
-          // Atualizar descrição com valor estimado e informações de pagamento
-          const { error: updateError } = await supabase
-            .from('service_orders')
-            .update({
-              description: `${group.problems.length > 1 ? group.problems.join('; ') : group.problems[0]} | Valor estimado: R$ ${paymentInfo.totalValue.toFixed(2)} | ${paymentInfo.paymentFlow}`
-            })
-            .eq('id', newOrder.id);
-
-          if (updateError) {
-            console.warn(`⚠️ Erro ao atualizar valor da OS ${newOrder.id}:`, updateError);
-          } else {
-            console.log(`💰 Valor estimado R$ ${paymentInfo.totalValue.toFixed(2)} salvo na OS ${newOrder.id} (${group.attendanceType}) - ${paymentInfo.paymentFlow}`);
-          }
-        }
-      }
-
-      // 4. Marcar agendamento como convertido
-      const updatedAgendamento = await agendamentosService.markAsConverted(
-        agendamento.id,
-        createdOrders[0]?.id || 'multiple_orders'
-      );
-
-      console.log(`🎉 ${createdOrders.length} ordens de serviço criadas com sucesso!`);
-
-      return {
-        serviceOrders: createdOrders,
-        updatedAgendamento
-      };
-
-    } catch (error) {
-      console.error('❌ Erro ao criar múltiplas OS:', error);
-      throw error;
-    }
   }
 
   /**

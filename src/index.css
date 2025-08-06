@@ -1,10 +1,20 @@
 
+@import './styles/technician-dashboard.css';
+@import './styles/modern-sidebar.css';
+@import './styles/modal-overrides.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import './styles/technician-dashboard.css';
-@import './styles/modern-sidebar.css';
+/* Force Tailwind to include common classes */
+.force-tailwind-classes {
+  @apply bg-white text-black p-4 m-2 flex items-center justify-center;
+  @apply bg-blue-500 text-white hover:bg-blue-600;
+  @apply border border-gray-300 rounded-lg shadow-md;
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
+  @apply w-full h-full min-h-screen;
+}
 
 @layer base {
   :root {

@@ -3,25 +3,29 @@ import { supabase } from '@/integrations/supabase/client';
 import { ScheduledService, ServiceOrder } from '@/types';
 import { format } from 'date-fns';
 
+/**
+ * 🎯 NOVA ARQUITETURA: Buscar eventos do calendário (fonte única da verdade)
+ */
 export const fetchScheduledServices = async (technicianId: string) => {
-  console.log(`Buscando serviços para o técnico ${technicianId}...`);
-  
+  console.log(`🎯 Buscando eventos do calendário para o técnico ${technicianId}...`);
+
   try {
     const { data, error } = await supabase
-      .from('scheduled_services')
+      .from('calendar_events')
       .select('*')
-      .eq('technician_id', technicianId);
+      .eq('technician_id', technicianId)
+      .order('start_time', { ascending: true });
 
     if (error) {
       console.error("Erro na consulta de serviços:", error);
       throw error;
     }
 
-    console.log(`Encontrados ${data?.length || 0} serviços agendados no banco de dados:`);
+    console.log(`Encontrados ${data?.length || 0} eventos do calendário:`);
     if (data && data.length > 0) {
-      data.forEach(service => {
-        const date = new Date(service.scheduled_start_time);
-        console.log(`- ID: ${service.id}, Data: ${format(date, 'yyyy-MM-dd HH:mm')}, Descrição: ${service.description}`);
+      data.forEach(event => {
+        const date = new Date(event.start_time);
+        console.log(`- ID: ${event.id}, Data: ${format(date, 'yyyy-MM-dd HH:mm')}, Cliente: ${event.client_name}`);
       });
     }
 

@@ -29,30 +29,39 @@ const ServiceOrdersFilters: React.FC<ServiceOrdersFiltersProps> = ({
 }) => {
   // Updated to match the ServiceOrderStatus type exactly
   const allStatuses: ServiceOrderStatus[] = [
-    'scheduled', 'scheduled_collection', 'in_progress', 'completed', 'pending', 
-    'cancelled', 'collected', 'collected_for_diagnosis',
-    'at_workshop', 'diagnosis_completed', 'ready_for_delivery',
-    'payment_pending', 'collected_for_delivery', 'on_the_way',
-    'on_the_way_to_deliver'
+    'pending', 'scheduled', 'scheduled_collection', 'in_progress', 'on_the_way',
+    'collected', 'collected_for_diagnosis', 'at_workshop', 'received_at_workshop',
+    'diagnosis_completed', 'quote_sent', 'awaiting_quote_approval', 'quote_approved',
+    'quote_rejected', 'ready_for_return', 'needs_workshop', 'ready_for_delivery',
+    'delivery_scheduled', 'collected_for_delivery', 'on_the_way_to_deliver',
+    'payment_pending', 'completed', 'cancelled'
   ];
 
   const getStatusLabel = (status: ServiceOrderStatus): string => {
     const labels: Record<ServiceOrderStatus, string> = {
+      'pending': 'Pendente',
       'scheduled': 'Agendado',
       'scheduled_collection': 'Coleta Agendada',
       'in_progress': 'Em andamento',
-      'completed': 'Concluído',
-      'pending': 'Pendente',
-      'cancelled': 'Cancelado',
+      'on_the_way': 'À Caminho',
       'collected': 'Coletado',
       'collected_for_diagnosis': 'Coletado para diagnóstico',
       'at_workshop': 'Na oficina',
+      'received_at_workshop': 'Recebido na oficina',
       'diagnosis_completed': 'Diagnóstico concluído',
+      'quote_sent': 'Orçamento enviado',
+      'awaiting_quote_approval': 'Aguardando aprovação do orçamento',
+      'quote_approved': 'Orçamento aprovado',
+      'quote_rejected': 'Orçamento rejeitado',
+      'ready_for_return': 'Pronto para devolução',
+      'needs_workshop': 'Precisa de oficina',
       'ready_for_delivery': 'Pronto para entrega',
-      'payment_pending': 'Pagamento pendente',
+      'delivery_scheduled': 'Entrega agendada',
       'collected_for_delivery': 'Coletado para entrega',
-      'on_the_way': 'À Caminho',
-      'on_the_way_to_deliver': 'À Caminho para Entrega'
+      'on_the_way_to_deliver': 'À Caminho para Entrega',
+      'payment_pending': 'Pagamento pendente',
+      'completed': 'Concluído',
+      'cancelled': 'Cancelado'
     };
     return labels[status] || status;
   };

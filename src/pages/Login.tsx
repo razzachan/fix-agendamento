@@ -13,10 +13,19 @@ const Login: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated && !isLoading && user) {
+      console.log('🔍 [Login] Redirecionando usuário autenticado:', {
+        email: user.email,
+        role: user.role,
+        isAuthenticated,
+        isLoading
+      });
+
       // Redirecionar baseado na role do usuário
       if (user.role === 'client') {
+        console.log('🔍 [Login] Redirecionando cliente para portal');
         navigate('/client/portal');
       } else {
+        console.log('🔍 [Login] Redirecionando não-cliente para dashboard');
         navigate('/dashboard');
       }
     }

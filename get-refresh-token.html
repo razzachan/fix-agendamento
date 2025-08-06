@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obter Refresh Token - Google Ads API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a73e8;
+            text-align: center;
+        }
+        .step {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #1a73e8;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #1a73e8;
+        }
+        .code {
+            background: #f1f3f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .button {
+            display: inline-block;
+            background: #1a73e8;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .button:hover {
+            background: #1557b0;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔑 Obter Refresh Token para Google Ads API</h1>
+        
+        <div class="warning">
+            <strong>⚠️ Importante:</strong> Você precisa do Client Secret que acabou de criar no Google Cloud Console.
+        </div>
+
+        <div class="step">
+            <h3>📋 Passo 1: Suas Credenciais</h3>
+            <p><strong>Client ID:</strong></p>
+            <div class="code">999231887417-8ei7ivulbasbpfelf6fqiukkf7vie153.apps.googleusercontent.com</div>
+            
+            <p><strong>Client Secret:</strong></p>
+            <input type="text" id="clientSecret" placeholder="Cole aqui o Client Secret que você criou">
+        </div>
+
+        <div class="step">
+            <h3>🔗 Passo 2: Acessar OAuth Playground</h3>
+            <p>Clique no botão abaixo para abrir o OAuth Playground:</p>
+            <a href="https://developers.google.com/oauthplayground/" target="_blank" class="button">
+                🚀 Abrir OAuth Playground
+            </a>
+        </div>
+
+        <div class="step">
+            <h3>⚙️ Passo 3: Configurar OAuth Playground</h3>
+            <p>No OAuth Playground:</p>
+            <ol>
+                <li>Clique no ícone de <strong>⚙️ Settings</strong> (canto superior direito)</li>
+                <li>Marque <strong>"Use your own OAuth credentials"</strong></li>
+                <li>Cole suas credenciais:
+                    <ul>
+                        <li><strong>OAuth Client ID:</strong> 999231887417-8ei7ivulbasbpfelf6fqiukkf7vie153.apps.googleusercontent.com</li>
+                        <li><strong>OAuth Client Secret:</strong> [O secret que você criou]</li>
+                    </ul>
+                </li>
+                <li>Clique <strong>"Close"</strong></li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>🎯 Passo 4: Selecionar Scopes</h3>
+            <p>Na seção <strong>"Step 1: Select & authorize APIs"</strong>:</p>
+            <ol>
+                <li>Procure por <strong>"Google Ads API"</strong></li>
+                <li>Selecione: <code>https://www.googleapis.com/auth/adwords</code></li>
+                <li>Clique <strong>"Authorize APIs"</strong></li>
+                <li>Faça login com sua conta Google</li>
+                <li>Autorize o acesso</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>🔄 Passo 5: Obter Refresh Token</h3>
+            <p>Na seção <strong>"Step 2: Exchange authorization code for tokens"</strong>:</p>
+            <ol>
+                <li>Clique <strong>"Exchange authorization code for tokens"</strong></li>
+                <li>Copie o <strong>"Refresh token"</strong> que aparecerá</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>📝 Passo 6: Cole o Refresh Token</h3>
+            <p><strong>Refresh Token:</strong></p>
+            <textarea id="refreshToken" placeholder="Cole aqui o Refresh Token obtido do OAuth Playground"></textarea>
+        </div>
+
+        <div class="step">
+            <h3>🚀 Passo 7: Gerar Configuração</h3>
+            <button onclick="generateConfig()" class="button">📋 Gerar Configuração .env</button>
+            
+            <div id="configOutput" style="display: none;">
+                <h4>✅ Configuração para seu .env:</h4>
+                <textarea id="envConfig" readonly style="height: 200px;"></textarea>
+                <div class="success">
+                    <strong>✅ Sucesso!</strong> Copie o conteúdo acima e substitua no seu arquivo .env
+                </div>
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>🧪 Passo 8: Testar Configuração</h3>
+            <p>Após atualizar o .env, execute:</p>
+            <div class="code">node test-google-ads-config.js</div>
+        </div>
+    </div>
+
+    <script>
+        function generateConfig() {
+            const clientSecret = document.getElementById('clientSecret').value.trim();
+            const refreshToken = document.getElementById('refreshToken').value.trim();
+            
+            if (!clientSecret) {
+                alert('❌ Por favor, insira o Client Secret');
+                return;
+            }
+            
+            if (!refreshToken) {
+                alert('❌ Por favor, insira o Refresh Token');
+                return;
+            }
+            
+            const config = `# Configurações do Google Ads API
+GOOGLE_ADS_CLIENT_ID=999231887417-8ei7ivulbasbpfelf6fqiukkf7vie153.apps.googleusercontent.com
+GOOGLE_ADS_CLIENT_SECRET=${clientSecret}
+GOOGLE_ADS_REFRESH_TOKEN=${refreshToken}
+GOOGLE_ADS_DEVELOPER_TOKEN=PENDING_APPROVAL
+GOOGLE_ADS_CUSTOMER_ID=2089607313
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=2089607313
+
+# IDs das Conversões (configurar após criar no Google Ads)
+GOOGLE_ADS_LEAD_CONVERSION_ID=
+GOOGLE_ADS_SCHEDULING_CONVERSION_ID=
+GOOGLE_ADS_COMPLETION_CONVERSION_ID=
+GOOGLE_ADS_STOVE_4_CONVERSION_ID=
+GOOGLE_ADS_STOVE_6_CONVERSION_ID=
+GOOGLE_ADS_COOKTOP_CONVERSION_ID=
+GOOGLE_ADS_OVEN_CONVERSION_ID=
+
+# Configurações de Vite para Google Ads (apenas IDs públicos)
+VITE_GOOGLE_ADS_CUSTOMER_ID=2089607313
+VITE_GOOGLE_ADS_TRACKING_ENABLED=true`;
+            
+            document.getElementById('envConfig').value = config;
+            document.getElementById('configOutput').style.display = 'block';
+            
+            // Scroll para o resultado
+            document.getElementById('configOutput').scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

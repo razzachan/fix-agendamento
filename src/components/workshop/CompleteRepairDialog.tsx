@@ -8,6 +8,7 @@ import { Loader2, CheckCircle, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { notificationTriggers } from '@/services/notifications/notificationTriggers';
 
 interface CompleteRepairDialogProps {
   open: boolean;
@@ -34,7 +35,6 @@ export function CompleteRepairDialog({
     completionNotes: '',
     warrantyPeriod: '90',
     warrantyTerms: '',
-    finalCost: '',
     qualityCheck: ''
   });
 
@@ -45,7 +45,6 @@ export function CompleteRepairDialog({
         completionNotes: '',
         warrantyPeriod: '90',
         warrantyTerms: 'Garantia de 90 dias para o serviço realizado, exceto danos causados por mau uso.',
-        finalCost: '',
         qualityCheck: 'Equipamento testado e funcionando perfeitamente.'
       });
     }
@@ -64,7 +63,6 @@ export function CompleteRepairDialog({
         completion_notes: formData.completionNotes.trim(),
         warranty_period: parseInt(formData.warrantyPeriod) || 90,
         warranty_terms: formData.warrantyTerms.trim(),
-        final_cost: formData.finalCost ? parseFloat(formData.finalCost) : null,
         quality_check: formData.qualityCheck.trim(),
         completed_by: user.id,
         completion_date: new Date().toISOString()
@@ -112,6 +110,24 @@ export function CompleteRepairDialog({
       }
 
       console.log('✅ Reparo concluído com sucesso');
+
+      // 3. Disparar notificação para admin agendar entrega
+      try {
+        // Buscar dados atualizados da ordem
+        const { data: updatedOrder } = await supabase
+          .from('service_orders')
+          .select('*')
+          .eq('id', order.id)
+          .single();
+
+        if (updatedOrder) {
+          await notificationTriggers.onStatusChanged(updatedOrder, 'in_progress', 'ready_for_delivery');
+        }
+      } catch (notificationError) {
+        console.error('⚠️ Erro ao disparar notificação de equipamento pronto:', notificationError);
+        // Não falhar o processo por causa de notificação
+      }
+
       onSuccess();
 
     } catch (error) {
@@ -193,18 +209,7 @@ export function CompleteRepairDialog({
               />
             </div>
 
-            {/* Custo Final (opcional) */}
-            <div className="space-y-2">
-              <Label htmlFor="finalCost">Custo Final (R$)</Label>
-              <Input
-                id="finalCost"
-                type="number"
-                step="0.01"
-                placeholder="Opcional"
-                value={formData.finalCost}
-                onChange={(e) => setFormData(prev => ({ ...prev, finalCost: e.target.value }))}
-              />
-            </div>
+
           </div>
 
           {/* Termos da Garantia */}

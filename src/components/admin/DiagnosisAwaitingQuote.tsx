@@ -180,12 +180,7 @@ export function DiagnosisAwaitingQuote() {
                           <p className="text-sm">{diagnosis.diagnosis.recommended_service}</p>
                         </div>
                         
-                        <div>
-                          <span className="text-sm font-medium text-gray-600">Custo Estimado:</span>
-                          <p className="text-sm font-medium text-green-600">
-                            {formatCurrency(diagnosis.diagnosis.estimated_cost)}
-                          </p>
-                        </div>
+
                       </div>
                       
                       <div className="flex items-center gap-4 text-xs text-gray-500">
@@ -193,9 +188,7 @@ export function DiagnosisAwaitingQuote() {
                           <Clock className="h-3 w-3" />
                           Diagnóstico: {formatDate(diagnosis.diagnosisDate)}
                         </div>
-                        <div>
-                          Previsão: {new Date(diagnosis.diagnosis.estimated_completion_date).toLocaleDateString('pt-BR')}
-                        </div>
+
                       </div>
                     </div>
                     

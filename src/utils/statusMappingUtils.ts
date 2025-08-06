@@ -11,8 +11,13 @@ export const SERVICE_ORDER_TO_SCHEDULED_STATUS = {
   'collected': 'in_progress',
   'at_workshop': 'in_progress',
   'received_at_workshop': 'in_progress',
+  'diagnosis_completed': 'in_progress',
+  'awaiting_quote_approval': 'in_progress',
+  'quote_approved': 'in_progress',
+  'quote_rejected': 'cancelled',
   'in_repair': 'in_progress',
-  'ready_for_delivery': 'in_progress',
+  'ready_for_delivery': 'ready_delivery',
+  'delivery_scheduled': 'ready_delivery', // ✅ NOVO: Entrega agendada
   'collected_for_delivery': 'in_progress',
   'on_the_way_to_deliver': 'in_progress',
   'payment_pending': 'in_progress',
@@ -31,13 +36,17 @@ export const SCHEDULED_TO_SERVICE_ORDER_STATUS = {
 // Status que indicam que uma ordem está ativa/em andamento
 export const ACTIVE_ORDER_STATUSES = [
   'scheduled',
-  'on_the_way', 
+  'on_the_way',
   'in_progress',
   'collected',
   'at_workshop',
   'received_at_workshop',
+  'diagnosis_completed',
+  'awaiting_quote_approval',
+  'quote_approved',
   'in_repair',
   'ready_for_delivery',
+  'delivery_scheduled',
   'collected_for_delivery',
   'on_the_way_to_deliver',
   'payment_pending'
@@ -51,10 +60,13 @@ export const SCHEDULED_ORDER_STATUSES = [
 // Status que indicam que uma ordem está em progresso ativo
 export const IN_PROGRESS_ORDER_STATUSES = [
   'on_the_way',
-  'in_progress', 
+  'in_progress',
   'collected',
   'at_workshop',
   'received_at_workshop',
+  'diagnosis_completed',
+  'awaiting_quote_approval',
+  'quote_approved',
   'in_repair',
   'ready_for_delivery',
   'collected_for_delivery',
@@ -101,7 +113,10 @@ export const isInProgressOrder = (status: string): boolean => {
 export const TECHNICIAN_ACTIVE_ORDER_STATUSES = [
   'scheduled',
   'on_the_way',
-  'in_progress'
+  'in_progress',
+  'delivery_scheduled',     // Entrega agendada - aparece para o técnico responsável pela entrega
+  'collected_for_delivery', // Coletado para entrega - em rota
+  'on_the_way_to_deliver'   // ✅ NOVO: Em rota de entrega - técnico ainda responsável
   // 'collected' NÃO está aqui - quando coletado, sai do dashboard do técnico
 ] as const;
 
@@ -123,6 +138,9 @@ export const getOrderPriority = (status: string): number => {
     'on_the_way': 2,
     'scheduled': 3,        // Agendado tem prioridade alta
     'pending': 4,
+    'diagnosis_completed': 10,
+    'awaiting_quote_approval': 11,  // Prioridade alta - precisa de ação
+    'quote_approved': 12,
     'collected': 50,       // Coletado vai para o final (baixa prioridade)
     'at_workshop': 51,
     'in_repair': 52,
@@ -131,7 +149,8 @@ export const getOrderPriority = (status: string): number => {
     'on_the_way_to_deliver': 55,
     'payment_pending': 56,
     'completed': 90,
-    'cancelled': 91
+    'cancelled': 91,
+    'quote_rejected': 92
   };
 
   return priorityMap[status] || 99;
@@ -145,8 +164,11 @@ export const getTechnicianOrderPriority = (status: string): number => {
   const priorityMap: Record<string, number> = {
     'in_progress': 1,      // Máxima prioridade
     'on_the_way': 2,
-    'scheduled': 3,
-    'pending': 4,
+    'on_the_way_to_deliver': 2, // ✅ NOVO: Em rota de entrega - mesma prioridade que on_the_way
+    'collected_for_delivery': 3, // Em rota de entrega - alta prioridade
+    'delivery_scheduled': 4, // Entrega agendada - precisa coletar na oficina
+    'scheduled': 5,
+    'pending': 6,
     'collected': 100,      // Prioridade muito baixa - quase invisível
     'at_workshop': 101,
     'completed': 200,

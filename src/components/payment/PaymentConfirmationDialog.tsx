@@ -15,6 +15,7 @@ interface ServiceOrder {
   equipment_type: string;
   equipment_model?: string;
   final_cost?: number;
+  initial_cost?: number;
   service_attendance_type: string;
 }
 
@@ -184,11 +185,12 @@ export function PaymentConfirmationDialog({
 
       if (paymentError) throw paymentError;
 
-      // 2. Atualizar status da ordem de serviço para "paid"
+      // 2. Atualizar status da ordem de serviço e payment_status
       const { error: updateError } = await supabase
         .from('service_orders')
         .update({
-          status: 'paid'
+          status: 'completed',
+          payment_status: 'completed'
         })
         .eq('id', serviceOrder.id);
 
@@ -242,11 +244,37 @@ export function PaymentConfirmationDialog({
     <div className="space-y-4">
       {/* Informações básicas do serviço */}
       <div className="bg-gray-50 p-4 rounded-lg">
-        <h4 className="font-medium mb-2 flex items-center gap-2">
+        <h4 className="font-medium mb-3 flex items-center gap-2">
           <Receipt className="h-4 w-4" />
           {serviceOrder.equipment_type} - {serviceOrder.client_name}
         </h4>
-        {finalCost > 0 && (
+
+        {/* Discriminação de valores para coleta_diagnostico */}
+        {serviceOrder.service_attendance_type === 'coleta_diagnostico' && finalCost > 0 && (
+          <div className="space-y-2 text-sm">
+            <div className="bg-white p-3 rounded border">
+              <h5 className="font-medium text-gray-800 mb-2">💰 Discriminação de Valores:</h5>
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Valor total do serviço:</span>
+                  <span className="font-medium">R$ {(serviceOrder.final_cost || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-green-600">
+                  <span>(-) Sinal já pago na coleta:</span>
+                  <span className="font-medium">- R$ {(serviceOrder.initial_cost || 350).toFixed(2)}</span>
+                </div>
+                <hr className="my-2" />
+                <div className="flex justify-between text-lg font-bold text-blue-600">
+                  <span>Valor a receber na entrega:</span>
+                  <span>R$ {finalCost.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Para outros tipos de serviço */}
+        {serviceOrder.service_attendance_type !== 'coleta_diagnostico' && finalCost > 0 && (
           <p className="text-sm text-gray-600">
             <strong>Valor a receber: R$ {finalCost.toFixed(2)}</strong>
           </p>

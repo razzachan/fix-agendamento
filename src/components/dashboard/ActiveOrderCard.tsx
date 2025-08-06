@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ServiceOrder, ServiceOrderStatus } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Clock,
   MapPin,
@@ -19,6 +20,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import NextStatusButton from '@/components/ServiceOrders/ProgressTracker/NextStatusButton';
 import { DisplayNumber } from '@/components/common/DisplayNumber';
+import { formatUTCStringAsLocal } from '@/utils/timezoneUtils';
 
 interface ActiveOrderCardProps {
   order: ServiceOrder | null;
@@ -61,6 +63,14 @@ const getStatusLabel = (status: string) => {
     'in_progress': 'Em Progresso',
     'collected': 'Coletado',
     'at_workshop': 'Na Oficina',
+    'diagnosis_completed': 'Diagnóstico Concluído',
+    'awaiting_quote_approval': 'Aguardando Aprovação',
+    'quote_approved': 'Orçamento Aprovado',
+    'ready_for_delivery': 'Pronto para Entrega',
+    'delivery_scheduled': 'Entrega Agendada',
+    'collected_for_delivery': 'Coletado para Entrega',
+    'on_the_way_to_deliver': 'Em Rota de Entrega',
+    'payment_pending': 'Aguardando Pagamento',
     'completed': 'Concluído',
     'cancelled': 'Cancelado'
   };
@@ -74,6 +84,46 @@ export const ActiveOrderCard: React.FC<ActiveOrderCardProps> = ({
   onUpdateStatus,
   className
 }) => {
+  const [correctScheduledTime, setCorrectScheduledTime] = useState<string | null>(null);
+
+  // 🎯 NOVA ARQUITETURA: Buscar horário correto de calendar_events (fonte única da verdade)
+  useEffect(() => {
+    const fetchCorrectTime = async () => {
+      if (!order?.id) return;
+
+      try {
+        // 🎯 NOVA ARQUITETURA: Buscar no calendar_events (fonte única da verdade)
+        const { data, error } = await supabase
+          .from('calendar_events')
+          .select('start_time')
+          .eq('service_order_id', order.id)
+          .single();
+
+        if (!error && data?.start_time) {
+          // Usar timezoneUtils para mostrar horário correto
+          const formattedTime = formatUTCStringAsLocal(data.start_time, 'HH:mm');
+          setCorrectScheduledTime(formattedTime);
+          console.log(`🕐 [ActiveOrderCard] Horário correto para ${order.clientName}: ${formattedTime}`);
+        } else {
+          // Fallback para service_orders.scheduledDate se não encontrar em calendar_events
+          if (order.scheduledDate) {
+            const fallbackTime = format(new Date(order.scheduledDate), 'HH:mm', { locale: ptBR });
+            setCorrectScheduledTime(fallbackTime);
+            console.warn(`⚠️ [ActiveOrderCard] Usando fallback para ${order.clientName}: ${fallbackTime}`);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao buscar horário correto:', error);
+        // Fallback em caso de erro
+        if (order.scheduledDate) {
+          const fallbackTime = format(new Date(order.scheduledDate), 'HH:mm', { locale: ptBR });
+          setCorrectScheduledTime(fallbackTime);
+        }
+      }
+    };
+
+    fetchCorrectTime();
+  }, [order?.id, order?.scheduledDate, order?.clientName]);
   if (!order) {
     return (
       <Card className={cn('transition-all duration-300', className)}>
@@ -107,10 +157,6 @@ export const ActiveOrderCard: React.FC<ActiveOrderCardProps> = ({
   const serviceFlow = getServiceFlow(validType);
   const currentStepIndex = getCurrentStepIndex(order.status, validType);
   const progress = serviceFlow.length > 0 ? ((currentStepIndex + 1) / serviceFlow.length) * 100 : 0;
-
-  const scheduledTime = order.scheduledDate 
-    ? format(new Date(order.scheduledDate), 'HH:mm', { locale: ptBR })
-    : null;
 
   return (
     <Card className={cn(
@@ -160,10 +206,10 @@ export const ActiveOrderCard: React.FC<ActiveOrderCardProps> = ({
         )}
 
         {/* Horário agendado */}
-        {scheduledTime && (
+        {correctScheduledTime && (
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{scheduledTime}</span>
+            <span className="text-sm font-medium">{correctScheduledTime}</span>
           </div>
         )}
 
@@ -238,3 +284,5 @@ export const ActiveOrderCard: React.FC<ActiveOrderCardProps> = ({
     </Card>
   );
 };
+
+export default ActiveOrderCard;

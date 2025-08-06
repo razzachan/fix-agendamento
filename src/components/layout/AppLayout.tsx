@@ -38,11 +38,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
       <AppSidebar />
-      <div className="flex-1 flex flex-col transition-all duration-300" style={{ marginLeft: 'var(--sidebar-width, 80px)' }}>
+      <div
+        className="flex-1 flex flex-col transition-all duration-300 main-content md:ml-[var(--sidebar-width,80px)] ml-0"
+      >
         {console.log('🔔 [AppLayout] Renderizando Header')}
         <Header />
         <main className="flex-1 overflow-y-auto pt-16 md:pt-4 bg-gray-50 dark:bg-gray-900">
-          <div className="w-full max-w-full sm:container sm:mx-auto mobile-safe-area px-3 sm:px-0">
+          <div className="w-full max-w-full sm:container sm:mx-auto mobile-safe-area px-1 sm:px-0">
             {children}
           </div>
         </main>

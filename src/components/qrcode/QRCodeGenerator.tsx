@@ -94,11 +94,20 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
 
       const qrCode = await generateQRCode(qrCodeRequest);
 
+      console.log('🎯 [QRCodeGenerator] QR Code gerado:', qrCode);
       setGeneratedQRCode(qrCode);
+
+      // Chamar callback IMEDIATAMENTE após gerar o QR Code
+      console.log('🎯 [QRCodeGenerator] Chamando onQRCodeGenerated callback');
       onQRCodeGenerated?.(qrCode);
 
-      // Gerar etiqueta automaticamente
-      await handleGenerateLabel(qrCode.qrCode);
+      // Gerar etiqueta automaticamente (não bloquear o callback)
+      try {
+        await handleGenerateLabel(qrCode.qrCode);
+      } catch (labelError) {
+        console.warn('⚠️ [QRCodeGenerator] Erro ao gerar etiqueta (não crítico):', labelError);
+        // Não falhar se a etiqueta der erro
+      }
 
     } catch (error) {
       console.error('❌ [QRCodeGenerator] Erro ao gerar QR Code:', error);
@@ -349,35 +358,40 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
               {/* Prévia da Etiqueta - Compacta */}
               <div className="bg-white border-2 border-dashed border-gray-300 p-2 rounded-lg">
                 <div className="text-center">
-                  <p className="text-xs text-gray-500 mb-2">📄 Prévia da Etiqueta (62mm x 29mm)</p>
+                  <p className="text-xs text-gray-500 mb-2">📄 Prévia da Etiqueta (58mm x 40mm)</p>
 
-                  {/* Layout da etiqueta - Menor */}
-                  <div className="bg-white border border-gray-400 p-2 mx-auto max-w-xs" style={{ aspectRatio: '62/29' }}>
-                    <div className="flex items-center gap-2 h-full">
-                      {/* QR Code - Menor */}
-                      <div className="flex-shrink-0">
+                  {/* Layout da etiqueta - Vertical */}
+                  <div className="bg-white border border-gray-400 p-3 mx-auto inline-block" style={{ width: '140px' }}>
+                    <div className="flex flex-col items-center text-center space-y-1">
+                      {/* QR Code - Centralizado */}
+                      <div className="mb-1">
                         <img
                           src={generatedLabel.qrCodeData}
                           alt="QR Code"
-                          className="w-12 h-12 border border-gray-300"
+                          className="border border-gray-300 mx-auto"
+                          style={{
+                            width: '48px',
+                            height: '48px',
+                            objectFit: 'contain'
+                          }}
                         />
                       </div>
 
-                      {/* Informações - Mais compactas */}
-                      <div className="flex-1 text-left space-y-0.5">
-                        <div className="text-xs font-bold text-gray-800 leading-tight">
+                      {/* Informações - Centralizadas */}
+                      <div className="space-y-0.5 w-full">
+                        <div className="text-sm font-bold text-gray-800">
                           {generatedLabel.orderNumber}
                         </div>
                         <div className="text-xs text-gray-700 leading-tight">
-                          {generatedLabel.clientName.substring(0, 15)}{generatedLabel.clientName.length > 15 ? '...' : ''}
+                          {generatedLabel.clientName.substring(0, 18)}{generatedLabel.clientName.length > 18 ? '...' : ''}
                         </div>
                         <div className="text-xs text-gray-600 leading-tight">
-                          {generatedLabel.equipmentType.substring(0, 12)}{generatedLabel.equipmentType.length > 12 ? '...' : ''}
+                          {generatedLabel.equipmentType.substring(0, 20)}{generatedLabel.equipmentType.length > 20 ? '...' : ''}
                         </div>
                         {/* 🔧 QR CODE: Mostrar problema na prévia - Filtrado */}
                         {generatedLabel.description && generatedLabel.description.trim() && (
                           <div className="text-xs text-gray-500 italic leading-tight">
-                            {(() => {
+                            Problema: {(() => {
                               // 🔧 PROBLEMA: Filtrar repetição do nome do equipamento
                               let problemText = generatedLabel.description.trim();
 
@@ -388,9 +402,9 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
                                 problemText = problemText.replace(/^[:\-\s]+/, '');
                               }
 
-                              // Limitar a 30 caracteres para a prévia
-                              return problemText.length > 30
-                                ? `${problemText.substring(0, 30)}...`
+                              // Limitar a 25 caracteres para a prévia vertical
+                              return problemText.length > 25
+                                ? `${problemText.substring(0, 25)}...`
                                 : problemText;
                             })()}
                           </div>

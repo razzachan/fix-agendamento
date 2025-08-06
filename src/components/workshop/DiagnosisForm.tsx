@@ -15,8 +15,6 @@ interface DiagnosisFormProps {
 export interface FormValues {
   diagnosis_details: string;
   recommended_service: string;
-  estimated_cost: string;
-  estimated_completion_date: string;
   parts_purchase_link: string;
 }
 
@@ -25,8 +23,6 @@ export function DiagnosisForm({ serviceOrderId, onSuccess }: DiagnosisFormProps)
     defaultValues: {
       diagnosis_details: '',
       recommended_service: '',
-      estimated_cost: '',
-      estimated_completion_date: '',
       parts_purchase_link: '',
     }
   });

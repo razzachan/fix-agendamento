@@ -160,7 +160,11 @@ export function useServiceOrdersData() {
       }));
 
       // Create scheduling if there's a scheduled date and technician
-      if (serviceOrder.scheduledDate && serviceOrder.technicianId && serviceOrder.technicianName) {
+      // IMPORTANTE: Não criar agendamento automático se a OS veio do OrderLifecycleService
+      // pois ele já cria os eventos no calendário diretamente
+      const isFromOrderLifecycle = serviceOrder.agendamentoId || serviceOrder.origemAgendamentoId;
+
+      if (serviceOrder.scheduledDate && serviceOrder.technicianId && serviceOrder.technicianName && !isFromOrderLifecycle) {
         console.log('🔍 [useServiceOrdersData] Tentando criar agendamento para ordem de serviço:', {
           orderId: serviceOrder.id,
           technicianId: serviceOrder.technicianId,
@@ -186,6 +190,8 @@ export function useServiceOrdersData() {
           await updateServiceOrder(serviceOrder.id, { status: 'scheduled' });
           serviceOrder.status = 'scheduled';
         }
+      } else if (isFromOrderLifecycle) {
+        console.log('🔍 [useServiceOrdersData] OS veio do OrderLifecycleService - pulando criação automática de agendamento');
       }
 
       setServiceOrders(prev => [serviceOrder, ...prev]);

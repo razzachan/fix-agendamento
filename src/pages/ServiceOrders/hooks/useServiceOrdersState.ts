@@ -10,11 +10,12 @@ export const useServiceOrdersState = (serviceOrders: ServiceOrder[]) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAllColumns, setShowAllColumns] = useState(false);
   const [filterStatus, setFilterStatus] = useState<ServiceOrderStatus[]>([
-    'scheduled', 'in_progress', 'completed', 'pending', 'cancelled',
-    'scheduled_collection', 'collected', 'at_workshop',
-    'collected_for_diagnosis', 'diagnosis_completed', 'ready_for_delivery',
-    'collected_for_delivery', 'payment_pending', 'on_the_way', 
-    'on_the_way_to_deliver'
+    'pending', 'scheduled', 'scheduled_collection', 'in_progress', 'on_the_way',
+    'collected', 'collected_for_diagnosis', 'at_workshop', 'received_at_workshop',
+    'diagnosis_completed', 'quote_sent', 'awaiting_quote_approval', 'quote_approved',
+    'quote_rejected', 'ready_for_return', 'needs_workshop', 'ready_for_delivery',
+    'delivery_scheduled', 'collected_for_delivery', 'on_the_way_to_deliver',
+    'payment_pending', 'completed', 'cancelled'
   ]);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof ServiceOrder | null;
@@ -48,7 +49,7 @@ export const useServiceOrdersState = (serviceOrders: ServiceOrder[]) => {
     const allStatuses: ServiceOrderStatus[] = [
       'scheduled', 'scheduled_collection', 'in_progress', 'completed', 'pending',
       'cancelled', 'collected', 'collected_for_diagnosis',
-      'at_workshop', 'diagnosis_completed', 'ready_for_delivery',
+      'at_workshop', 'diagnosis_completed', 'awaiting_quote_approval', 'ready_for_delivery',
       'payment_pending', 'collected_for_delivery', 'on_the_way',
       'on_the_way_to_deliver'
     ];

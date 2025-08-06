@@ -45,11 +45,27 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Se o usuário não tiver a role necessária, redireciona para a página apropriada
   if (user && !allowedRoles.includes(user.role as UserRole)) {
+    console.log('🚨 [ProtectedRoute] Usuário sem permissão:', {
+      userRole: user.role,
+      allowedRoles,
+      userEmail: user.email,
+      currentPath: location.pathname
+    });
+
     // Redirecionar clientes para o portal do cliente
     if (user.role === 'client') {
+      console.log('🚨 [ProtectedRoute] Redirecionando cliente para portal');
       return <Navigate to="/client/portal" state={{ from: location }} replace />;
     }
+
+    // Para usuários de oficina, redirecionar para dashboard se não tiver permissão na rota atual
+    if (user.role === 'workshop') {
+      console.log('🚨 [ProtectedRoute] Usuário de oficina sem permissão, redirecionando para dashboard');
+      return <Navigate to="/dashboard" state={{ from: location }} replace />;
+    }
+
     // Outros usuários para o dashboard padrão
+    console.log('🚨 [ProtectedRoute] Redirecionando outros usuários para dashboard padrão');
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 

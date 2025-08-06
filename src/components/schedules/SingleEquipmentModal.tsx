@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { AgendamentoAI } from '@/services/agendamentos';
 import { orderLifecycleService } from '@/services/orderLifecycle/OrderLifecycleService';
 import { toast } from 'sonner';
+import { useGoogleAdsTracking } from '@/hooks/useGoogleAdsTracking';
 import {
   Package,
   Loader2,
@@ -52,6 +53,7 @@ const SingleEquipmentModal: React.FC<SingleEquipmentModalProps> = ({
   const [attendanceType, setAttendanceType] = useState<'em_domicilio' | 'coleta_conserto' | 'coleta_diagnostico'>('em_domicilio');
   const [estimatedValue, setEstimatedValue] = useState<number | undefined>();
   const [notes, setNotes] = useState('');
+  const { recordSchedulingConversion } = useGoogleAdsTracking();
 
   // Inicializar tipo de atendimento baseado no agendamento
   useEffect(() => {
@@ -125,7 +127,7 @@ const SingleEquipmentModal: React.FC<SingleEquipmentModalProps> = ({
         });
       } else {
         // Usar orderLifecycleService diretamente
-        await orderLifecycleService.createServiceOrderFromAgendamento(
+        const result = await orderLifecycleService.createServiceOrderFromAgendamento(
           agendamento.id,
           attendanceType,
           scheduledDate,
@@ -136,6 +138,14 @@ const SingleEquipmentModal: React.FC<SingleEquipmentModalProps> = ({
         );
 
         toast.success('Ordem de serviço criada com sucesso!');
+
+        // Registrar conversão de agendamento no Google Ads
+        if (result?.serviceOrder) {
+          await recordSchedulingConversion(
+            result.serviceOrder.id,
+            estimatedValue || 0
+          );
+        }
 
         if (onOrderCreated) {
           onOrderCreated();

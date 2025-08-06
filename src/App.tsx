@@ -6,6 +6,8 @@ import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import { MapProvider } from './contexts/MapContext';
+import GoogleAdsTrackingProvider from './components/tracking/GoogleAdsTrackingProvider';
+
 // Pages
 import Index from './pages/Index';
 import Login from './pages/Login';
@@ -23,7 +25,6 @@ import TechnicianServiceOrders from './pages/TechnicianServiceOrders';
 
 import TechnicianPurge from './pages/TechnicianPurge';
 import Technicians from './pages/Technicians';
-import CalendarView from './pages/CalendarView';
 import MainCalendarPage from './pages/MainCalendarPage';
 import Workshops from './pages/Workshops';
 import Schedules from './pages/Schedules';
@@ -69,8 +70,9 @@ function App() {
           disableTransitionOnChange
         >
           <Toaster />
-          <AuthProvider>
-            <MapProvider>
+          <GoogleAdsTrackingProvider>
+            <AuthProvider>
+              <MapProvider>
             <Routes>
               {/* Rotas públicas */}
               <Route path="/login" element={<Login />} />
@@ -310,18 +312,11 @@ function App() {
                 path="/calendar"
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'technician', 'workshop']}>
-                    <AppLayout><CalendarView /></AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/main-calendar"
-                element={
-                  <ProtectedRoute allowedRoles={['admin', 'technician', 'workshop']}>
                     <AppLayout><MainCalendarPage /></AppLayout>
                   </ProtectedRoute>
                 }
               />
+              {/* Rota /main-calendar removida - agora /calendar usa MainCalendarPage */}
 
               {/* Rota de teste mobile */}
               <Route
@@ -378,8 +373,9 @@ function App() {
               {/* Rota de fallback */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </MapProvider>
-        </AuthProvider>
+            </MapProvider>
+          </AuthProvider>
+        </GoogleAdsTrackingProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </BrowserRouter>

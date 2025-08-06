@@ -27,6 +27,11 @@
   transition: width 0.4s ease, transform 0.4s ease;
   z-index: 50;
   width: 288px; /* w-72 */
+  background-color: white;
+}
+
+.dark .sidebar {
+  background-color: rgb(17 24 39); /* gray-900 */
 }
 
 .sidebar.collapsed {
@@ -43,9 +48,35 @@
 }
 
 @media (max-width: 768px) {
-  .sidebar.collapsed {
+  .sidebar {
     transform: translateX(-100%);
     width: 288px;
+  }
+
+  .sidebar:not(.collapsed) {
+    transform: translateX(0);
+  }
+
+  /* No mobile, SEMPRE remover margem do conteúdo principal */
+  .main-content {
+    margin-left: 0 !important;
+  }
+
+  /* Garantir que a variável CSS seja 0 no mobile */
+  :root {
+    --sidebar-width: 0px;
+  }
+
+  /* Remover padding/margin de containers no mobile */
+  .mobile-safe-area {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Garantir que o container principal use toda a largura */
+  .main-content main {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
 }
 
@@ -63,6 +94,7 @@
   padding: 16px;
   overflow-y: auto;
   scrollbar-width: thin;
+  height: calc(100vh - 80px); /* Garantir altura específica */
 }
 
 .sidebar.collapsed .sidebar-content {
@@ -210,16 +242,18 @@
 
 /* Scrollbar Styling - usando classes Tailwind */
 .sidebar-content::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .sidebar-content::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
 }
 
 .sidebar-content::-webkit-scrollbar-thumb {
   @apply bg-gray-400 dark:bg-gray-600;
-  border-radius: 3px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-content::-webkit-scrollbar-thumb:hover {

@@ -26,9 +26,11 @@ const TrelloView: React.FC<TrelloViewProps> = ({
     { key: 'collected', label: 'Coletado', color: 'bg-cyan-50 border-cyan-200' },
     { key: 'at_workshop', label: 'Na Oficina', color: 'bg-purple-50 border-purple-200' },
     { key: 'diagnosis_completed', label: 'Diagnóstico Concluído', color: 'bg-pink-50 border-pink-200' },
-    { key: 'awaiting_approval', label: 'Aguardando Aprovação', color: 'bg-orange-50 border-orange-200' },
-    { key: 'approved', label: 'Aprovado', color: 'bg-green-50 border-green-200' },
+    { key: 'awaiting_quote_approval', label: 'Aguardando Aprovação', color: 'bg-orange-50 border-orange-200' },
+    { key: 'quote_approved', label: 'Aprovado', color: 'bg-green-50 border-green-200' },
     { key: 'ready_for_delivery', label: 'Pronto para Entrega', color: 'bg-teal-50 border-teal-200' },
+    { key: 'delivery_scheduled', label: 'Entrega Agendada', color: 'bg-blue-100 border-blue-300' },
+    { key: 'collected_for_delivery', label: 'Coletado para Entrega', color: 'bg-cyan-100 border-cyan-300' },
     { key: 'completed', label: 'Concluído', color: 'bg-emerald-50 border-emerald-200' },
     { key: 'cancelled', label: 'Cancelado', color: 'bg-red-50 border-red-200' }
   ];

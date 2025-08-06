@@ -145,7 +145,7 @@ export function useQRCodeGeneration(): UseQRCodeGenerationReturn & {
 
       // Incrementar contador de impressões se bem-sucedido
       if (success) {
-        const qrCodeData = await QRCodeService.getActiveQRCodeByServiceOrder(label.orderNumber);
+        const qrCodeData = await QRCodeService.getActiveQRCodeByServiceOrder(label.serviceOrderId);
         if (qrCodeData) {
           await QRCodeService.incrementPrintCount(qrCodeData.id);
         }

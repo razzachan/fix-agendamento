@@ -5,18 +5,29 @@ import { notificationService } from '@/services/notificationService';
 import { addProgressEntry } from './addProgressEntry';
 import { notificationTriggers } from '@/services/notifications/notificationTriggers';
 import { mapServiceOrder } from '../queries/mapServiceOrder';
+import { locationUpdateService } from '../locationUpdateService';
 
-// Define valid status values that match exactly the database constraint
-const VALID_STATUS_VALUES = [
+// Import valid status values from types to ensure consistency
+import { ServiceOrderStatus } from '@/types';
+
+// Define valid status values that match exactly the ServiceOrderStatus type
+const VALID_STATUS_VALUES: ServiceOrderStatus[] = [
   'pending',
   'scheduled',
   'scheduled_collection',
-  'on_the_way',
   'in_progress',
+  'on_the_way',
   'collected',
   'collected_for_diagnosis',
   'at_workshop',
-  'diagnosis_completed', // Adding the missing status that appears in the flow
+  'received_at_workshop',
+  'diagnosis_completed',
+  'quote_sent',
+  'awaiting_quote_approval',
+  'quote_approved',
+  'quote_rejected',
+  'ready_for_return',
+  'needs_workshop',
   'ready_for_delivery',
   'collected_for_delivery',
   'on_the_way_to_deliver',
@@ -108,6 +119,14 @@ export async function updateServiceOrder(id: string, updates: Partial<ServiceOrd
       // Create notification and progress entry if status was changed
       if (updates.status && currentOrder.status !== updates.status) {
         console.log(`updateServiceOrder: Creating notification for status change ${currentOrder.status} -> ${updates.status}`);
+
+        // 🎯 ATUALIZAR CURRENT_LOCATION AUTOMATICAMENTE
+        await locationUpdateService.updateLocationOnStatusChange(
+          id,
+          currentOrder.status,
+          updates.status,
+          currentOrder.service_attendance_type as any
+        );
 
         // Mapear dados da ordem para o formato ServiceOrder
         const serviceOrder = mapServiceOrder(currentOrder);

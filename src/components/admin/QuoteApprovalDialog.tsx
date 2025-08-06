@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle, XCircle, MessageSquare } from 'lucide-react';
 import { quoteService } from '@/services/admin/quoteService';
@@ -40,14 +41,20 @@ export function QuoteApprovalDialog({
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [notes, setNotes] = useState('');
+  const [estimatedCompletionDate, setEstimatedCompletionDate] = useState('');
 
-  // Resetar notas quando o dialog abre
+  // Resetar campos quando o dialog abre
   React.useEffect(() => {
     if (open) {
       if (approvalType === 'approve') {
         setNotes('Cliente confirmou aprovação via WhatsApp/telefone.');
+        // Definir data padrão para 7 dias a partir de hoje
+        const defaultDate = new Date();
+        defaultDate.setDate(defaultDate.getDate() + 7);
+        setEstimatedCompletionDate(defaultDate.toISOString().split('T')[0]);
       } else {
         setNotes('');
+        setEstimatedCompletionDate('');
       }
     }
   }, [open, approvalType]);
@@ -60,6 +67,11 @@ export function QuoteApprovalDialog({
       return;
     }
 
+    if (approvalType === 'approve' && !estimatedCompletionDate) {
+      toast.error('Informe a data estimada de conclusão.');
+      return;
+    }
+
     setIsProcessing(true);
     try {
       let success = false;
@@ -68,7 +80,8 @@ export function QuoteApprovalDialog({
         success = await quoteService.approveQuoteManually(
           quote.id,
           user.id,
-          notes.trim()
+          notes.trim(),
+          estimatedCompletionDate
         );
       } else {
         success = await quoteService.rejectQuoteManually(
@@ -215,6 +228,25 @@ export function QuoteApprovalDialog({
             />
           </div>
 
+          {/* Campo de Data Estimada de Conclusão - apenas para aprovação */}
+          {isApproval && (
+            <div className="space-y-2">
+              <Label htmlFor="estimatedDate">
+                Data Estimada de Conclusão *
+              </Label>
+              <Input
+                id="estimatedDate"
+                type="date"
+                value={estimatedCompletionDate}
+                onChange={(e) => setEstimatedCompletionDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]} // Não permitir datas passadas
+              />
+              <p className="text-xs text-gray-500">
+                Data prevista para conclusão do reparo na oficina
+              </p>
+            </div>
+          )}
+
           {/* Aviso sobre próximos passos */}
           <div className={`p-3 rounded-lg ${isApproval ? 'bg-green-50' : 'bg-red-50'}`}>
             <p className={`text-sm ${isApproval ? 'text-green-800' : 'text-red-800'}`}>
@@ -234,9 +266,9 @@ export function QuoteApprovalDialog({
           >
             Cancelar
           </Button>
-          <Button 
+          <Button
             onClick={handleApproval}
-            disabled={isProcessing || !notes.trim()}
+            disabled={isProcessing || !notes.trim() || (isApproval && !estimatedCompletionDate)}
             className={isApproval ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
           >
             {isProcessing ? (

@@ -1,4 +1,9 @@
 
+/**
+ * 🎯 NOVA ARQUITETURA: Este contexto agora usa calendar_events automaticamente
+ * através do scheduledServiceService migrado (fonte única da verdade)
+ */
+
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Technician, ScheduledService } from '@/types';

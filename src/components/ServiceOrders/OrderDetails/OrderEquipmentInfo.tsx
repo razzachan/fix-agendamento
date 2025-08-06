@@ -5,6 +5,7 @@ import { Calendar, Clock } from 'lucide-react';
 import { ServiceOrder } from '@/types';
 import { formatDate } from '../utils';
 import { DisplayNumber } from '@/components/common/DisplayNumber';
+import OrderEquipmentImage from './OrderEquipmentImage';
 
 interface OrderEquipmentInfoProps {
   order: ServiceOrder;
@@ -17,8 +18,8 @@ const OrderEquipmentInfo: React.FC<OrderEquipmentInfoProps> = ({ order, orderInd
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-start">
-        <div>
+      <div className="flex justify-between items-start gap-6">
+        <div className="flex-1">
           <p className="text-sm text-muted-foreground">
             <DisplayNumber item={order} index={orderIndex} variant="inline" size="sm" showIcon={true} />
           </p>
@@ -40,6 +41,12 @@ const OrderEquipmentInfo: React.FC<OrderEquipmentInfoProps> = ({ order, orderInd
             {order.serviceAttendanceType === 'coleta_diagnostico' && 'Coleta para Diagnóstico'}
           </p>
         </div>
+
+        {/* Imagem do Equipamento */}
+        <div className="flex-shrink-0">
+          <OrderEquipmentImage order={order} className="w-24 h-24" />
+        </div>
+
         <div className="flex flex-col items-end">
           <div className="flex items-center">
             <Calendar className="h-4 w-4 mr-1.5 text-muted-foreground" />

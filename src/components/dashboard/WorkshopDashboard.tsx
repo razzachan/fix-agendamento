@@ -97,7 +97,7 @@ const WorkshopDashboard: React.FC = () => {
       // Incluir equipamentos CONFIRMADOS como recebidos na oficina e outros status relevantes
       return (order.status === 'received_at_workshop' ||
               order.status === 'diagnosis_completed' ||
-              order.status === 'quote_sent' ||
+              order.status === 'awaiting_quote_approval' ||
               order.status === 'quote_approved' ||
               order.status === 'in_progress' ||
               order.status === 'collected' ||

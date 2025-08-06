@@ -10,22 +10,34 @@ interface ClientStatusBadgeProps {
 export function ClientStatusBadge({ status, className }: ClientStatusBadgeProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'pending':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
       case 'scheduled':
         return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'on_the_way':
+        return 'bg-cyan-100 text-cyan-800 border-cyan-200';
       case 'in_progress':
         return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'collected':
+      case 'collected_for_diagnosis':
+        return 'bg-teal-100 text-teal-800 border-teal-200';
       case 'at_workshop':
       case 'received_at_workshop':
         return 'bg-indigo-100 text-indigo-800 border-indigo-200';
       case 'diagnosis_completed':
         return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'awaiting_quote_approval':
       case 'quote_sent':
       case 'awaiting_approval':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'quote_approved':
         return 'bg-green-100 text-green-800 border-green-200';
+      case 'quote_rejected':
+        return 'bg-red-100 text-red-800 border-red-200';
       case 'ready_for_delivery':
         return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'delivery_scheduled':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'collected_for_delivery':
         return 'bg-teal-100 text-teal-800 border-teal-200';
       case 'on_the_way_to_deliver':

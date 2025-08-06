@@ -1,39 +1,60 @@
+/**
+ * ⚠️ DEPRECATED: Serviço para consultas de agendamentos
+ *
+ * 🎯 NOVA ARQUITETURA: Use CalendarEventsService em vez deste serviço
+ * Este arquivo será removido em versões futuras
+ */
+
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduledService } from '@/types';
 import { toast } from 'sonner';
 import { mapScheduledService } from './utils';
 import { format, startOfDay, endOfDay, parseISO } from 'date-fns';
 
+console.warn('⚠️ [scheduledServiceQueryService] DEPRECATED: Use CalendarEventsService instead');
+
 export const scheduledServiceQueryService = {
   async getAll(): Promise<ScheduledService[]> {
     try {
+      // 🎯 NOVA ARQUITETURA: Buscar de calendar_events (fonte única da verdade)
       const { data, error } = await supabase
-        .from('scheduled_services')
-        .select(`
-          *,
-          service_orders!service_order_id(final_cost, client_phone)
-        `);
+        .from('calendar_events')
+        .select('*')
+        .order('start_time', { ascending: true });
 
       if (error) {
         throw error;
       }
 
-      console.log('Todos os serviços agendados:', data?.length || 0);
+      console.log('Todos os eventos do calendário:', data?.length || 0);
       if (data && data.length > 0) {
-        console.log('Amostra de datas:', data.slice(0, 3).map(service => ({
-          id: service.id,
-          scheduledStartTime: service.scheduled_start_time,
-          normalizedDate: format(new Date(service.scheduled_start_time), 'yyyy-MM-dd')
+        console.log('Amostra de datas:', data.slice(0, 3).map(event => ({
+          id: event.id,
+          scheduledStartTime: event.start_time,
+          normalizedDate: format(new Date(event.start_time), 'yyyy-MM-dd')
         })));
       }
-      return data.map(item => mapScheduledService({
-        ...item,
-        final_cost: item.service_orders?.final_cost || null,
-        client_phone: item.service_orders?.client_phone || null
+
+      // Converter calendar_events para formato ScheduledService (compatibilidade)
+      return data.map(event => ({
+        id: event.id,
+        serviceOrderId: event.service_order_id,
+        technicianId: event.technician_id,
+        technicianName: event.technician_name,
+        clientId: event.client_id,
+        clientName: event.client_name,
+        scheduledStartTime: event.start_time,
+        scheduledEndTime: event.end_time,
+        address: event.address,
+        description: event.description,
+        status: event.status,
+        finalCost: event.final_cost,
+        clientPhone: event.client_phone,
+        equipmentType: event.equipment_type
       }));
     } catch (error) {
-      console.error('Erro ao buscar serviços agendados:', error);
-      toast.error('Erro ao carregar serviços agendados.');
+      console.error('Erro ao buscar eventos do calendário:', error);
+      toast.error('Erro ao carregar agendamentos.');
       return [];
     }
   },
@@ -41,21 +62,25 @@ export const scheduledServiceQueryService = {
   async getByTechnicianId(technicianId: string): Promise<ScheduledService[]> {
     try {
       console.log(`Buscando serviços para o técnico ID: ${technicianId}`);
-      
+
       // Imprimir a consulta que estamos prestes a fazer para debugging
-      console.log(`Executando consulta: SELECT * FROM scheduled_services WHERE technician_id = '${technicianId}'`);
-      
+      console.log(`Executando consulta: SELECT * FROM calendar_events WHERE technician_id = '${technicianId}'`);
+
+      // 🎯 NOVA ARQUITETURA: Buscar de calendar_events (fonte única da verdade)
       const { data, error } = await supabase
-        .from('scheduled_services')
-        .select(`
-          *,
-          service_orders!service_order_id(final_cost, client_phone)
-        `)
-        .eq('technician_id', technicianId);
+        .from('calendar_events')
+        .select('*')
+        .eq('technician_id', technicianId)
+        .order('start_time', { ascending: true });
 
       if (error) {
         console.error('Erro na consulta Supabase:', error);
         throw error;
+      }
+
+      if (!data) {
+        console.log('Nenhum dado retornado da consulta');
+        return [];
       }
 
       // Log detalhado dos resultados
@@ -64,18 +89,54 @@ export const scheduledServiceQueryService = {
         console.log('Nenhum serviço encontrado para o técnico');
       } else if (data) {
         console.log('Primeiros 2 serviços encontrados:', JSON.stringify(data.slice(0, 2)));
-        console.log('Datas dos serviços:', data.map(service => ({
-          id: service.id,
-          scheduledStartTime: service.scheduled_start_time,
-          normalizedDate: format(new Date(service.scheduled_start_time), 'yyyy-MM-dd')
-        })));
+
+
+        console.log('Datas dos serviços:', data.map(service => {
+          try {
+            const date = new Date(service.scheduled_start_time);
+            return {
+              id: service.id,
+              scheduledStartTime: service.scheduled_start_time,
+              normalizedDate: isNaN(date.getTime()) ? 'Data inválida' : format(date, 'yyyy-MM-dd')
+            };
+          } catch (error) {
+            return {
+              id: service.id,
+              scheduledStartTime: service.scheduled_start_time,
+              normalizedDate: 'Erro na data'
+            };
+          }
+        }));
       }
       
-      return data ? data.map(item => mapScheduledService({
-        ...item,
-        final_cost: item.service_orders?.final_cost || null,
-        client_phone: item.service_orders?.client_phone || null
-      })) : [];
+      // Converter calendar_events para formato ScheduledService (compatibilidade)
+      return data ? data.map(event => {
+        try {
+          // Validar datas antes de mapear
+          const startTime = event.start_time ? new Date(event.start_time) : null;
+          const endTime = event.end_time ? new Date(event.end_time) : null;
+
+          return {
+            id: event.id,
+            serviceOrderId: event.service_order_id,
+            technicianId: event.technician_id,
+            technicianName: event.technician_name,
+            clientId: event.client_id,
+            clientName: event.client_name,
+            scheduledStartTime: startTime && !isNaN(startTime.getTime()) ? event.start_time : null,
+            scheduledEndTime: endTime && !isNaN(endTime.getTime()) ? event.end_time : null,
+            address: event.address,
+            description: event.description,
+            status: event.status,
+            finalCost: event.final_cost,
+            clientPhone: event.client_phone,
+            equipmentType: event.equipment_type
+          };
+        } catch (error) {
+          console.error('Erro ao mapear evento:', event.id, error);
+          return null;
+        }
+      }).filter(Boolean) : [];
     } catch (error) {
       console.error(`Erro ao buscar serviços agendados para o técnico ${technicianId}:`, error);
       return [];
@@ -90,18 +151,37 @@ export const scheduledServiceQueryService = {
       
       console.log(`Buscando serviços no intervalo: ${startIso} até ${endIso}`);
       
+      // 🎯 NOVA ARQUITETURA: Buscar de calendar_events (fonte única da verdade)
       const { data, error } = await supabase
-        .from('scheduled_services')
+        .from('calendar_events')
         .select('*')
-        .gte('scheduled_start_time', startIso)
-        .lte('scheduled_start_time', endIso);
+        .gte('start_time', startIso)
+        .lte('start_time', endIso)
+        .order('start_time', { ascending: true });
 
       if (error) {
         throw error;
       }
 
-      console.log(`Encontrados ${data?.length || 0} serviços no intervalo de datas`);
-      return data.map(mapScheduledService);
+      console.log(`Encontrados ${data?.length || 0} eventos no intervalo de datas`);
+
+      // Converter calendar_events para formato ScheduledService (compatibilidade)
+      return data.map(event => ({
+        id: event.id,
+        serviceOrderId: event.service_order_id,
+        technicianId: event.technician_id,
+        technicianName: event.technician_name,
+        clientId: event.client_id,
+        clientName: event.client_name,
+        scheduledStartTime: event.start_time,
+        scheduledEndTime: event.end_time,
+        address: event.address,
+        description: event.description,
+        status: event.status,
+        finalCost: event.final_cost,
+        clientPhone: event.client_phone,
+        equipmentType: event.equipment_type
+      }));
     } catch (error) {
       console.error('Erro ao buscar serviços agendados por intervalo de data:', error);
       return [];
@@ -117,15 +197,14 @@ export const scheduledServiceQueryService = {
     console.log(`Intervalo: ${dayStart.toISOString()} até ${dayEnd.toISOString()}`);
     
     try {
+      // 🎯 NOVA ARQUITETURA: Buscar de calendar_events (fonte única da verdade)
       const { data, error } = await supabase
-        .from('scheduled_services')
-        .select(`
-          *,
-          service_orders!service_order_id(final_cost, client_phone)
-        `)
+        .from('calendar_events')
+        .select('*')
         .eq('technician_id', technicianId)
-        .gte('scheduled_start_time', dayStart.toISOString())
-        .lte('scheduled_start_time', dayEnd.toISOString());
+        .gte('start_time', dayStart.toISOString())
+        .lte('start_time', dayEnd.toISOString())
+        .order('start_time', { ascending: true });
 
       if (error) {
         console.error('Erro na consulta Supabase:', error);
@@ -136,10 +215,22 @@ export const scheduledServiceQueryService = {
       if (data?.length > 0) {
         console.log('Detalhes dos serviços encontrados:', JSON.stringify(data.slice(0, 2)));
       }
-      return data.map(item => mapScheduledService({
-        ...item,
-        final_cost: item.service_orders?.final_cost || null,
-        client_phone: item.service_orders?.client_phone || null
+      // Converter calendar_events para formato ScheduledService (compatibilidade)
+      return data.map(event => ({
+        id: event.id,
+        serviceOrderId: event.service_order_id,
+        technicianId: event.technician_id,
+        technicianName: event.technician_name,
+        clientId: event.client_id,
+        clientName: event.client_name,
+        scheduledStartTime: event.start_time,
+        scheduledEndTime: event.end_time,
+        address: event.address,
+        description: event.description,
+        status: event.status,
+        finalCost: event.final_cost,
+        clientPhone: event.client_phone,
+        equipmentType: event.equipment_type
       }));
     } catch (error) {
       console.error(`Erro ao buscar agenda do técnico ${technicianId} para a data ${date.toISOString()}:`, error);
@@ -149,18 +240,36 @@ export const scheduledServiceQueryService = {
   
   async getByClientId(clientId: string): Promise<ScheduledService[]> {
     try {
+      // 🎯 NOVA ARQUITETURA: Buscar de calendar_events (fonte única da verdade)
       const { data, error } = await supabase
-        .from('scheduled_services')
+        .from('calendar_events')
         .select('*')
-        .eq('client_id', clientId);
+        .eq('client_id', clientId)
+        .order('start_time', { ascending: true });
 
       if (error) {
         throw error;
       }
 
-      return data.map(mapScheduledService);
+      // Converter calendar_events para formato ScheduledService (compatibilidade)
+      return data.map(event => ({
+        id: event.id,
+        serviceOrderId: event.service_order_id,
+        technicianId: event.technician_id,
+        technicianName: event.technician_name,
+        clientId: event.client_id,
+        clientName: event.client_name,
+        scheduledStartTime: event.start_time,
+        scheduledEndTime: event.end_time,
+        address: event.address,
+        description: event.description,
+        status: event.status,
+        finalCost: event.final_cost,
+        clientPhone: event.client_phone,
+        equipmentType: event.equipment_type
+      }));
     } catch (error) {
-      console.error(`Erro ao buscar serviços agendados para o cliente ${clientId}:`, error);
+      console.error(`Erro ao buscar eventos para o cliente ${clientId}:`, error);
       return [];
     }
   },
@@ -169,10 +278,10 @@ export const scheduledServiceQueryService = {
     try {
       console.log(`Verificando se o técnico ${technicianId} tem algum serviço agendado`);
       
-      // Vamos usar uma consulta mais simples sem contagem para debugging
+      // 🎯 NOVA ARQUITETURA: Verificar em calendar_events (fonte única da verdade)
       const { data, error } = await supabase
-        .from('scheduled_services')
-        .select('id, description, scheduled_start_time, client_name')
+        .from('calendar_events')
+        .select('id, description, start_time, client_name')
         .eq('technician_id', technicianId)
         .limit(10);
 
@@ -186,10 +295,10 @@ export const scheduledServiceQueryService = {
       
       if (hasServices) {
         console.log('Serviços encontrados:', JSON.stringify(data));
-        console.log('Datas dos serviços:', data.map(service => ({
-          id: service.id,
-          scheduledStartTime: service.scheduled_start_time,
-          normalizedDate: format(new Date(service.scheduled_start_time), 'yyyy-MM-dd')
+        console.log('Datas dos eventos:', data.map(event => ({
+          id: event.id,
+          scheduledStartTime: event.start_time,
+          normalizedDate: format(new Date(event.start_time), 'yyyy-MM-dd')
         })));
       }
       

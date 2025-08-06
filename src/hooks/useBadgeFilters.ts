@@ -131,7 +131,7 @@ export function useBadgeFilters() {
 
       delayed_repairs: `status.eq.in_progress,created_at.lte.${fiveDaysAgo.toISOString()}`,
 
-      pending_quotes: `status.eq.diagnosis_completed`,
+      pending_quotes: `status.eq.awaiting_quote_approval`,
 
       urgent_deliveries: `status.eq.ready_for_pickup,created_at.lte.${twoDaysAgo.toISOString()}`,
 

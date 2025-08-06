@@ -48,6 +48,7 @@ export type ServiceOrderStatus =
   | 'received_at_workshop'
   | 'diagnosis_completed'
   | 'quote_sent'
+  | 'awaiting_quote_approval'
   | 'quote_approved'
   | 'quote_rejected'
   | 'ready_for_return'
@@ -99,6 +100,7 @@ export interface ServiceOrder {
   archived?: boolean;
   initialCost?: number; // ✅ Valor inicial (sinal para coleta diagnóstico)
   finalCost?: number; // ✅ Valor final total do serviço
+  paymentStatus?: 'pending' | 'advance_paid' | 'partial' | 'completed' | 'overdue'; // ✅ Status do pagamento
 
   // Campos para identificar a oficina responsável
   workshopId?: string | null;
@@ -117,9 +119,64 @@ export interface ServiceOrder {
   warrantyTerms?: string | null;
   relatedWarrantyOrderId?: string | null;
 
-  // Campo para relacionamento com agendamento
+  // Google Ads Tracking para conversões offline
+  gclid?: string | null; // Google Click ID
+  utmSource?: string | null; // Fonte da campanha (google, facebook, etc)
+  utmMedium?: string | null; // Meio (cpc, organic, social, etc)
+  utmCampaign?: string | null; // Nome da campanha
+  utmTerm?: string | null; // Palavra-chave
+  utmContent?: string | null; // Conteúdo do anúncio
+  conversionValue?: number | null; // Valor da conversão para Google Ads
+  conversionTime?: string | null; // Timestamp da conversão
+
+  // Campo para relacionamento com agendamento e reciclagem
   agendamentoId?: string | null;
+  recycledToSchedulingId?: string | null;
+
+  // Relacionamento Pai-Filho (para coleta diagnóstico → conserto)
+  parentOrderId?: string | null; // ID da ordem pai (diagnóstico)
+  childOrderIds?: string[] | null; // IDs das ordens filhas (consertos)
+  orderType?: 'parent' | 'child' | 'standalone' | null; // Tipo da ordem
+  relationshipStatus?: 'pending' | 'linked' | 'completed' | null; // Status do relacionamento
 }
+
+// Google Ads Conversions
+export interface GoogleAdsConversion {
+  id: string;
+  serviceOrderId: string;
+  gclid: string;
+  conversionName: string;
+  conversionTime: string;
+  conversionValue: number;
+  conversionCurrency: string;
+  orderId?: string;
+  equipmentType?: string;
+  serviceType?: string;
+  exported: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConversionExportData {
+  googleClickId: string;
+  conversionName: string;
+  conversionTime: string;
+  conversionValue: number;
+  conversionCurrency: string;
+  orderId?: string;
+}
+
+export type ConversionType =
+  | 'lead_gerado'
+  | 'agendamento'
+  | 'servico_iniciado'
+  | 'orcamento_aprovado'
+  | 'servico_concluido'
+  | 'pagamento_recebido'
+  | 'fogao_4_bocas_concluido'
+  | 'fogao_6_bocas_concluido'
+  | 'cooktop_concluido'
+  | 'forno_concluido';
 
 export interface ServiceOrderImage {
   id: string;
@@ -154,6 +211,8 @@ export interface ScheduledService {
   clientId: string | null;
   finalCost?: number; // ✅ Valor da OS relacionada
   clientPhone?: string; // ✅ Telefone do cliente
+  equipmentType?: string; // ✅ Tipo de equipamento da OS
+  orderStatus?: string; // ✅ Status da ordem de serviço relacionada
 }
 
 export interface FinancialTransaction {

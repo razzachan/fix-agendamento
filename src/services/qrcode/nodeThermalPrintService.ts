@@ -186,6 +186,7 @@ export class NodeThermalPrintService {
       console.log('🧪 [NodeThermal] Testando impressora:', printer.name);
 
       const testLabel: QRCodeLabel = {
+        serviceOrderId: 'test-service-order-id',
         orderNumber: 'TESTE',
         clientName: 'Teste de Impressão',
         equipmentType: 'Teste',

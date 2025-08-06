@@ -17,9 +17,24 @@ import {
   Calendar,
   MapPin,
   RefreshCw,
-  Eye
+  Eye,
+  FileText,
+  Copy
 } from 'lucide-react';
 import { ClientOrder } from '@/types/client';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import QuoteApprovalCard from '@/components/client/QuoteApprovalCard';
 
 export function ClientOrders() {
   const { orders, isLoading, error, refetch } = useClientOrders();
@@ -28,10 +43,50 @@ export function ClientOrders() {
   const [sortBy, setSortBy] = useState<string>('newest');
   const [selectedOrder, setSelectedOrder] = useState<ClientOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleViewDetails = (order: ClientOrder) => {
     setSelectedOrder(order);
     setIsModalOpen(true);
+  };
+
+  // Dados do orçamento (mock - depois vamos buscar da API)
+  const getQuoteData = (orderId: string) => ({
+    diagnosticFee: 50.00, // Taxa de diagnóstico
+    laborCost: 120.00,    // Mão de obra
+    partsCost: 80.00,     // Peças
+    totalCost: 150.00,    // Total (diagnóstico + labor + peças - diagnóstico como mão de obra)
+    description: "Necessário substituir capacitor do motor e limpeza geral do equipamento. O diagnóstico será descontado do valor total como mão de obra.",
+    details: [
+      { item: "Taxa de diagnóstico", value: 50.00, note: "Será descontada do total" },
+      { item: "Capacitor do motor", value: 80.00, note: "Peça original" },
+      { item: "Mão de obra (limpeza e instalação)", value: 120.00, note: "Inclui desconto do diagnóstico" }
+    ]
+  });
+
+  const handleQuoteApproval = async (orderId: string, approved: boolean) => {
+    setIsProcessing(true);
+    try {
+      // Aqui vamos implementar a chamada para a API
+      console.log(`Orçamento ${approved ? 'aprovado' : 'rejeitado'} para ordem ${orderId}`);
+
+      // Simular delay da API
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      toast.success(
+        approved
+          ? 'Orçamento aprovado com sucesso! Iniciaremos o reparo em breve.'
+          : 'Orçamento rejeitado. Entraremos em contato para discutir outras opções.'
+      );
+
+      // Atualizar a lista de ordens
+      refetch();
+
+    } catch (error) {
+      toast.error('Erro ao processar resposta do orçamento. Tente novamente.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleCloseModal = () => {
@@ -78,7 +133,7 @@ export function ClientOrders() {
       total: orders.length,
       active: orders.filter(o => o.status === 'in_progress' || o.status === 'scheduled').length,
       completed: orders.filter(o => o.status === 'completed').length,
-      pending: orders.filter(o => o.status === 'quote_sent' || o.status === 'diagnosis_completed').length
+      pending: orders.filter(o => o.status === 'awaiting_quote_approval' || o.status === 'diagnosis_completed').length
     };
   }, [orders]);
 
@@ -340,6 +395,16 @@ export function ClientOrders() {
                           <strong>Previsão de conclusão:</strong> {order.estimatedCompletion}
                         </p>
                       </div>
+
+                      {/* Seção de Orçamento - Apenas quando aguardando aprovação */}
+                      {order.status === 'awaiting_quote_approval' && (
+                        <div className="mt-4">
+                          <QuoteApprovalCard
+                            order={order as any}
+                            onQuoteResponse={(approved) => handleQuoteApproval(order.id, approved)}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* Ações */}

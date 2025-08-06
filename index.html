@@ -10,11 +10,11 @@
     <meta property="og:title" content="Fix Fogões" />
     <meta property="og:description" content="Sistema de gestão para assistência técnica de fogões" />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:image" content="/icons/icon-512.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@lovable_dev" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta name="twitter:site" content="@fixfogoes" />
+    <meta name="twitter:image" content="/icons/icon-512.png" />
 
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#E5B034" />
@@ -42,20 +42,19 @@
 
   <body>
     <div id="root"></div>
-    <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
+    <!-- GPT Engineer script removido para produção -->
     <script type="module" src="/src/main.tsx"></script>
 
-    <!-- Service Worker Registration -->
+    <!-- Service Worker Registration - SUPER SIMPLES -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+          navigator.serviceWorker.register('/sw-simple.js')
             .then((registration) => {
-              console.log('SW registered: ', registration);
+              console.log('✅ SW simples registrado:', registration);
             })
-            .catch((registrationError) => {
-              console.log('SW registration failed: ', registrationError);
+            .catch((error) => {
+              console.log('❌ SW erro:', error);
             });
         });
       }

@@ -1,3 +1,8 @@
+/**
+ * 🎯 NOVA ARQUITETURA: Este hook agora usa calendar_events automaticamente
+ * através do scheduledServiceService migrado (fonte única da verdade)
+ */
+
 import { useState, useEffect } from 'react';
 import { ScheduledService } from '@/types';
 import { scheduledServiceService } from '@/services/scheduledService';

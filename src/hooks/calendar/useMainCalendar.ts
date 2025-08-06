@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CalendarEvent } from '@/types/calendar';
-import { Technician, User, ScheduledService, ServiceOrder } from '@/types';
-import { scheduledServiceService } from '@/services/scheduledService';
+import { Technician, User } from '@/types';
 import { technicianService } from '@/services/technician';
-import { serviceOrderService } from '@/services/serviceOrder';
 import { isSameDay, format } from 'date-fns';
 import { toast } from 'sonner';
+import { useCalendarEvents } from '@/hooks/calendar/useCalendarEvents';
+import { convertToLegacyCalendarEvent } from '@/utils/calendarStatusMapping';
 
 interface UseMainCalendarProps {
   startDate: Date;
@@ -39,35 +39,59 @@ export const useMainCalendar = ({
   const [isInitialized, setIsInitialized] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
 
-  // Mapear status de ordem de serviço para status de calendário
-  const mapServiceOrderStatusToCalendarStatus = (status: string): 'confirmed' | 'completed' | 'cancelled' | 'suggested' | 'in_progress' => {
+  // Mapear status de ordem de serviço para status de calendário com cores específicas para coleta diagnóstico
+  const mapServiceOrderStatusToCalendarStatus = (status: string): 'confirmed' | 'completed' | 'cancelled' | 'suggested' | 'in_progress' | 'at_workshop' | 'diagnosis' | 'awaiting_approval' | 'in_repair' | 'ready_delivery' => {
     switch (status) {
+      // 🔵 AZUL - Agendado/Confirmado
       case 'pending':
       case 'scheduled':
       case 'scheduled_collection':
         return 'confirmed';
-      case 'in_progress':
+
+      // 🟣 ROXO - Em trânsito/coleta
       case 'on_the_way':
       case 'collected':
       case 'collected_for_diagnosis':
+        return 'in_progress';
+
+      // 🟠 LARANJA - Na oficina (recebido)
       case 'at_workshop':
       case 'received_at_workshop':
+        return 'at_workshop';
+
+      // 🔵 CIANO - Em diagnóstico
+      case 'in_progress': // Quando é coleta diagnóstico, in_progress = diagnóstico
+        return 'diagnosis';
+
+      // 🟡 AMARELO - Aguardando aprovação do cliente
       case 'diagnosis_completed':
       case 'quote_sent':
+        return 'awaiting_approval';
+
+      // 🟢 VERDE - Orçamento aprovado / Em reparo
       case 'quote_approved':
       case 'needs_workshop':
+      case 'in_repair':
+        return 'in_repair';
+
+      // 🔷 AZUL ESCURO - Pronto para entrega
       case 'ready_for_delivery':
       case 'collected_for_delivery':
       case 'on_the_way_to_deliver':
       case 'payment_pending':
-        return 'in_progress';
+        return 'ready_delivery';
+
+      // ✅ VERDE ESCURO - Concluído
       case 'completed':
       case 'delivered':
         return 'completed';
+
+      // 🔴 VERMELHO - Cancelado
       case 'cancelled':
       case 'quote_rejected':
       case 'returned':
         return 'cancelled';
+
       default:
         return 'suggested';
     }
@@ -75,8 +99,15 @@ export const useMainCalendar = ({
 
   // Converter ScheduledService para CalendarEvent
   const convertToCalendarEvent = (service: ScheduledService, relatedOrder?: ServiceOrder): CalendarEvent => {
-    const startTime = new Date(service.scheduledStartTime);
-    const endTime = new Date(service.scheduledEndTime);
+    // 🔧 CORREÇÃO UTC: Sempre preservar horário visual para todos os eventos
+    // Isso evita problemas de timezone onde 15h vira 18h na visualização
+
+    const startTime = createDateFromUTCString(service.scheduledStartTime);
+    const endTime = createDateFromUTCString(service.scheduledEndTime);
+
+    console.log(`🕐 [convertToCalendarEvent] ${service.clientName}:`);
+    console.log(`🕐 [convertToCalendarEvent] UTC original: ${service.scheduledStartTime}`);
+    console.log(`🕐 [convertToCalendarEvent] Local convertido: ${startTime.toISOString()}`);
 
     // Extrair equipamento e problema da description se não estiverem disponíveis no relatedOrder
     let equipment = relatedOrder?.equipment || 'Equipamento não especificado';
@@ -93,6 +124,7 @@ export const useMainCalendar = ({
     }
 
     return {
+      // 🔧 CORREÇÃO: Usar ID original do scheduled_service para evitar duplicatas
       id: service.id,
       startTime,
       endTime,
@@ -149,9 +181,12 @@ export const useMainCalendar = ({
     setError(null);
 
     try {
-      console.log(`🔍 [useMainCalendar] Buscando eventos de ${format(startDate, 'dd/MM/yyyy HH:mm')} até ${format(endDate, 'dd/MM/yyyy HH:mm')}`);
-      console.log(`🔍 [useMainCalendar] Range ISO: ${startDate.toISOString()} até ${endDate.toISOString()}`);
-      console.log(`🔍 [useMainCalendar] TechnicianId: ${technicianId}, User role: ${user?.role}`);
+      console.warn(`🔍 [useMainCalendar] === BUSCANDO EVENTOS ===`);
+      console.warn(`🔍 [useMainCalendar] Range: ${format(startDate, 'dd/MM/yyyy HH:mm')} até ${format(endDate, 'dd/MM/yyyy HH:mm')}`);
+      console.warn(`🔍 [useMainCalendar] Range ISO: ${startDate.toISOString()} até ${endDate.toISOString()}`);
+      console.warn(`🔍 [useMainCalendar] TechnicianId: ${technicianId}, User role: ${user?.role}`);
+      console.warn(`🔍 [useMainCalendar] Data do Giovani: 2025-07-26T15:00:00.000Z`);
+      console.warn(`🔍 [useMainCalendar] Giovani está no range: ${new Date('2025-07-26T15:00:00.000Z') >= startDate && new Date('2025-07-26T15:00:00.000Z') <= endDate}`);
 
       let scheduledServices: ScheduledService[] = [];
 
@@ -359,11 +394,55 @@ export const useMainCalendar = ({
             }
           }
 
-          const serviceDate = new Date(service.scheduledStartTime);
-          return serviceDate >= startDate && serviceDate <= endDate;
+          // 🔧 CORREÇÃO UTC: Sempre preservar horário visual para todos os eventos
+          const serviceDate = createDateFromUTCString(service.scheduledStartTime);
+
+          const inRange = serviceDate >= startDate && serviceDate <= endDate;
+
+          // DEBUG: Log específico para o Giovani
+          if (service.clientName?.includes('Giovani')) {
+            console.warn(`🎯 [RANGE CHECK] Giovani (PRESERVADO):`, {
+              originalUTC: service.scheduledStartTime,
+              serviceDate: serviceDate.toISOString(),
+              serviceDateLocal: serviceDate.toLocaleString('pt-BR'),
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              inRange: inRange,
+              serviceId: service.id
+            });
+          }
+
+          return inRange;
         });
 
-        console.log(`📋 [useMainCalendar] Encontrados ${filteredServices.length} serviços em scheduled_services`);
+        console.warn(`📋 [useMainCalendar] Encontrados ${filteredServices.length} serviços em scheduled_services`);
+
+        // DEBUG: Verificar se o serviço do Giovani está na lista
+        const giovaniService = filteredServices.find(s => s.clientName?.includes('Giovani'));
+        if (giovaniService) {
+          console.warn(`🎯 [DEBUG] Serviço do Giovani encontrado em scheduled_services:`, {
+            id: giovaniService.id,
+            serviceOrderId: giovaniService.serviceOrderId,
+            scheduledStartTime: giovaniService.scheduledStartTime,
+            status: giovaniService.status
+          });
+        } else {
+          console.warn(`❌ [DEBUG] Serviço do Giovani NÃO encontrado em scheduled_services`);
+
+          // Verificar se existe no array original
+          const giovaniInOriginal = scheduledServices.find(s => s.clientName?.includes('Giovani'));
+          if (giovaniInOriginal) {
+            console.warn(`🔍 [DEBUG] Giovani existe no array original mas foi filtrado:`, {
+              id: giovaniInOriginal.id,
+              scheduledStartTime: giovaniInOriginal.scheduledStartTime,
+              status: giovaniInOriginal.status,
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              serviceDate: new Date(giovaniInOriginal.scheduledStartTime).toISOString(),
+              inRange: new Date(giovaniInOriginal.scheduledStartTime) >= startDate && new Date(giovaniInOriginal.scheduledStartTime) <= endDate
+            });
+          }
+        }
 
         // 2. Buscar ordens órfãs do técnico (sem agendamento específico)
         const technicianOrphanOrders = serviceOrders.filter(order => {
@@ -377,6 +456,7 @@ export const useMainCalendar = ({
 
           // Se tem data agendada, verificar se está no intervalo
           if (order.scheduledDate) {
+            // 🔧 CORREÇÃO UTC: Converter UTC para local
             const orderDate = new Date(order.scheduledDate);
             const inRange = orderDate >= startDate && orderDate <= endDate;
 
@@ -445,13 +525,18 @@ export const useMainCalendar = ({
       });
 
       // DEBUG: Log de todos os eventos antes do filtro
-      console.log(`🔍 [DEBUG] Eventos antes do filtro:`, calendarEvents.map(e => ({
-        id: e.id,
-        clientName: e.clientName,
-        status: e.status,
-        scheduledStartTime: e.scheduledStartTime,
-        serviceOrderId: e.serviceOrderId
-      })));
+      console.warn(`🔍 [DEBUG] === EVENTOS ANTES DO FILTRO ===`);
+      console.warn(`🔍 [DEBUG] Total de eventos: ${calendarEvents.length}`);
+      calendarEvents.forEach((e, index) => {
+        console.warn(`🔍 [DEBUG] Evento ${index + 1}:`, {
+          id: e.id,
+          clientName: e.clientName,
+          status: e.status,
+          scheduledStartTime: e.scheduledStartTime,
+          serviceOrderId: e.serviceOrderId,
+          isGiovani: e.clientName?.includes('Giovani')
+        });
+      });
 
       // 🔍 VERIFICAÇÃO DE DUPLICATAS: Detectar possíveis duplicatas por serviceOrderId
       const serviceOrderIds = calendarEvents
@@ -490,12 +575,26 @@ export const useMainCalendar = ({
 
       // Filtrar eventos relevantes para o calendário principal (excluir sugeridos e cancelados)
       // IMPORTANTE: Eventos cancelados NÃO devem aparecer no calendário
+      console.warn(`🔍 [FILTER] === INICIANDO FILTRO DE RELEVÂNCIA ===`);
+
       const relevantEvents = calendarEvents.filter(event => {
         const isRelevant = event.status === 'confirmed' ||    // ✅ INCLUIR AGENDADOS (scheduled)
                           event.status === 'completed' ||    // ✅ INCLUIR CONCLUÍDOS
                           event.status === 'in_progress';    // ✅ INCLUIR EM PROGRESSO
 
-        console.log(`🔍 [DEBUG] Evento ${event.id}: status="${event.status}", isRelevant=${isRelevant}`);
+        const isGiovani = event.clientName?.includes('Giovani');
+
+        if (isGiovani) {
+          console.warn(`🎯 [FILTER] GIOVANI ENCONTRADO:`, {
+            id: event.id,
+            clientName: event.clientName,
+            status: event.status,
+            isRelevant: isRelevant,
+            scheduledStartTime: event.scheduledStartTime
+          });
+        }
+
+        console.log(`🔍 [FILTER] Evento ${event.clientName}: status="${event.status}", isRelevant=${isRelevant}`);
         return isRelevant;
       });
 

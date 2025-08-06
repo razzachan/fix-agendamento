@@ -53,6 +53,13 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
     console.log('🎯 [NextStatusButton] Estado atualizado:', { showRequiredActions, hasConfig: !!requiredActionConfig });
   }, [showRequiredActions, requiredActionConfig]);
 
+  // Debug: Monitorar mudanças do modal de navegação
+  useEffect(() => {
+    console.log('🗺️ [NextStatusButton] Estado do modal de navegação:', { showNavigationDialog });
+  }, [showNavigationDialog]);
+
+
+
   // Validar e garantir um tipo de atendimento válido
   const attendanceType = serviceOrder.serviceAttendanceType || "em_domicilio";
   const validType = ["em_domicilio", "coleta_conserto", "coleta_diagnostico"].includes(attendanceType)
@@ -65,14 +72,32 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
 
   // Encontrar o próximo status no fluxo
   const getNextStatus = (): string | null => {
+    console.warn(`🔍 [NextStatusButton] DEBUG getNextStatus:`, {
+      currentStatus: serviceOrder.status,
+      currentStatusIndex,
+      serviceFlowLength: serviceFlow.length,
+      serviceFlow: serviceFlow.map(s => s.status),
+      validType
+    });
+
     if (currentStatusIndex === -1 || currentStatusIndex === serviceFlow.length - 1) {
+      console.warn(`🔍 [NextStatusButton] Retornando null - currentStatusIndex: ${currentStatusIndex}, length: ${serviceFlow.length}`);
       return null;
     }
-    return serviceFlow[currentStatusIndex + 1].status;
+
+    const nextStatus = serviceFlow[currentStatusIndex + 1].status;
+    console.warn(`🔍 [NextStatusButton] Próximo status calculado: ${nextStatus}`);
+    return nextStatus;
   };
 
   const nextStatus = getNextStatus();
   const nextStep = nextStatus ? serviceFlow.find(step => step.status === nextStatus) : null;
+
+  console.warn(`🔍 [NextStatusButton] ESTADO FINAL:`, {
+    nextStatus,
+    nextStepLabel: nextStep?.label,
+    hasNextStatus: !!nextStatus
+  });
 
 
 
@@ -208,26 +233,37 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
   };
 
   const handleUpdateStatus = async () => {
-    console.log('🎯 [NextStatusButton] ===== INÍCIO handleUpdateStatus =====');
+    console.warn('🎯 [NextStatusButton] ===== INÍCIO handleUpdateStatus =====');
+    console.warn('🎯 [NextStatusButton] DADOS COMPLETOS:', {
+      serviceOrderId: serviceOrder.id,
+      clientName: serviceOrder.clientName,
+      currentStatus: serviceOrder.status,
+      nextStatus,
+      isUpdating,
+      validType,
+      hasNextStatus: !!nextStatus,
+      nextStatusType: typeof nextStatus
+    });
 
     if (!nextStatus || isUpdating) {
-      console.log('🎯 [NextStatusButton] Saindo early - nextStatus:', nextStatus, 'isUpdating:', isUpdating);
+      console.warn('🎯 [NextStatusButton] ❌ SAINDO EARLY:', {
+        nextStatus,
+        isUpdating,
+        reason: !nextStatus ? 'Sem próximo status' : 'Já atualizando'
+      });
       return;
     }
 
-    console.log('🎯 [NextStatusButton] handleUpdateStatus iniciado:', {
-      currentStatus: serviceOrder.status,
-      nextStatus,
-      serviceType: validType
-    });
+    console.warn('🎯 [NextStatusButton] ✅ PROSSEGUINDO COM ATUALIZAÇÃO');
 
     // Verificar se está indo para "À Caminho" - perguntar sobre navegação
     if (nextStatus === 'on_the_way') {
-      console.log('🎯 [NextStatusButton] Transição para À Caminho - abrindo dialog de navegação');
+      console.log('🎯 [NextStatusButton] 🗺️ TRANSIÇÃO PARA À CAMINHO - ABRINDO MODAL');
       setShowNavigationDialog(true);
       return;
     }
 
+    console.warn('🎯 [NextStatusButton] ➡️ PROSSEGUINDO PARA OUTROS STATUS');
     // Para outros status, prosseguir normalmente
     await proceedWithStatusUpdate();
   };
@@ -427,7 +463,7 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
           {/* Botão principal - sempre individual */}
           <Button
             onClick={() => {
-              console.log('🎯 [NextStatusButton] ===== BOTÃO CLICADO =====');
+              console.log('🎯 [NextStatusButton] Botão clicado');
               handleUpdateStatus();
             }}
             disabled={isUpdating}
@@ -518,6 +554,50 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
           }}
         />
 
+        {/* Dialog de Navegação para "À Caminho" */}
+        {console.log('🗺️ [NextStatusButton] Renderizando modal de navegação (branch simples):', { showNavigationDialog })}
+        <Dialog open={showNavigationDialog} onOpenChange={setShowNavigationDialog}>
+          <DialogContent className="max-w-md" style={{ zIndex: 9999, position: 'fixed' }}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                🗺️ Navegação
+              </DialogTitle>
+              <DialogDescription>
+                Você está indo para o endereço do cliente. Deseja abrir a navegação no Google Maps?
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {serviceOrder.pickupAddress && (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-700">Endereço:</p>
+                  <p className="text-sm text-gray-600">{serviceOrder.pickupAddress}</p>
+                </div>
+              )}
+
+              <div className="text-sm text-gray-600">
+                O status será atualizado para "À Caminho" independentemente da sua escolha.
+              </div>
+            </div>
+
+            <DialogFooter className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => handleNavigationConfirm(false)}
+                disabled={isUpdating}
+              >
+                {isUpdating ? 'Atualizando...' : 'Não, obrigado'}
+              </Button>
+              <Button
+                onClick={() => handleNavigationConfirm(true)}
+                disabled={isUpdating}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {isUpdating ? 'Atualizando...' : '🗺️ Abrir Maps'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
       </div>
     );
@@ -645,8 +725,9 @@ const NextStatusButton: React.FC<NextStatusButtonProps> = ({ serviceOrder, onUpd
       />
 
       {/* Dialog de Navegação para "À Caminho" */}
+      {console.log('🗺️ [NextStatusButton] Renderizando modal de navegação:', { showNavigationDialog })}
       <Dialog open={showNavigationDialog} onOpenChange={setShowNavigationDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" style={{ zIndex: 9999, position: 'fixed' }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               🗺️ Navegação

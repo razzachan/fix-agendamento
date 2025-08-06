@@ -52,20 +52,6 @@ export function useOrderNumber() {
    */
   const getNextScheduleNumber = async (): Promise<string | null> => {
     return getNextNumber('pre_schedule');
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const orderNumber = await generateNextOrderNumber();
-      return orderNumber;
-    } catch (err: any) {
-      const errorMessage = err.message || 'Erro ao gerar número da ordem';
-      setError(errorMessage);
-      console.error('❌ Erro no hook useOrderNumber:', err);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   /**
@@ -171,8 +157,8 @@ export function useDisplayNumber(item: any, index?: number) {
     item.order_number,
     item.scheduleNumber,
     item.schedule_number,
-    index,
-    ensureOrderHasNumber
+    index
+    // Removido ensureOrderHasNumber das dependências para evitar loop infinito
   ]);
 
   return displayNumber;

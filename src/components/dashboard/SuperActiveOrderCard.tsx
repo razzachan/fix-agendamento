@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ServiceOrder, ServiceOrderStatus } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Clock,
   MapPin,
@@ -25,6 +26,7 @@ import NextStatusButton from '@/components/ServiceOrders/ProgressTracker/NextSta
 import { DisplayNumber } from '@/components/common/DisplayNumber';
 import { translateStatus } from '@/utils/statusMapping';
 import { cardPresets, cardText, cardSurface, getOrderStatusClasses } from '@/lib/cardStyles';
+import { formatUTCStringAsLocal } from '@/utils/timezoneUtils';
 
 interface SuperActiveOrderCardProps {
   orders: ServiceOrder[];
@@ -117,6 +119,70 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
   className
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [correctScheduledTimes, setCorrectScheduledTimes] = useState<Record<string, string>>({});
+
+  // 🎯 NOVA ARQUITETURA: Buscar horários corretos de calendar_events (fonte única da verdade)
+  useEffect(() => {
+    const fetchCorrectTimes = async () => {
+      console.log('🕐 [SuperActiveOrderCard] Iniciando busca de horários corretos...');
+      const times: Record<string, string> = {};
+
+      for (const order of orders) {
+        try {
+          console.log(`🔍 [SuperActiveOrderCard] Buscando horário para ${order.clientName} (${order.id.substring(0, 8)})`);
+
+          // 🎯 NOVA FONTE: Buscar em scheduled_services (mesma fonte do MainCalendarView)
+          const { data, error } = await supabase
+            .from('scheduled_services')
+            .select('scheduled_start_time')
+            .eq('service_order_id', order.id)
+            .single();
+
+          if (!error && data?.scheduled_start_time) {
+            const correctedTime = formatUTCStringAsLocal(data.scheduled_start_time, 'HH:mm');
+            times[order.id] = correctedTime;
+            console.log(`✅ [SuperActiveOrderCard] ${order.clientName}: Horário correto encontrado em scheduled_services: ${correctedTime}`);
+          } else {
+            console.log(`⚠️ [SuperActiveOrderCard] ${order.clientName}: Não encontrado em scheduled_services, tentando calendar_events`);
+
+            // Fallback para calendar_events
+            const { data: calendarData, error: calendarError } = await supabase
+              .from('calendar_events')
+              .select('start_time')
+              .eq('service_order_id', order.id)
+              .single();
+
+            if (!calendarError && calendarData?.start_time) {
+              const correctedTime = formatUTCStringAsLocal(calendarData.start_time, 'HH:mm');
+              times[order.id] = correctedTime;
+              console.log(`✅ [SuperActiveOrderCard] ${order.clientName}: Horário correto encontrado em calendar_events: ${correctedTime}`);
+            } else if (order.scheduledDate) {
+              const fallbackTime = format(new Date(order.scheduledDate), 'HH:mm', { locale: ptBR });
+              times[order.id] = fallbackTime;
+              console.log(`📅 [SuperActiveOrderCard] ${order.clientName}: Usando fallback final: ${fallbackTime}`);
+            }
+          }
+        } catch (error) {
+          console.error(`❌ [SuperActiveOrderCard] Erro ao buscar horário para ${order.clientName}:`, error);
+          if (order.scheduledDate) {
+            const fallbackTime = format(new Date(order.scheduledDate), 'HH:mm', { locale: ptBR });
+            times[order.id] = fallbackTime;
+            console.log(`🔄 [SuperActiveOrderCard] ${order.clientName}: Fallback após erro: ${fallbackTime}`);
+          }
+        }
+      }
+
+      console.log('🎯 [SuperActiveOrderCard] Horários finais:', times);
+      setCorrectScheduledTimes(times);
+    };
+
+    if (orders.length > 0) {
+      console.log(`🚀 [SuperActiveOrderCard] Processando ${orders.length} ordens`);
+      fetchCorrectTimes();
+    } else {
+      console.log('⚠️ [SuperActiveOrderCard] Nenhuma ordem para processar');
+    }
+  }, [orders]);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   if (!orders || orders.length === 0) {
@@ -199,9 +265,8 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
 
   const averageProgress = currentOrders.length > 0 ? totalProgress / currentOrders.length : 0;
 
-  const scheduledTime = primaryOrder.scheduledDate
-    ? format(new Date(primaryOrder.scheduledDate), 'HH:mm', { locale: ptBR })
-    : null;
+  // 🔧 CORREÇÃO: Usar horário correto de scheduled_services
+  const scheduledTime = correctScheduledTimes[primaryOrder.id] || null;
 
   // Função para gerar link do WhatsApp
   const getWhatsAppLink = (phone: string) => {
@@ -275,9 +340,40 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
 
       {/* Conteúdo Principal Integrado */}
       <div className="p-6 space-y-6">
-        {/* Informações do Cliente e Equipamento - Layout Responsivo */}
+        {/* Informações do Equipamento e Cliente - Layout Responsivo */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          {/* Coluna 1: Cliente e Contato */}
+          {/* Coluna 1: Equipamento e Problema */}
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex items-start gap-3">
+              <Wrench className="w-5 h-5 text-[#e5b034] flex-shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-base sm:text-lg text-gray-900 break-words">
+                  {primaryOrder.equipmentType}
+                  {primaryOrder.equipmentModel && ` - ${primaryOrder.equipmentModel}`}
+                </div>
+                <Badge variant="secondary" className="text-xs sm:text-sm mt-1 mobile-badge">
+                  {primaryOrder.serviceAttendanceType === 'em_domicilio' && '🏠 Em Domicílio'}
+                  {primaryOrder.serviceAttendanceType === 'coleta_diagnostico' && '🔍 Coleta p/ Diagnóstico'}
+                  {primaryOrder.serviceAttendanceType === 'coleta_conserto' && '🔧 Coleta p/ Conserto'}
+                </Badge>
+              </div>
+            </div>
+
+            {primaryOrder.description && (
+              <div className="bg-gray-50 p-3 rounded-lg border">
+                <div className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Problema Relatado:</div>
+                <div className="text-sm sm:text-base text-gray-800 break-words">{primaryOrder.description}</div>
+              </div>
+            )}
+
+            {hasMultipleOrders && (
+              <div className="text-xs sm:text-sm text-muted-foreground">
+                + {allActiveOrders.length - 1} equipamento{allActiveOrders.length > 2 ? 's' : ''} adicional{allActiveOrders.length > 2 ? 'is' : ''}
+              </div>
+            )}
+          </div>
+
+          {/* Coluna 2: Cliente e Contato */}
           <div className="space-y-3 sm:space-y-4">
             <div className="flex items-start gap-3">
               <User className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -311,37 +407,6 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
               <div className="flex items-center gap-3">
                 <Clock className="w-5 h-5 text-purple-600 flex-shrink-0" />
                 <span className="text-sm sm:text-base font-medium">{scheduledTime}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Coluna 2: Equipamento e Problema */}
-          <div className="space-y-3 sm:space-y-4">
-            <div className="flex items-start gap-3">
-              <Wrench className="w-5 h-5 text-[#e5b034] flex-shrink-0 mt-0.5" />
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold text-base sm:text-lg text-gray-900 break-words">
-                  {primaryOrder.equipmentType}
-                  {primaryOrder.equipmentModel && ` - ${primaryOrder.equipmentModel}`}
-                </div>
-                <Badge variant="secondary" className="text-xs sm:text-sm mt-1 mobile-badge">
-                  {primaryOrder.serviceAttendanceType === 'em_domicilio' && '🏠 Em Domicílio'}
-                  {primaryOrder.serviceAttendanceType === 'coleta_diagnostico' && '🔍 Coleta p/ Diagnóstico'}
-                  {primaryOrder.serviceAttendanceType === 'coleta_conserto' && '🔧 Coleta p/ Conserto'}
-                </Badge>
-              </div>
-            </div>
-
-            {primaryOrder.description && (
-              <div className="bg-gray-50 p-3 rounded-lg border">
-                <div className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Problema Relatado:</div>
-                <div className="text-sm sm:text-base text-gray-800 break-words">{primaryOrder.description}</div>
-              </div>
-            )}
-
-            {hasMultipleOrders && (
-              <div className="text-xs sm:text-sm text-muted-foreground">
-                + {allActiveOrders.length - 1} equipamento{allActiveOrders.length > 2 ? 's' : ''} adicional{allActiveOrders.length > 2 ? 'is' : ''}
               </div>
             )}
           </div>
@@ -413,10 +478,10 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
               {allActiveOrders.slice(1, 3).map((order) => (
                 <div key={order.id} className={cn(cardSurface.elevated, "flex items-center justify-between p-3 rounded border")}>
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <Wrench className="w-4 h-4 text-[#e5b034] flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className={cn("text-base truncate", cardText.primary)}>
-                        {order.clientName} - {order.equipmentType}
+                        {order.equipmentType} - {order.clientName}
                       </div>
                       {order.description && (
                         <div className={cn("text-xs truncate", cardText.secondary)}>
@@ -479,13 +544,13 @@ export const SuperActiveOrderCard: React.FC<SuperActiveOrderCardProps> = ({
               {allActiveOrders.map((order) => (
                 <div key={order.id} className={cn(cardSurface.elevated, "flex items-center justify-between p-4 rounded border")}>
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <User className="w-5 h-5 status-blue-text flex-shrink-0" />
+                    <Wrench className="w-5 h-5 text-[#e5b034] flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className={cn("font-medium text-base truncate", cardText.primary)}>
-                        {order.clientName}
+                        {order.equipmentType} {order.equipmentModel && `- ${order.equipmentModel}`}
                       </div>
                       <div className={cn("text-sm truncate", cardText.secondary)}>
-                        {order.equipmentType} {order.equipmentModel && `- ${order.equipmentModel}`}
+                        Cliente: {order.clientName}
                       </div>
                       {order.description && (
                         <div className={cn("text-xs truncate mt-1", cardText.muted)}>

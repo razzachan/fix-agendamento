@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useAppData } from '@/hooks/useAppData';
 import { format, addDays, startOfDay, eachDayOfInterval, startOfWeek, endOfWeek, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TechnicianTimeSlotsProps {
   selectedTechnicianId: string;
@@ -24,11 +24,35 @@ const TechnicianTimeSlots: React.FC<TechnicianTimeSlotsProps> = ({
   currentWeek,
   onWeekChange
 }) => {
-  const { serviceOrders } = useAppData();
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+
+  // Buscar eventos do calendário para o técnico
+  useEffect(() => {
+    const fetchCalendarEvents = async () => {
+      if (!selectedTechnicianId) return;
+
+      const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
+
+      const { data, error } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .eq('technician_id', selectedTechnicianId)
+        .gte('start_time', weekStart.toISOString())
+        .lte('start_time', weekEnd.toISOString())
+        .neq('status', 'cancelled');
+
+      if (!error && data) {
+        setCalendarEvents(data);
+      }
+    };
+
+    fetchCalendarEvents();
+  }, [selectedTechnicianId, currentWeek]);
 
   // Horários disponíveis (9h às 17h)
   const timeSlots = [
-    '09:00', '10:00', '11:00', '12:00', 
+    '09:00', '10:00', '11:00', '12:00',
     '13:00', '14:00', '15:00', '16:00', '17:00'
   ];
 
@@ -41,12 +65,31 @@ const TechnicianTimeSlots: React.FC<TechnicianTimeSlotsProps> = ({
   const isTimeSlotOccupied = (date: Date, time: string) => {
     if (!selectedTechnicianId) return false;
     const dateStr = format(date, 'yyyy-MM-dd');
-    return serviceOrders.some(order => 
-      order.technician_id === selectedTechnicianId &&
-      order.scheduled_date === dateStr &&
-      order.scheduled_time === time &&
-      order.status !== 'cancelled'
-    );
+
+    // 🎯 NOVA ARQUITETURA: Usar apenas calendar_events (fonte única da verdade)
+    // Não verificar service_orders para evitar duplicação e inconsistências
+    const hasCalendarEvent = calendarEvents.some(event => {
+      const eventDate = format(new Date(event.start_time), 'yyyy-MM-dd');
+      const eventTime = format(new Date(event.start_time), 'HH:mm');
+      const isMatch = eventDate === dateStr && eventTime === time;
+
+      // Debug para Denise Deibler
+      if (event.client_name?.includes('Denise') && event.client_name?.includes('Deibler')) {
+        console.log(`🔍 [TechnicianTimeSlots] Denise Deibler - Evento:`, {
+          eventId: event.id,
+          eventDate,
+          eventTime,
+          checkingDate: dateStr,
+          checkingTime: time,
+          isMatch,
+          startTime: event.start_time
+        });
+      }
+
+      return isMatch;
+    });
+
+    return hasCalendarEvent;
   };
 
   // Verificar se é horário de almoço

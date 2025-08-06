@@ -39,6 +39,7 @@ import { useTechniciansData } from '@/hooks/data/useTechniciansData';
 import { v4 as uuidv4 } from 'uuid';
 import { generateUUID } from '@/utils/uuid';
 import { toast } from 'sonner';
+import { useGoogleAdsTracking } from '@/hooks/useGoogleAdsTracking';
 import { formatPhoneNumber } from '@/utils/phoneFormatter';
 
 // Schema de validação para o formulário simplificado
@@ -86,6 +87,7 @@ const NewOrderDialog: React.FC<NewOrderDialogProps> = ({
 
   // Buscar técnicos disponíveis
   const { technicians, isLoading: isTechniciansLoading } = useTechniciansData();
+  const { recordSchedulingConversion } = useGoogleAdsTracking();
 
   // Use either the controlled props or internal state
   const isDialogOpen = isOpen !== undefined ? isOpen : dialogOpen;
@@ -288,8 +290,14 @@ const NewOrderDialog: React.FC<NewOrderDialogProps> = ({
 
     // Enviar para criação
     if (onCreateOrder) {
-      onCreateOrder(serviceOrder).then(result => {
+      onCreateOrder(serviceOrder).then(async (result) => {
         if (result) {
+          // Registrar conversão de agendamento no Google Ads
+          await recordSchedulingConversion(
+            result.id,
+            serviceOrder.initialCost || serviceOrder.finalCost || 0
+          );
+
           setIsDialogOpen(false);
           if (refreshServiceOrders) {
             refreshServiceOrders();

@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { AgendamentoAI } from '@/services/agendamentos';
 import { orderLifecycleService } from '@/services/orderLifecycle/OrderLifecycleService';
 import { ServiceOrder } from '@/types';
+import { useGoogleAdsTracking } from '@/hooks/useGoogleAdsTracking';
+import { OrderRelationshipService } from '@/services/orderRelationshipService';
 import { Calendar, MapPin, Phone, User, AlertTriangle, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -25,6 +27,7 @@ export const CreateOrderFromAgendamento: React.FC<CreateOrderFromAgendamentoProp
   onCancel
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const { recordSchedulingConversion, recordSecondPhaseConversion } = useGoogleAdsTracking();
   const [formData, setFormData] = useState({
     equipment: '',
     problem_description: '',
@@ -58,7 +61,68 @@ export const CreateOrderFromAgendamento: React.FC<CreateOrderFromAgendamentoProp
       );
 
       toast.success(`Ordem de serviço ${result.serviceOrder.id} criada com sucesso!`);
-      
+
+      // Tentar vincular automaticamente se for coleta conserto
+      if (result.serviceOrder.serviceAttendanceType === 'coleta_conserto') {
+        const linkResult = await OrderRelationshipService.autoLinkChildOrder(result.serviceOrder);
+
+        if (linkResult.linked && linkResult.parentOrder) {
+          toast.success(`Ordem vinculada automaticamente ao diagnóstico ${linkResult.parentOrder.id.slice(0, 8)}`);
+
+          // Para segunda fase, usar conversão especial
+          await recordSecondPhaseConversion(
+            result.serviceOrder.id,
+            linkResult.parentOrder.id,
+            result.serviceOrder.initialCost || 0,
+            result.serviceOrder.equipmentType,
+            {
+              equipmentBrand: result.serviceOrder.equipmentBrand,
+              equipmentModel: result.serviceOrder.equipmentModel,
+              problemDescription: result.serviceOrder.description,
+              clientName: result.serviceOrder.clientName,
+              clientPhone: result.serviceOrder.clientPhone,
+              serviceAttendanceType: result.serviceOrder.serviceAttendanceType,
+              initialCost: result.serviceOrder.initialCost,
+              finalCost: result.serviceOrder.finalCost
+            }
+          );
+        } else {
+          // Conversão normal se não conseguiu vincular
+          await recordSchedulingConversion(
+            result.serviceOrder.id,
+            result.serviceOrder.initialCost || 0,
+            result.serviceOrder.equipmentType,
+            {
+              equipmentBrand: result.serviceOrder.equipmentBrand,
+              equipmentModel: result.serviceOrder.equipmentModel,
+              problemDescription: result.serviceOrder.description,
+              clientName: result.serviceOrder.clientName,
+              clientPhone: result.serviceOrder.clientPhone,
+              serviceAttendanceType: result.serviceOrder.serviceAttendanceType,
+              initialCost: result.serviceOrder.initialCost,
+              finalCost: result.serviceOrder.finalCost
+            }
+          );
+        }
+      } else {
+        // Conversão normal para outros tipos
+        await recordSchedulingConversion(
+          result.serviceOrder.id,
+          result.serviceOrder.initialCost || 0,
+          result.serviceOrder.equipmentType,
+          {
+            equipmentBrand: result.serviceOrder.equipmentBrand,
+            equipmentModel: result.serviceOrder.equipmentModel,
+            problemDescription: result.serviceOrder.description,
+            clientName: result.serviceOrder.clientName,
+            clientPhone: result.serviceOrder.clientPhone,
+            serviceAttendanceType: result.serviceOrder.serviceAttendanceType,
+            initialCost: result.serviceOrder.initialCost,
+            finalCost: result.serviceOrder.finalCost
+          }
+        );
+      }
+
       if (onOrderCreated) {
         onOrderCreated(result.serviceOrder, result.updatedAgendamento);
       }

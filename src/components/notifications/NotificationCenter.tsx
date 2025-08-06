@@ -278,8 +278,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                       </h4>
                       <div className="space-y-2">
                         {dayNotifications.map((notification) => (
-                          <Card 
-                            key={notification.id} 
+                          <Card
+                            key={notification.id}
                             className={`cursor-pointer transition-colors hover:bg-muted/50 ${
                               !notification.read ? 'border-l-4 border-l-blue-500 bg-blue-50/50' : ''
                             }`}

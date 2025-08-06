@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Clock, MapPin, User, Wrench, Search, Filter, Calendar, DollarSign, Phone } from 'lucide-react';
+import EventGroup from './EventGroup';
 
 interface ListViewProps {
   events: CalendarEvent[];
@@ -22,6 +23,7 @@ const ListView: React.FC<ListViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date');
+  const [groupedView, setGroupedView] = useState(true); // ✅ Nova opção para visualização agrupada
 
   // Debug: Log eventos da lista
   console.log(`📅 [ListView] Total eventos: ${events.length}`);
@@ -72,35 +74,134 @@ const ListView: React.FC<ListViewProps> = ({
     return groups;
   }, {} as Record<string, CalendarEvent[]>);
 
-  const getEventColor = (status: string) => {
+  const getEventColor = (status: string, eventType?: string) => {
+    // Cores específicas por tipo de evento
+    if (eventType === 'delivery') {
+      switch (status) {
+        case 'scheduled': return 'border-l-blue-500 bg-blue-50 hover:bg-blue-100';
+        case 'on_the_way': return 'border-l-blue-600 bg-blue-100 hover:bg-blue-150';
+        case 'completed': return 'border-l-blue-700 bg-blue-200 hover:bg-blue-250';
+        default: return 'border-l-blue-400 bg-blue-50 hover:bg-blue-100';
+      }
+    }
+
+    if (eventType === 'collection') {
+      switch (status) {
+        case 'scheduled': return 'border-l-green-500 bg-green-50 hover:bg-green-100';
+        case 'on_the_way': return 'border-l-green-600 bg-green-100 hover:bg-green-150';
+        case 'completed': return 'border-l-green-700 bg-green-200 hover:bg-green-250';
+        default: return 'border-l-green-400 bg-green-50 hover:bg-green-100';
+      }
+    }
+
+    if (eventType === 'diagnosis') {
+      switch (status) {
+        case 'scheduled': return 'border-l-purple-500 bg-purple-50 hover:bg-purple-100';
+        case 'in_progress': return 'border-l-purple-600 bg-purple-100 hover:bg-purple-150';
+        case 'completed': return 'border-l-purple-700 bg-purple-200 hover:bg-purple-250';
+        default: return 'border-l-purple-400 bg-purple-50 hover:bg-purple-100';
+      }
+    }
+
+    // Cores padrão por status (para eventos de serviço)
     switch (status) {
-      case 'confirmed': return 'border-l-blue-500 bg-blue-50 hover:bg-blue-100';
+      case 'scheduled': return 'border-l-blue-500 bg-blue-50 hover:bg-blue-100';
+      case 'on_the_way': return 'border-l-purple-500 bg-purple-50 hover:bg-purple-100';
+      case 'in_progress': return 'border-l-purple-600 bg-purple-100 hover:bg-purple-150';
       case 'completed': return 'border-l-green-500 bg-green-50 hover:bg-green-100';
-      case 'suggested': return 'border-l-yellow-500 bg-yellow-50 hover:bg-yellow-100';
       case 'cancelled': return 'border-l-red-500 bg-red-50 hover:bg-red-100';
-      case 'in_progress': return 'border-l-orange-500 bg-orange-50 hover:bg-orange-100';
       default: return 'border-l-gray-500 bg-gray-50 hover:bg-gray-100';
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'confirmed': return 'Confirmado';
-      case 'completed': return 'Concluído';
-      case 'suggested': return 'Sugerido';
-      case 'cancelled': return 'Cancelado';
-      case 'in_progress': return 'Em Progresso';
-      default: return 'Desconhecido';
+  const getContextualStatusText = (status: string, eventType?: string) => {
+    const statusMap = {
+      service: {
+        scheduled: 'Visita Agendada',
+        on_the_way: 'Técnico a Caminho',
+        in_progress: 'Atendimento em Curso',
+        completed: 'Serviço Concluído',
+        cancelled: 'Visita Cancelada'
+      },
+      collection: {
+        scheduled: 'Coleta Agendada',
+        on_the_way: 'Indo Coletar',
+        in_progress: 'Coletando Equipamento',
+        completed: 'Equipamento Coletado',
+        cancelled: 'Coleta Cancelada'
+      },
+      delivery: {
+        scheduled: 'Entrega Agendada',
+        on_the_way: 'Saiu para Entrega',
+        in_progress: 'Entregando',
+        completed: 'Equipamento Entregue',
+        cancelled: 'Entrega Cancelada'
+      },
+      diagnosis: {
+        scheduled: 'Diagnóstico Agendado',
+        in_progress: 'Diagnosticando',
+        completed: 'Diagnóstico Pronto',
+        cancelled: 'Diagnóstico Cancelado'
+      }
+    };
+
+    const type = eventType || 'service';
+    return statusMap[type]?.[status] || status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const getEventTypeText = (eventType: string) => {
+    switch (eventType) {
+      case 'delivery': return 'Entrega';
+      case 'collection': return 'Coleta';
+      case 'diagnosis': return 'Diagnóstico';
+      default: return 'Atendimento';
+    }
+  };
+
+  const getEventTypeBadgeClass = (eventType: string) => {
+    switch (eventType) {
+      case 'delivery': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'collection': return 'bg-green-50 text-green-700 border-green-200';
+      case 'diagnosis': return 'bg-purple-50 text-purple-700 border-purple-200';
+      default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmed': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'completed': return 'bg-green-100 text-green-700 border-green-200';
-      case 'suggested': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      // 🔵 AZUL - Agendado
+      case 'scheduled': return 'bg-blue-100 text-blue-700 border-blue-200';
+
+      // 🟣 ROXO - A caminho
+      case 'on_the_way': return 'bg-purple-100 text-purple-700 border-purple-200';
+
+      // 🟣 ROXO - Em trânsito/coleta
+      case 'in_progress': return 'bg-purple-100 text-purple-700 border-purple-200';
+
+      // 🟠 LARANJA - Na oficina (recebido)
+      case 'at_workshop': return 'bg-orange-100 text-orange-700 border-orange-200';
+
+      // 🔵 CIANO - Em diagnóstico
+      case 'diagnosis': return 'bg-cyan-100 text-cyan-700 border-cyan-200';
+
+      // 🟡 AMARELO - Aguardando aprovação do cliente
+      case 'awaiting_approval': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+
+      // 🟢 VERDE - Orçamento aprovado / Em reparo
+      case 'in_repair': return 'bg-green-100 text-green-700 border-green-200';
+
+      // 🔷 AZUL ESCURO - Pronto para entrega
+      case 'ready_delivery': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+
+      // ✅ VERDE ESCURO - Concluído
+      case 'completed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+
+      // 🔴 VERMELHO - Cancelado
       case 'cancelled': return 'bg-red-100 text-red-700 border-red-200';
-      case 'in_progress': return 'bg-orange-100 text-orange-700 border-orange-200';
+
+      // 🟡 AMARELO CLARO - Sugerido
+      case 'suggested': return 'bg-amber-100 text-amber-700 border-amber-200';
+
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
@@ -144,10 +245,10 @@ const ListView: React.FC<ListViewProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
-                <SelectItem value="confirmed">Confirmado</SelectItem>
-                <SelectItem value="in_progress">Em Progresso</SelectItem>
+                <SelectItem value="scheduled">Agendado</SelectItem>
+                <SelectItem value="on_the_way">A Caminho</SelectItem>
+                <SelectItem value="in_progress">Em Andamento</SelectItem>
                 <SelectItem value="completed">Concluído</SelectItem>
-                <SelectItem value="suggested">Sugerido</SelectItem>
                 <SelectItem value="cancelled">Cancelado</SelectItem>
               </SelectContent>
             </Select>
@@ -164,6 +265,16 @@ const ListView: React.FC<ListViewProps> = ({
                 <SelectItem value="status">Status</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* Alternância de visualização */}
+            <Button
+              variant={groupedView ? "default" : "outline"}
+              onClick={() => setGroupedView(!groupedView)}
+              className="flex items-center gap-2"
+            >
+              <Calendar className="h-4 w-4" />
+              {groupedView ? "Agrupado" : "Individual"}
+            </Button>
           </div>
 
           <div className="mt-4 text-sm text-gray-600">
@@ -172,10 +283,15 @@ const ListView: React.FC<ListViewProps> = ({
         </CardContent>
       </Card>
 
-      {/* Lista de eventos agrupados por data */}
+      {/* Lista de eventos - agrupados ou individuais */}
       <div className="space-y-6">
-        <AnimatePresence>
-          {Object.entries(groupedEvents).map(([dateKey, dayEvents]) => (
+        {groupedView ? (
+          /* Visualização agrupada por OS */
+          <EventGroup events={sortedEvents} onEventClick={onEventClick} />
+        ) : (
+          /* Visualização individual por data */
+          <AnimatePresence>
+            {Object.entries(groupedEvents).map(([dateKey, dayEvents]) => (
             <motion.div
               key={dateKey}
               initial={{ opacity: 0, y: 20 }}
@@ -202,10 +318,10 @@ const ListView: React.FC<ListViewProps> = ({
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
                   >
-                    <Card 
+                    <Card
                       className={`
                         cursor-pointer transition-all duration-200 hover:shadow-md border-l-4
-                        ${getEventColor(event.status)}
+                        ${getEventColor(event.status, event.eventType)}
                       `}
                       onClick={() => onEventClick(event)}
                     >
@@ -219,8 +335,13 @@ const ListView: React.FC<ListViewProps> = ({
                               </span>
                             </div>
                             <Badge variant="outline" className={getStatusColor(event.status)}>
-                              {getStatusText(event.status)}
+                              {getContextualStatusText(event.status, event.eventType)}
                             </Badge>
+                            {event.eventType && event.eventType !== 'service' && (
+                              <Badge variant="outline" className={getEventTypeBadgeClass(event.eventType)}>
+                                {getEventTypeText(event.eventType)}
+                              </Badge>
+                            )}
                           </div>
                           {event.isUrgent && (
                             <Badge variant="destructive" className="text-xs">
@@ -232,12 +353,12 @@ const ListView: React.FC<ListViewProps> = ({
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-gray-500" />
-                              <span className="font-semibold">{event.clientName}</span>
+                              <Wrench className="h-4 w-4 text-[#e5b034]" />
+                              <span className="font-semibold">{event.equipment}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Wrench className="h-4 w-4 text-gray-500" />
-                              <span>{event.equipment}</span>
+                              <User className="h-4 w-4 text-gray-500" />
+                              <span>{event.clientName}</span>
                             </div>
                           </div>
 
@@ -281,8 +402,9 @@ const ListView: React.FC<ListViewProps> = ({
                 ))}
               </div>
             </motion.div>
-          ))}
-        </AnimatePresence>
+            ))}
+          </AnimatePresence>
+        )}
 
         {sortedEvents.length === 0 && (
           <Card className="shadow-lg border-0">

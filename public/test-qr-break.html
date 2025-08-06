@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Quebra de Linha QR</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .label-test {
+            width: 58mm;
+            height: 32mm;
+            background: white;
+            border: 2px solid #333;
+            display: flex;
+            align-items: flex-start;
+            gap: 2mm;
+            padding: 2mm;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+            text-align: left;
+            margin: 10px 0;
+        }
+        .qr-placeholder {
+            width: 16mm;
+            height: 16mm;
+            background: #ddd;
+            border: 1px solid #999;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+        }
+        .text-content {
+            flex: 1;
+            text-align: left;
+            padding-right: 1mm;
+        }
+        .order-number {
+            font-weight: bold;
+            font-size: 7pt;
+            margin-bottom: 0.5mm;
+            line-height: 1.0;
+        }
+        .client-name {
+            font-size: 6pt;
+            color: #333;
+            margin-bottom: 0.5mm;
+            line-height: 1.0;
+        }
+        .equipment {
+            font-size: 5.5pt;
+            color: #666;
+            margin-bottom: 0.5mm;
+            line-height: 1.0;
+        }
+        .problem {
+            font-size: 5pt;
+            color: #888;
+            margin-bottom: 0.5mm;
+            line-height: 1.0;
+            font-style: italic;
+        }
+        .date {
+            font-size: 5pt;
+            color: #999;
+            line-height: 1.0;
+            margin-top: 0.5mm;
+        }
+        .test-result {
+            background: #f0f8ff;
+            padding: 10px;
+            border-left: 4px solid #007acc;
+            margin: 10px 0;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste de Quebra de Linha - Etiquetas QR</h1>
+    
+    <div class="test-container">
+        <h2>Teste 1: Função de Quebra de Linha</h2>
+        <button onclick="testLineBreak()">Executar Teste de Quebra</button>
+        <div id="break-result"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>Teste 2: Etiqueta Visual</h2>
+        <button onclick="createVisualTest()">Criar Etiqueta de Teste</button>
+        <div id="visual-test"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>Teste 3: Comparação Antes/Depois</h2>
+        <button onclick="createComparison()">Comparar Quebras</button>
+        <div id="comparison-test"></div>
+    </div>
+
+    <script>
+        // Função de quebra de linha (copiada do QRPrintService)
+        function breakText(text, maxChars = 16) {
+            console.log(`🧪 [TESTE] Testando quebra de linha para: "${text}"`);
+            console.log(`🧪 [TESTE] Máximo de caracteres por linha: ${maxChars}`);
+            
+            const lines = [];
+            for (let i = 0; i < text.length; i += maxChars) {
+                lines.push(text.substring(i, i + maxChars));
+            }
+            
+            console.log(`🧪 [TESTE] Resultado:`, lines);
+            console.log(`🧪 [TESTE] HTML: ${lines.join('<br>')}`);
+            
+            return lines;
+        }
+
+        function testLineBreak() {
+            const testTexts = [
+                "#028",
+                "Denise Deibler da Silva Santos",
+                "Fogão elétrico por indução Fischer 2 bocas",
+                "Fischer 2 bocas que não está aquecendo corretamente"
+            ];
+
+            let result = '<h3>Resultados dos Testes:</h3>';
+            
+            testTexts.forEach((text, index) => {
+                const lines = breakText(text, 16);
+                result += `
+                    <div class="test-result">
+                        <strong>Teste ${index + 1}:</strong><br>
+                        <strong>Original:</strong> "${text}" (${text.length} chars)<br>
+                        <strong>Quebrado:</strong> ${lines.map(line => `"${line}"`).join(' + ')}<br>
+                        <strong>HTML:</strong> ${lines.join('<br>')}<br>
+                        <strong>Linhas:</strong> ${lines.length}
+                    </div>
+                `;
+            });
+
+            document.getElementById('break-result').innerHTML = result;
+        }
+
+        function createVisualTest() {
+            const testData = {
+                orderNumber: "#028",
+                clientName: "Denise Deibler da Silva Santos",
+                equipmentType: "Fogão elétrico por indução Fischer 2 bocas",
+                problem: "Fischer 2 bocas que não está aquecendo corretamente",
+                date: "31/07/2025"
+            };
+
+            // Quebrar textos
+            const orderLines = breakText(testData.orderNumber, 16);
+            const clientLines = breakText(testData.clientName, 16);
+            const equipLines = breakText(testData.equipmentType, 16);
+            const problemLines = breakText(testData.problem, 16);
+
+            const labelHTML = `
+                <div class="label-test">
+                    <div class="qr-placeholder">QR</div>
+                    <div class="text-content">
+                        <div class="order-number">${orderLines.join('<br>')}</div>
+                        <div class="client-name">${clientLines.join('<br>')}</div>
+                        <div class="equipment">${equipLines.join('<br>')}</div>
+                        <div class="problem">Problema:<br>${problemLines.join('<br>')}</div>
+                        <div class="date">${testData.date}</div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('visual-test').innerHTML = labelHTML;
+        }
+
+        function createComparison() {
+            const longText = "Fogão elétrico por indução Fischer 2 bocas que não está aquecendo";
+            
+            const lines16 = breakText(longText, 16);
+            const lines20 = breakText(longText, 20);
+            const lines25 = breakText(longText, 25);
+
+            const comparisonHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h4>16 caracteres (atual)</h4>
+                        <div class="test-result">
+                            ${lines16.map(line => `"${line}"`).join('<br>')}
+                            <br><strong>Linhas: ${lines16.length}</strong>
+                        </div>
+                    </div>
+                    <div>
+                        <h4>20 caracteres (anterior)</h4>
+                        <div class="test-result">
+                            ${lines20.map(line => `"${line}"`).join('<br>')}
+                            <br><strong>Linhas: ${lines20.length}</strong>
+                        </div>
+                    </div>
+                    <div>
+                        <h4>25 caracteres (original)</h4>
+                        <div class="test-result">
+                            ${lines25.map(line => `"${line}"`).join('<br>')}
+                            <br><strong>Linhas: ${lines25.length}</strong>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('comparison-test').innerHTML = comparisonHTML;
+        }
+
+        // Executar teste automático ao carregar
+        window.onload = function() {
+            console.log('🧪 [TESTE] Página de teste carregada!');
+            console.log('🧪 [TESTE] Execute os botões para ver os resultados');
+            
+            // Executar todos os testes automaticamente
+            setTimeout(() => {
+                testLineBreak();
+                createVisualTest();
+                createComparison();
+            }, 500);
+        };
+    </script>
+</body>
+</html>

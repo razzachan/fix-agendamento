@@ -19,20 +19,27 @@ export type ServiceItemType = z.infer<typeof serviceItemSchema>;
 
 // Define the status options to match ServiceOrderStatus exactly
 const statusSchema = z.enum([
-  'pending', 
-  'scheduled', 
+  'pending',
+  'scheduled',
   'scheduled_collection',
-  'in_progress', 
+  'in_progress',
   'on_the_way',
   'collected',
   'collected_for_diagnosis',
   'at_workshop',
+  'received_at_workshop',
   'diagnosis_completed',
+  'quote_sent',
+  'awaiting_quote_approval',
+  'quote_approved',
+  'quote_rejected',
+  'ready_for_return',
+  'needs_workshop',
   'ready_for_delivery',
   'collected_for_delivery',
   'on_the_way_to_deliver',
   'payment_pending',
-  'completed', 
+  'completed',
   'cancelled'
 ]);
 

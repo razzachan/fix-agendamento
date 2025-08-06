@@ -73,11 +73,20 @@ export async function getCurrentUser(): Promise<User | null> {
       console.error('Erro ao buscar perfil:', profileError);
     }
 
+    // Verificar se é o usuário da oficina (fallback especial)
+    const userEmail = data.session.user.email || '';
+    let userRole = profileData?.role || 'client';
+
+    if (userEmail === 'joaooficina@fixfogoes.com.br') {
+      console.log('🔧 [Session] Detectado usuário da oficina, forçando role workshop');
+      userRole = 'workshop';
+    }
+
     const user = {
       id: data.session.user.id,
       name: profileData?.name || data.session.user.user_metadata.name || 'Usuário',
-      email: data.session.user.email || '',
-      role: profileData?.role || 'client',
+      email: userEmail,
+      role: userRole,
       avatar: profileData?.avatar || undefined,
       phone: profileData?.phone || undefined,
       address: profileData?.address || undefined,

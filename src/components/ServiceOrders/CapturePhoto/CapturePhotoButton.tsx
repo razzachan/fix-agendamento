@@ -30,6 +30,21 @@ const CapturePhotoButton: React.FC<CapturePhotoButtonProps> = ({
     setIsCapturing(true);
 
     try {
+      // Verificar se a API de permissões está disponível
+      if ('permissions' in navigator) {
+        try {
+          const permission = await navigator.permissions.query({ name: 'camera' as PermissionName });
+          if (permission.state === 'denied') {
+            toast.error('Permissão da câmera negada. Ative a câmera nas configurações do navegador.');
+            setIsCapturing(false);
+            setIsOpen(false);
+            return;
+          }
+        } catch (permError) {
+          console.warn('Não foi possível verificar permissões:', permError);
+        }
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
         audio: false
@@ -39,12 +54,27 @@ const CapturePhotoButton: React.FC<CapturePhotoButtonProps> = ({
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        await videoRef.current.play();
       }
-    } catch (error) {
+
+      toast.success('Câmera ativada com sucesso!');
+
+    } catch (error: any) {
       console.error('Erro ao acessar a câmera:', error);
-      toast.error('Não foi possível acessar a câmera. Verifique as permissões.');
+
+      let errorMessage = 'Não foi possível acessar a câmera.';
+
+      if (error.name === 'NotAllowedError') {
+        errorMessage = 'Permissão da câmera negada. Ative a câmera nas configurações do navegador.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = 'Nenhuma câmera encontrada no dispositivo.';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = 'Câmera está sendo usada por outro aplicativo.';
+      }
+
+      toast.error(errorMessage);
       setIsCapturing(false);
+      setIsOpen(false);
     }
   };
 
@@ -92,6 +122,20 @@ const CapturePhotoButton: React.FC<CapturePhotoButtonProps> = ({
     setIsCapturing(true);
 
     try {
+      // Verificar se a API de permissões está disponível
+      if ('permissions' in navigator) {
+        try {
+          const permission = await navigator.permissions.query({ name: 'camera' as PermissionName });
+          if (permission.state === 'denied') {
+            toast.error('Permissão da câmera negada. Ative a câmera nas configurações do navegador.');
+            setIsCapturing(false);
+            return;
+          }
+        } catch (permError) {
+          console.warn('Não foi possível verificar permissões:', permError);
+        }
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
         audio: false
@@ -101,11 +145,23 @@ const CapturePhotoButton: React.FC<CapturePhotoButtonProps> = ({
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        await videoRef.current.play();
       }
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Erro ao acessar a câmera:', error);
-      toast.error('Não foi possível acessar a câmera. Verifique as permissões.');
+
+      let errorMessage = 'Não foi possível acessar a câmera.';
+
+      if (error.name === 'NotAllowedError') {
+        errorMessage = 'Permissão da câmera negada. Ative a câmera nas configurações do navegador.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = 'Nenhuma câmera encontrada no dispositivo.';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = 'Câmera está sendo usada por outro aplicativo.';
+      }
+
+      toast.error(errorMessage);
       setIsCapturing(false);
     }
   };

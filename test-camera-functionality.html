@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Funcionalidade da Câmera</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        video {
+            width: 100%;
+            max-width: 400px;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .debug {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎥 Teste de Funcionalidade da Câmera</h1>
+    
+    <div class="container">
+        <h2>1. Teste de Permissões</h2>
+        <button onclick="testPermissions()">Verificar Permissões</button>
+        <div id="permissions-status"></div>
+    </div>
+
+    <div class="container">
+        <h2>2. Teste de Acesso à Câmera</h2>
+        <button onclick="startCamera()">Iniciar Câmera</button>
+        <button onclick="stopCamera()" disabled id="stop-btn">Parar Câmera</button>
+        <div id="camera-status"></div>
+        <video id="video" autoplay playsinline muted style="display: none;"></video>
+    </div>
+
+    <div class="container">
+        <h2>3. Teste de Captura</h2>
+        <button onclick="capturePhoto()" disabled id="capture-btn">Capturar Foto</button>
+        <div id="capture-status"></div>
+        <canvas id="canvas" style="display: none;"></canvas>
+        <div id="photo-preview"></div>
+    </div>
+
+    <div class="container">
+        <h2>4. Teste de Upload (Simulado)</h2>
+        <button onclick="simulateUpload()" disabled id="upload-btn">Simular Upload</button>
+        <div id="upload-status"></div>
+    </div>
+
+    <div class="container">
+        <h2>📋 Log de Debug</h2>
+        <button onclick="clearLog()">Limpar Log</button>
+        <div id="debug-log" class="debug"></div>
+    </div>
+
+    <script>
+        let stream = null;
+        let video = null;
+        let canvas = null;
+        let capturedBlob = null;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('debug-log');
+            logDiv.textContent += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function showStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function clearLog() {
+            document.getElementById('debug-log').textContent = '';
+        }
+
+        async function testPermissions() {
+            log('🔍 Testando permissões da câmera...');
+            
+            try {
+                if ('permissions' in navigator) {
+                    const permission = await navigator.permissions.query({ name: 'camera' });
+                    log(`📋 Status da permissão: ${permission.state}`);
+                    showStatus('permissions-status', `Permissão: ${permission.state}`, 
+                        permission.state === 'granted' ? 'success' : 'info');
+                } else {
+                    log('⚠️ API de permissões não suportada');
+                    showStatus('permissions-status', 'API de permissões não suportada', 'info');
+                }
+            } catch (error) {
+                log(`❌ Erro ao verificar permissões: ${error.message}`);
+                showStatus('permissions-status', `Erro: ${error.message}`, 'error');
+            }
+        }
+
+        async function startCamera() {
+            log('🎬 Iniciando câmera...');
+            
+            try {
+                video = document.getElementById('video');
+                canvas = document.getElementById('canvas');
+                
+                const constraints = {
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                };
+                
+                log(`📱 Solicitando acesso com constraints: ${JSON.stringify(constraints)}`);
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                log(`✅ Stream obtido com ${stream.getTracks().length} tracks`);
+                
+                video.srcObject = stream;
+                video.style.display = 'block';
+                
+                video.onloadedmetadata = () => {
+                    log(`📐 Video carregado: ${video.videoWidth}x${video.videoHeight}`);
+                    showStatus('camera-status', 
+                        `Câmera ativa: ${video.videoWidth}x${video.videoHeight}`, 'success');
+                    
+                    document.getElementById('stop-btn').disabled = false;
+                    document.getElementById('capture-btn').disabled = false;
+                };
+                
+                await video.play();
+                log('▶️ Video iniciado');
+                
+            } catch (error) {
+                log(`❌ Erro ao iniciar câmera: ${error.name} - ${error.message}`);
+                showStatus('camera-status', `Erro: ${error.message}`, 'error');
+            }
+        }
+
+        function stopCamera() {
+            log('🛑 Parando câmera...');
+            
+            if (stream) {
+                stream.getTracks().forEach(track => {
+                    track.stop();
+                    log(`🔴 Track parado: ${track.kind}`);
+                });
+                stream = null;
+            }
+            
+            if (video) {
+                video.srcObject = null;
+                video.style.display = 'none';
+            }
+            
+            document.getElementById('stop-btn').disabled = true;
+            document.getElementById('capture-btn').disabled = true;
+            document.getElementById('upload-btn').disabled = true;
+            
+            showStatus('camera-status', 'Câmera parada', 'info');
+            log('📴 Câmera parada');
+        }
+
+        async function capturePhoto() {
+            log('📸 Capturando foto...');
+            
+            if (!video || video.videoWidth === 0) {
+                log('❌ Video não está pronto');
+                showStatus('capture-status', 'Video não está pronto', 'error');
+                return;
+            }
+            
+            try {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.style.display = 'block';
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+                
+                log(`🎨 Imagem desenhada no canvas: ${canvas.width}x${canvas.height}`);
+                
+                // Converter para blob
+                capturedBlob = await new Promise((resolve, reject) => {
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            log(`📦 Blob criado: ${blob.size} bytes`);
+                            resolve(blob);
+                        } else {
+                            reject(new Error('Falha ao criar blob'));
+                        }
+                    }, 'image/jpeg', 0.8);
+                });
+                
+                // Mostrar preview
+                const url = URL.createObjectURL(capturedBlob);
+                const img = document.createElement('img');
+                img.src = url;
+                img.style.maxWidth = '300px';
+                img.style.border = '2px solid green';
+                
+                const preview = document.getElementById('photo-preview');
+                preview.innerHTML = '';
+                preview.appendChild(img);
+                
+                showStatus('capture-status', 
+                    `Foto capturada: ${capturedBlob.size} bytes`, 'success');
+                document.getElementById('upload-btn').disabled = false;
+                
+            } catch (error) {
+                log(`❌ Erro na captura: ${error.message}`);
+                showStatus('capture-status', `Erro: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateUpload() {
+            log('☁️ Simulando upload...');
+            
+            if (!capturedBlob) {
+                log('❌ Nenhuma foto para upload');
+                showStatus('upload-status', 'Nenhuma foto para upload', 'error');
+                return;
+            }
+            
+            try {
+                // Simular criação de arquivo
+                const file = new File([capturedBlob], `photo_${Date.now()}.jpg`, { 
+                    type: 'image/jpeg' 
+                });
+                
+                log(`📁 Arquivo criado: ${file.name} (${file.size} bytes)`);
+                
+                // Simular delay de upload
+                showStatus('upload-status', 'Fazendo upload...', 'info');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Simular sucesso
+                const fakeUrl = `https://example.com/uploads/${file.name}`;
+                log(`✅ Upload simulado concluído: ${fakeUrl}`);
+                showStatus('upload-status', 
+                    `Upload concluído: ${file.name}`, 'success');
+                
+            } catch (error) {
+                log(`❌ Erro no upload simulado: ${error.message}`);
+                showStatus('upload-status', `Erro: ${error.message}`, 'error');
+            }
+        }
+
+        // Inicializar
+        log('🚀 Teste de funcionalidade da câmera iniciado');
+        log('📱 User Agent: ' + navigator.userAgent);
+        log('🌐 Protocolo: ' + location.protocol);
+        log('🔒 Contexto seguro: ' + window.isSecureContext);
+    </script>
+</body>
+</html>
