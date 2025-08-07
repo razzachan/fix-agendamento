@@ -21,7 +21,7 @@
     "deploy:hostgator": "npm run build && npm run deploy:manual",
     "deploy:setup": "node setup-deploy.js",
     "deploy:test": "node test-deploy.js",
-    "deploy:health": "node health-check.js",
+    "deploy:health": "node health-check.cjs",
     "zip-dist": "npm run build:clean && echo 'Pasta dist limpa e pronta para ZIP manual!'"
   },
   "dependencies": {
