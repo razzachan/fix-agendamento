@@ -15,15 +15,16 @@ const path = require('path');
 const { execSync } = require('child_process');
 require('dotenv').config();
 
-// Configurações
+// Configurações FTP (BASEADO NO CPANEL HOSTGATOR)
 const FTP_CONFIG = {
-    host: process.env.FTP_SERVER || 'ftp.fixfogoes.com.br',
+    host: process.env.FTP_SERVER || 'br594.hostgator.com.br',
     user: process.env.FTP_USERNAME || 'master@app.fixfogoes.com.br',
-    password: process.env.FTP_PASSWORD || 'Senha!23',
-    secure: false
+    password: process.env.FTP_PASSWORD || 'SuaSenhaFTP_AquiDepois',
+    secure: false,
+    port: 21
 };
 
-const REMOTE_PATH = '/public_html/app.fixfogoes.com.br';
+const REMOTE_PATH = '/home2/miragi67/app.fixfogoes.com.br/master';
 const LOCAL_DIST = './dist';
 
 // Função para log colorido
