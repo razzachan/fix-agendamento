@@ -41,8 +41,8 @@ const googleAdsConfig = {
   clientSecret: process.env.GOOGLE_ADS_CLIENT_SECRET || '',
   refreshToken: process.env.GOOGLE_ADS_REFRESH_TOKEN || '',
   developerToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN || 'PENDING_APPROVAL',
-  customerId: process.env.GOOGLE_ADS_CUSTOMER_ID || '2089607313',
-  loginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || '2089607313',
+  customerId: process.env.GOOGLE_ADS_CUSTOMER_ID || '2906892366',
+  loginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || '2906892366',
   apiVersion: 'v16',
   baseUrl: 'https://googleads.googleapis.com',
 };

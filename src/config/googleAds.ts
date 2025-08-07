@@ -32,8 +32,8 @@ export const googleAdsConfig: GoogleAdsConfig = {
   clientSecret: import.meta.env.GOOGLE_ADS_CLIENT_SECRET || '',
   refreshToken: import.meta.env.GOOGLE_ADS_REFRESH_TOKEN || '',
   developerToken: import.meta.env.GOOGLE_ADS_DEVELOPER_TOKEN || 'PENDING_APPROVAL',
-  customerId: import.meta.env.GOOGLE_ADS_CUSTOMER_ID || '2089607313',
-  loginCustomerId: import.meta.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || '2089607313',
+  customerId: import.meta.env.GOOGLE_ADS_CUSTOMER_ID || '2906892366',
+  loginCustomerId: import.meta.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || '2906892366',
   apiVersion: 'v16',
   baseUrl: 'https://googleads.googleapis.com',
 };
@@ -57,7 +57,7 @@ export const conversionActionIds: ConversionActionIds = {
  */
 export const trackingConfig = {
   enabled: import.meta.env.VITE_GOOGLE_ADS_TRACKING_ENABLED === 'true',
-  customerId: import.meta.env.VITE_GOOGLE_ADS_CUSTOMER_ID || '2089607313',
+  customerId: import.meta.env.VITE_GOOGLE_ADS_CUSTOMER_ID || '2906892366',
   autoUploadInterval: 30, // minutos
   maxRetries: 3,
   retryDelay: 5000, // ms

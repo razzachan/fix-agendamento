@@ -4,8 +4,8 @@ Este guia te ajudará a configurar completamente a integração com Google Ads A
 
 ## 📋 Status Atual
 
-✅ **Conta MCC Criada**: 208-960-7313  
-✅ **Conta Original Vinculada**: 290-689-2366  
+✅ **Conta Principal (ATIVA)**: 290-689-2366
+✅ **Conta MCC Gerenciadora**: 208-960-7313
 ✅ **Developer Token**: Solicitado (aguardando aprovação)  
 ✅ **Estrutura do Sistema**: Configurada  
 ⏳ **Aprovação Pendente**: 3 dias úteis  

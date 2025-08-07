@@ -1,0 +1,234 @@
+<!-- 
+🎯 CÓDIGOS PARA ADICIONAR NO HEADER DOS SITES
+Copie e cole estes códigos no <head> de cada site
+-->
+
+<!-- ========================================= -->
+<!-- 1. PARA www.fixfogoes.com.br -->
+<!-- ========================================= -->
+
+<!-- Google Ads Conversion Tracking -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-2906892366"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'AW-2906892366');
+</script>
+
+<!-- Fix Fogões - Tracking Personalizado -->
+<script>
+(function() {
+  // Configurações específicas do Fix Fogões
+  window.SITE_CONFIG = {
+    siteDomain: 'www.fixfogoes.com.br',
+    siteName: 'Fix Fogões',
+    businessName: 'Fix Fogões',
+    businessType: 'assistencia_tecnica_fogoes',
+    googleAdsId: 'AW-2906892366'
+  };
+
+  // Capturar parâmetros de tracking da URL
+  function captureTrackingParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const trackingParams = {
+      gclid: urlParams.get('gclid'),
+      utm_source: urlParams.get('utm_source'),
+      utm_medium: urlParams.get('utm_medium'),
+      utm_campaign: urlParams.get('utm_campaign'),
+      utm_term: urlParams.get('utm_term'),
+      utm_content: urlParams.get('utm_content')
+    };
+
+    // Se tiver parâmetros de tracking, salvar e sincronizar
+    if (trackingParams.gclid || trackingParams.utm_source) {
+      // Salvar no localStorage
+      localStorage.setItem('fixfogoes_tracking', JSON.stringify({
+        ...trackingParams,
+        ...window.SITE_CONFIG,
+        capturedAt: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        referer: document.referrer,
+        requestUrl: window.location.href
+      }));
+
+      // Sincronizar com middleware
+      syncWithMiddleware(trackingParams);
+      
+      console.log('🎯 Fix Fogões - Tracking capturado:', trackingParams);
+    }
+  }
+
+  // Sincronizar com middleware
+  function syncWithMiddleware(trackingParams) {
+    const syncData = {
+      ...trackingParams,
+      ...window.SITE_CONFIG,
+      captured_at: new Date().toISOString(),
+      user_agent: navigator.userAgent,
+      referer: document.referrer,
+      request_url: window.location.href,
+      sync_source: 'fixfogoes_website'
+    };
+
+    fetch('https://fix-agendamento-production.up.railway.app/sync-tracking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(syncData)
+    }).then(response => {
+      if (response.ok) {
+        console.log('✅ Fix Fogões - Tracking sincronizado com middleware');
+      }
+    }).catch(error => {
+      console.error('❌ Fix Fogões - Erro na sincronização:', error);
+    });
+  }
+
+  // Executar quando página carregar
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', captureTrackingParams);
+  } else {
+    captureTrackingParams();
+  }
+
+  // Função global para registrar conversões
+  window.registerFixFogoesConversion = function(conversionType, value) {
+    const tracking = JSON.parse(localStorage.getItem('fixfogoes_tracking') || '{}');
+    
+    if (tracking.gclid) {
+      // Registrar via Google Ads
+      gtag('event', 'conversion', {
+        'send_to': 'AW-2906892366/' + conversionType,
+        'value': value,
+        'currency': 'BRL'
+      });
+      
+      console.log('✅ Fix Fogões - Conversão registrada:', conversionType, value);
+    }
+  };
+})();
+</script>
+
+<!-- ========================================= -->
+<!-- 2. PARA fixeletros.com.br -->
+<!-- ========================================= -->
+
+<!-- Google Ads Conversion Tracking -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-2906892366"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'AW-2906892366');
+</script>
+
+<!-- Fix Eletros - Tracking Personalizado -->
+<script>
+(function() {
+  // Configurações específicas do Fix Eletros
+  window.SITE_CONFIG = {
+    siteDomain: 'fixeletros.com.br',
+    siteName: 'Fix Eletros',
+    businessName: 'Fix Eletros',
+    businessType: 'assistencia_tecnica_eletros',
+    googleAdsId: 'AW-2906892366'
+  };
+
+  // Capturar parâmetros de tracking da URL
+  function captureTrackingParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const trackingParams = {
+      gclid: urlParams.get('gclid'),
+      utm_source: urlParams.get('utm_source'),
+      utm_medium: urlParams.get('utm_medium'),
+      utm_campaign: urlParams.get('utm_campaign'),
+      utm_term: urlParams.get('utm_term'),
+      utm_content: urlParams.get('utm_content')
+    };
+
+    // Se tiver parâmetros de tracking, salvar e sincronizar
+    if (trackingParams.gclid || trackingParams.utm_source) {
+      // Salvar no localStorage
+      localStorage.setItem('fixeletros_tracking', JSON.stringify({
+        ...trackingParams,
+        ...window.SITE_CONFIG,
+        capturedAt: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        referer: document.referrer,
+        requestUrl: window.location.href
+      }));
+
+      // Sincronizar com middleware
+      syncWithMiddleware(trackingParams);
+      
+      console.log('🎯 Fix Eletros - Tracking capturado:', trackingParams);
+    }
+  }
+
+  // Sincronizar com middleware
+  function syncWithMiddleware(trackingParams) {
+    const syncData = {
+      ...trackingParams,
+      ...window.SITE_CONFIG,
+      captured_at: new Date().toISOString(),
+      user_agent: navigator.userAgent,
+      referer: document.referrer,
+      request_url: window.location.href,
+      sync_source: 'fixeletros_website'
+    };
+
+    fetch('https://fix-agendamento-production.up.railway.app/sync-tracking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(syncData)
+    }).then(response => {
+      if (response.ok) {
+        console.log('✅ Fix Eletros - Tracking sincronizado com middleware');
+      }
+    }).catch(error => {
+      console.error('❌ Fix Eletros - Erro na sincronização:', error);
+    });
+  }
+
+  // Executar quando página carregar
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', captureTrackingParams);
+  } else {
+    captureTrackingParams();
+  }
+
+  // Função global para registrar conversões
+  window.registerFixEletrosConversion = function(conversionType, value) {
+    const tracking = JSON.parse(localStorage.getItem('fixeletros_tracking') || '{}');
+    
+    if (tracking.gclid) {
+      // Registrar via Google Ads
+      gtag('event', 'conversion', {
+        'send_to': 'AW-2906892366/' + conversionType,
+        'value': value,
+        'currency': 'BRL'
+      });
+      
+      console.log('✅ Fix Eletros - Conversão registrada:', conversionType, value);
+    }
+  };
+})();
+</script>
+
+<!-- ========================================= -->
+<!-- 3. BOTÕES DE CONVERSÃO (OPCIONAL) -->
+<!-- ========================================= -->
+
+<!-- Para Fix Fogões - Adicionar onclick nos botões de contato -->
+<script>
+// Exemplo de uso nos botões:
+// <button onclick="registerFixFogoesConversion('Contato', 50)">Entre em Contato</button>
+// <a href="tel:(48)98833-2664" onclick="registerFixFogoesConversion('Ligacao', 100)">Ligar Agora</a>
+</script>
+
+<!-- Para Fix Eletros - Adicionar onclick nos botões de contato -->
+<script>
+// Exemplo de uso nos botões:
+// <button onclick="registerFixEletrosConversion('Contato', 50)">Entre em Contato</button>
+// <a href="tel:(48)98833-2664" onclick="registerFixEletrosConversion('Ligacao', 100)">Ligar Agora</a>
+</script>
