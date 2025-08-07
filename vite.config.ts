@@ -73,12 +73,12 @@ export default defineConfig(({ mode, command }) => {
         start_url: '/',
         icons: [
           {
-            src: '/fix fogoes.png',
+            src: '/icons/icon-192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: '/fix fogoes.png',
+            src: '/icons/icon-512.png',
             sizes: '512x512',
             type: 'image/png'
           }
@@ -107,7 +107,14 @@ export default defineConfig(({ mode, command }) => {
         assetFileNames: `assets/[name]-[hash].[ext]`
       }
     },
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 1000,
+    minify: 'terser',
+    terserOptions: {
+      mangle: {
+        // Não minificar nomes de classes específicas
+        reserved: ['GoogleAdsTrackingService']
+      }
+    }
   }
   };
 });

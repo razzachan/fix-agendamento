@@ -63,6 +63,27 @@ export class GoogleAdsTrackingService {
   }
 
   /**
+   * Armazena parâmetros de tracking no localStorage
+   */
+  static storeTrackingParams(params: {
+    gclid?: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+    utmTerm?: string;
+    utmContent?: string;
+  }): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+      localStorage.setItem('trackingParams', JSON.stringify(params));
+      console.log('🎯 [GoogleAdsTracking] Parâmetros armazenados:', params);
+    } catch (error) {
+      console.error('❌ [GoogleAdsTracking] Erro ao armazenar parâmetros:', error);
+    }
+  }
+
+  /**
    * 🎯 REGISTRA CONVERSÕES INTELIGENTES (MÚLTIPLAS CATEGORIAS)
    *
    * ESTRATÉGIA:
@@ -579,3 +600,6 @@ export class GoogleAdsTrackingService {
     }
   }
 }
+
+// Exportação explícita para garantir compatibilidade
+export default GoogleAdsTrackingService;

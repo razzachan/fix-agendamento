@@ -1,0 +1,3 @@
+TESTE DE DEPLOY - 05:08
+Este arquivo foi criado para testar se o deploy está funcionando corretamente.
+Timestamp: 2025-01-08 05:08:00

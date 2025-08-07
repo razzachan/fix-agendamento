@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Fix Fogões</title>
+    <meta name="description" content="Sistema de gestão para assistência técnica de fogões" />
+    <meta name="author" content="Fix Fogões" />
+
+    <meta property="og:title" content="Fix Fogões" />
+    <meta property="og:description" content="Sistema de gestão para assistência técnica de fogões" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@lovable_dev" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#E5B034" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Fix Fogões" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="msapplication-TileColor" content="#E5B034" />
+    <meta name="msapplication-tap-highlight" content="no" />
+
+    <!-- TWA Specific Meta Tags -->
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="alternate" href="/twa-manifest.json" type="application/json" />
+
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
+    <script type="module" crossorigin src="/assets/index-d_Q6LavW.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-BJaCQb1B.js">
+    <link rel="modulepreload" crossorigin href="/assets/ui-N8kfuQG7.js">
+    <link rel="modulepreload" crossorigin href="/assets/charts-B0ZRp5vW.js">
+    <link rel="modulepreload" crossorigin href="/assets/utils-BJ9f0Uta.js">
+    <link rel="modulepreload" crossorigin href="/assets/maps-DgedmEtj.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-DWTBlKu-.css">
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
+
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>

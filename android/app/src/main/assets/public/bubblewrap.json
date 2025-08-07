@@ -1,0 +1,66 @@
+{
+  "packageId": "br.com.fixfogoes.app.twa",
+  "host": "app.fixfogoes.com.br",
+  "name": "Fix Fogões",
+  "launcherName": "Fix Fogões",
+  "display": "standalone",
+  "orientation": "default",
+  "themeColor": "#E5B034",
+  "navigationColor": "#E5B034",
+  "backgroundColor": "#ffffff",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://app.fixfogoes.com.br/icons/icon-512.png",
+  "maskableIconUrl": "https://app.fixfogoes.com.br/icons/icon-maskable-512.png",
+  "monochromeIconUrl": "https://app.fixfogoes.com.br/icons/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "fixfogoes"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Novo Orçamento",
+      "short_name": "Orçamento",
+      "url": "/orcamentos/novo",
+      "icons": [
+        {
+          "src": "https://app.fixfogoes.com.br/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Clientes",
+      "short_name": "Clientes",
+      "url": "/clientes",
+      "icons": [
+        {
+          "src": "https://app.fixfogoes.com.br/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://app.fixfogoes.com.br/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": false
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false
+}
