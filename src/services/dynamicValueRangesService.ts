@@ -20,23 +20,31 @@ export class DynamicValueRangesService {
   static async initialize(): Promise<void> {
     try {
       console.log('🎯 [DynamicRanges] Inicializando faixas dinâmicas...');
-      
+
+      // Versão simplificada para teste
+      console.log('🔄 [DynamicRanges] Calculando faixas...');
       const ranges = await calculateDynamicValueRanges();
-      
+
       this.cachedRanges = ranges;
       this.lastUpdate = new Date();
-      
+
       console.log('✅ [DynamicRanges] Faixas dinâmicas inicializadas:', {
         baixo: `R$ ${ranges.baixo_valor.min} - R$ ${ranges.baixo_valor.max.toFixed(2)}`,
         medio: `R$ ${ranges.medio_valor.min} - R$ ${ranges.medio_valor.max.toFixed(2)}`,
         alto: `R$ ${ranges.alto_valor.min}+`
       });
-      
+
+      console.log('🎉 [DynamicRanges] Inicialização concluída com sucesso!');
+
     } catch (error) {
       console.error('❌ [DynamicRanges] Erro ao inicializar:', error);
+      console.error('❌ [DynamicRanges] Stack trace:', error.stack);
+
       // Usar valores padrão em caso de erro
       this.cachedRanges = VALUE_CATEGORY_MAP;
       this.lastUpdate = new Date();
+
+      console.log('⚠️ [DynamicRanges] Usando valores padrão devido ao erro');
     }
   }
 

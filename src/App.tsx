@@ -63,23 +63,38 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 const queryClient = new QueryClient();
 
 function App() {
+  // 🚨 LOG BÁSICO PARA DETECTAR SE APP.TSX EXECUTA
+  console.log('🚀 [App] COMPONENTE APP.TSX EXECUTADO!');
+
   // 🤖 INICIALIZAR SISTEMAS AUTOMÁTICOS
   useEffect(() => {
+    console.log('🎯 [App] useEffect EXECUTADO!');
+
     const initializeServices = async () => {
-      // 1. Inicializar faixas dinâmicas de valor
-      console.log('🎯 [App] Inicializando faixas dinâmicas de valor...');
-      await DynamicValueRangesService.initialize();
+      try {
+        console.log('🔄 [App] Iniciando inicialização dos serviços...');
 
-      // 2. Inicializar cron de conversões se habilitado
-      if (trackingConfig.enabled) {
-        console.log('🚀 [App] Iniciando cron de conversões automáticas...');
+        // 1. Inicializar faixas dinâmicas de valor
+        console.log('🎯 [App] Inicializando faixas dinâmicas de valor...');
+        await DynamicValueRangesService.initialize();
+        console.log('✅ [App] Faixas dinâmicas inicializadas!');
 
-        // Iniciar upload automático a cada 30 minutos
-        AutoConversionUpload.startAutoUpload(trackingConfig.autoUploadInterval);
+        // 2. Inicializar cron de conversões se habilitado
+        if (trackingConfig.enabled) {
+          console.log('🚀 [App] Iniciando cron de conversões automáticas...');
 
-        console.log(`✅ [App] Cron iniciado: upload a cada ${trackingConfig.autoUploadInterval} minutos`);
-      } else {
-        console.log('⚠️ [App] Tracking desabilitado - cron não iniciado');
+          // Iniciar upload automático a cada 30 minutos
+          AutoConversionUpload.startAutoUpload(trackingConfig.autoUploadInterval);
+
+          console.log(`✅ [App] Cron iniciado: upload a cada ${trackingConfig.autoUploadInterval} minutos`);
+        } else {
+          console.log('⚠️ [App] Tracking desabilitado - cron não iniciado');
+        }
+
+        console.log('🎉 [App] Todos os serviços inicializados com sucesso!');
+
+      } catch (error) {
+        console.error('❌ [App] Erro na inicialização dos serviços:', error);
       }
     };
 
