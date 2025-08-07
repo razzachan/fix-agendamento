@@ -17,6 +17,11 @@
     "clean-dist": "rm -rf dist/.vercel dist/vercel.json dist/test-* dist/debug-* dist/mobile-order-popup.html dist/mobile-orders.html dist/icons/logos.zip dist/.gitignore dist/*.zip dist/.git",
     "deploy": "npm run build:clean && cd dist && vercel --prod",
     "deploy:preview": "npm run build:clean && cd dist && vercel",
+    "deploy:manual": "node deploy-manual.js",
+    "deploy:hostgator": "npm run build && npm run deploy:manual",
+    "deploy:setup": "node setup-deploy.js",
+    "deploy:test": "node test-deploy.js",
+    "deploy:health": "node health-check.js",
     "zip-dist": "npm run build:clean && echo 'Pasta dist limpa e pronta para ZIP manual!'"
   },
   "dependencies": {
@@ -101,6 +106,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.20",
+    "basic-ftp": "^5.0.5",
     "dotenv": "^16.5.0",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
