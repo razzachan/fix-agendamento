@@ -17,12 +17,12 @@
     <meta name="twitter:image" content="/icons/icon-512.png" />
 
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#E5B034" />
+    <meta name="theme-color" content="#0080ff" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Fix Fogões" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="msapplication-TileColor" content="#E5B034" />
+    <meta name="msapplication-TileColor" content="#0080ff" />
     <meta name="msapplication-tap-highlight" content="no" />
 
     <!-- Manifest -->
@@ -34,33 +34,34 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192.png" />
 
     <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon.svg" />
-    <link rel="shortcut icon" href="/favicon.svg" />
-    <script type="module" crossorigin src="/assets/index-CxrLJhQU.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/vendor-BJaCQb1B.js">
-    <link rel="modulepreload" crossorigin href="/assets/ui-Dn8Aqb0j.js">
-    <link rel="modulepreload" crossorigin href="/assets/charts-B0ZRp5vW.js">
-    <link rel="modulepreload" crossorigin href="/assets/utils-mnyH58Xp.js">
-    <link rel="modulepreload" crossorigin href="/assets/maps-DgedmEtj.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-DNP3UeeF.css">
-  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+    <link rel="shortcut icon" href="/favicon.png" />
+    <link rel="modulepreload" crossorigin href="/assets/vendor-BJaCQb1B-Cbr5T7rF.js">
+    <link rel="modulepreload" crossorigin href="/assets/ui-Dn8Aqb0j-DnN0Mb9-.js">
+    <link rel="modulepreload" crossorigin href="/assets/charts-B0ZRp5vW-CsJwuvNu.js">
+    <link rel="modulepreload" crossorigin href="/assets/utils-mnyH58Xp-D78SC-Vr.js">
+    <link rel="modulepreload" crossorigin href="/assets/maps-DgedmEtj-ex3DfE3h.js">
+  <link rel="manifest" href="/assets/manifest-cbH4b58J.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script>  <script type="module" crossorigin src="/assets/index-DhUf2O5w.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-83-L6JCf.css">
+<link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
   <body>
     <div id="root"></div>
-    <!-- GPT Engineer script removido para produção -->
+    <!-- GPT Engineer script removido para produção -->
 
-    <!-- Service Worker Registration - SUPER SIMPLES -->
+
+    <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw-simple.js')
+          navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
-              console.log('✅ SW simples registrado:', registration);
+              console.log('✅ Service Worker registrado:', registration);
             })
             .catch((error) => {
-              console.log('❌ SW erro:', error);
+              console.log('❌ Erro no Service Worker:', error);
             });
         });
       }

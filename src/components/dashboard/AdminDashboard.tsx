@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   TrendingUp,
   TrendingDown,
+  TrendingDown,
   Users,
   Wrench,
   Calendar,
@@ -44,6 +45,7 @@ import ConversionDetailsReport from '@/components/analytics/ConversionDetailsRep
 import AdvancedBIDashboard from '@/components/analytics/AdvancedBIDashboard';
 import ConversionTestRunner from '@/components/testing/ConversionTestRunner';
 import RealTimeMonitoringDashboard from '@/components/monitoring/RealTimeMonitoringDashboard';
+import { DashboardAnalyticsService, WeeklyPerformanceData, TeamPerformanceData, GrowthMetrics, ExecutiveSummary } from '@/services/dashboardAnalyticsService';
 
 interface AdminDashboardProps {
   serviceOrders: ServiceOrder[];
@@ -81,6 +83,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [weeklyData, setWeeklyData] = useState<WeeklyPerformanceData[]>([]);
+  const [isLoadingWeekly, setIsLoadingWeekly] = useState(true);
+  const [teamData, setTeamData] = useState<TeamPerformanceData[]>([]);
+  const [isLoadingTeam, setIsLoadingTeam] = useState(true);
+  const [growthMetrics, setGrowthMetrics] = useState<GrowthMetrics>({
+    revenueGrowth: 0,
+    ordersGrowth: 0,
+    clientsGrowth: 0,
+    avgOrderValueGrowth: 0
+  });
+  const [isLoadingGrowth, setIsLoadingGrowth] = useState(true);
+  const [executiveSummary, setExecutiveSummary] = useState<ExecutiveSummary>({
+    efficiency: 0,
+    quality: 0,
+    punctuality: 0,
+    totalOrders: 0,
+    avgCompletionTime: 0,
+    customerSatisfaction: 0
+  });
+  const [isLoadingExecutive, setIsLoadingExecutive] = useState(true);
 
   // Atualizar horário em tempo real
   useEffect(() => {
@@ -88,10 +110,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Carregar todos os dados do dashboard
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        // Carregar dados em paralelo
+        const [weeklyPerformance, teamPerformance, growth, executive] = await Promise.all([
+          DashboardAnalyticsService.getWeeklyPerformance(),
+          DashboardAnalyticsService.getTeamPerformance(),
+          DashboardAnalyticsService.getGrowthMetrics(),
+          DashboardAnalyticsService.getExecutiveSummary()
+        ]);
+
+        setWeeklyData(weeklyPerformance);
+        setTeamData(teamPerformance);
+        setGrowthMetrics(growth);
+        setExecutiveSummary(executive);
+      } catch (error) {
+        console.error('❌ Erro ao carregar dados do dashboard:', error);
+      } finally {
+        setIsLoadingWeekly(false);
+        setIsLoadingTeam(false);
+        setIsLoadingGrowth(false);
+        setIsLoadingExecutive(false);
+      }
+    };
+
+    loadDashboardData();
+  }, []);
+
   // Calcular métricas avançadas
   const totalOrders = pendingOrders + inProgressOrders + completedOrders;
   const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
-  const revenueGrowth = 12.5; // Simulado - pode ser calculado com dados históricos
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
   // Ordens recentes (últimas 5)
@@ -99,22 +149,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
 
-  // Dados para gráficos (simulados - podem ser calculados com dados reais)
-  const weeklyData = [
-    { day: 'Seg', orders: 12, revenue: 2400 },
-    { day: 'Ter', orders: 19, revenue: 3800 },
-    { day: 'Qua', orders: 15, revenue: 3000 },
-    { day: 'Qui', orders: 22, revenue: 4400 },
-    { day: 'Sex', orders: 18, revenue: 3600 },
-    { day: 'Sáb', orders: 8, revenue: 1600 },
-    { day: 'Dom', orders: 5, revenue: 1000 }
-  ];
+  // Dados de performance semanal agora vêm do banco de dados (não mais mockados)
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // Simular refresh
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsRefreshing(false);
+    setIsLoadingWeekly(true);
+    setIsLoadingTeam(true);
+    setIsLoadingGrowth(true);
+    setIsLoadingExecutive(true);
+
+    try {
+      // Recarregar todos os dados
+      const [weeklyPerformance, teamPerformance, growth, executive] = await Promise.all([
+        DashboardAnalyticsService.getWeeklyPerformance(),
+        DashboardAnalyticsService.getTeamPerformance(),
+        DashboardAnalyticsService.getGrowthMetrics(),
+        DashboardAnalyticsService.getExecutiveSummary()
+      ]);
+
+      setWeeklyData(weeklyPerformance);
+      setTeamData(teamPerformance);
+      setGrowthMetrics(growth);
+      setExecutiveSummary(executive);
+    } catch (error) {
+      console.error('❌ Erro ao atualizar dados:', error);
+    } finally {
+      setIsRefreshing(false);
+      setIsLoadingWeekly(false);
+      setIsLoadingTeam(false);
+      setIsLoadingGrowth(false);
+      setIsLoadingExecutive(false);
+    }
   };
 
   return (
@@ -352,27 +417,51 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5" />
                   Performance Semanal
+                  {isLoadingWeekly && (
+                    <div className="ml-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {weeklyData.map((day, index) => (
-                    <div key={day.day} className="flex items-center gap-4">
-                      <div className="w-8 text-xs font-medium text-muted-foreground">
-                        {day.day}
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span>{day.orders} ordens</span>
-                          <span>{formatCurrency(day.revenue)}</span>
+                {isLoadingWeekly ? (
+                  <div className="space-y-4">
+                    {Array.from({ length: 7 }).map((_, index) => (
+                      <div key={index} className="flex items-center gap-4">
+                        <div className="w-8 h-4 bg-gray-200 rounded animate-pulse" />
+                        <div className="flex-1 space-y-2">
+                          <div className="flex justify-between">
+                            <div className="w-16 h-3 bg-gray-200 rounded animate-pulse" />
+                            <div className="w-20 h-3 bg-gray-200 rounded animate-pulse" />
+                          </div>
+                          <div className="w-full h-2 bg-gray-200 rounded animate-pulse" />
                         </div>
-                        <Progress
-                          value={(day.orders / 25) * 100}
-                          className="h-2"
-                        />
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {weeklyData.map((day, index) => {
+                      const maxOrders = Math.max(...weeklyData.map(d => d.orders), 1);
+                      return (
+                        <div key={day.day} className="flex items-center gap-4">
+                          <div className="w-8 text-xs font-medium text-muted-foreground">
+                            {day.day}
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span>{day.orders} ordens</span>
+                              <span>{formatCurrency(day.revenue)}</span>
+                            </div>
+                            <Progress
+                              value={(day.orders / maxOrders) * 100}
+                              className="h-2"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 </div>
               </CardContent>
             </Card>
@@ -527,44 +616,70 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
                   Performance da Equipe
+                  {isLoadingTeam && (
+                    <div className="ml-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {/* Simulando dados de técnicos */}
-                  {[
-                    { name: 'Pedro Santos', orders: 15, rating: 4.8, status: 'Ativo' },
-                    { name: 'Paulo Cesar', orders: 12, rating: 4.6, status: 'Ativo' },
-                    { name: 'Ana Silva', orders: 8, rating: 4.9, status: 'Ocupado' },
-                    { name: 'Carlos Lima', orders: 6, rating: 4.5, status: 'Disponível' }
-                  ].map((tech, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
-                          {tech.name.split(' ').map(n => n[0]).join('')}
+                {isLoadingTeam ? (
+                  <div className="space-y-4">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg animate-pulse">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gray-300 rounded-full" />
+                          <div className="space-y-2">
+                            <div className="w-24 h-4 bg-gray-300 rounded" />
+                            <div className="w-16 h-3 bg-gray-300 rounded" />
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">{tech.name}</p>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={tech.status === 'Ativo' ? 'default' : tech.status === 'Ocupado' ? 'destructive' : 'secondary'}
-                              className="text-xs"
-                            >
-                              {tech.status}
-                            </Badge>
-                            <div className="flex items-center gap-1">
-                              <Star className="h-3 w-3 text-yellow-500 fill-current" />
-                              <span className="text-xs text-muted-foreground">{tech.rating}</span>
+                        <div className="text-right space-y-2">
+                          <div className="w-12 h-4 bg-gray-300 rounded" />
+                          <div className="w-8 h-3 bg-gray-300 rounded" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : teamData.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Nenhum técnico encontrado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {teamData.map((tech, index) => (
+                      <div key={tech.technicianId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
+                            {tech.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{tech.name}</p>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={tech.status === 'Ativo' ? 'default' : tech.status === 'Ocupado' ? 'destructive' : 'secondary'}
+                                className="text-xs"
+                              >
+                                {tech.status}
+                              </Badge>
+                              <div className="flex items-center gap-1">
+                                <Star className="h-3 w-3 text-yellow-500 fill-current" />
+                                <span className="text-xs text-muted-foreground">{tech.rating}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium">{tech.orders}</p>
+                          <p className="text-xs text-muted-foreground">ordens</p>
+                          {tech.revenue > 0 && (
+                            <p className="text-xs text-green-600 font-medium">{formatCurrency(tech.revenue)}</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">{tech.orders}</p>
-                        <p className="text-xs text-muted-foreground">ordens</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
                 </div>
               </CardContent>
             </Card>
@@ -661,50 +776,146 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
                   Métricas de Crescimento
+                  {isLoadingGrowth && (
+                    <div className="ml-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-4">
-                    <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium text-green-800">Crescimento Mensal</p>
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                      </div>
-                      <p className="text-2xl font-bold text-green-900">+{revenueGrowth}%</p>
-                      <p className="text-xs text-green-700">vs. mês anterior</p>
+                {isLoadingGrowth ? (
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-4">
+                      {Array.from({ length: 2 }).map((_, index) => (
+                        <div key={index} className="p-4 bg-gray-100 rounded-lg animate-pulse">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="w-24 h-4 bg-gray-300 rounded" />
+                            <div className="w-4 h-4 bg-gray-300 rounded" />
+                          </div>
+                          <div className="w-16 h-8 bg-gray-300 rounded mb-1" />
+                          <div className="w-20 h-3 bg-gray-300 rounded" />
+                        </div>
+                      ))}
                     </div>
-
-                    <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium text-blue-800">Novos Clientes</p>
-                        <Users className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <p className="text-2xl font-bold text-blue-900">+24</p>
-                      <p className="text-xs text-blue-700">este mês</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium text-purple-800">Satisfação</p>
-                        <Star className="h-4 w-4 text-purple-600" />
-                      </div>
-                      <p className="text-2xl font-bold text-purple-900">4.8/5</p>
-                      <p className="text-xs text-purple-700">avaliação média</p>
-                    </div>
-
-                    <div className="p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium text-orange-800">Tempo Médio</p>
-                        <Clock className="h-4 w-4 text-orange-600" />
-                      </div>
-                      <p className="text-2xl font-bold text-orange-900">2.3 dias</p>
-                      <p className="text-xs text-orange-700">para conclusão</p>
+                    <div className="space-y-4">
+                      {Array.from({ length: 2 }).map((_, index) => (
+                        <div key={index} className="p-4 bg-gray-100 rounded-lg animate-pulse">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="w-24 h-4 bg-gray-300 rounded" />
+                            <div className="w-4 h-4 bg-gray-300 rounded" />
+                          </div>
+                          <div className="w-16 h-8 bg-gray-300 rounded mb-1" />
+                          <div className="w-20 h-3 bg-gray-300 rounded" />
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-4">
+                      <div className={`p-4 rounded-lg ${
+                        growthMetrics.revenueGrowth >= 0
+                          ? 'bg-gradient-to-r from-green-50 to-green-100'
+                          : 'bg-gradient-to-r from-red-50 to-red-100'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className={`text-sm font-medium ${
+                            growthMetrics.revenueGrowth >= 0 ? 'text-green-800' : 'text-red-800'
+                          }`}>Crescimento de Receita</p>
+                          {growthMetrics.revenueGrowth >= 0 ? (
+                            <TrendingUp className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                        <p className={`text-2xl font-bold ${
+                          growthMetrics.revenueGrowth >= 0 ? 'text-green-900' : 'text-red-900'
+                        }`}>
+                          {growthMetrics.revenueGrowth >= 0 ? '+' : ''}{growthMetrics.revenueGrowth}%
+                        </p>
+                        <p className={`text-xs ${
+                          growthMetrics.revenueGrowth >= 0 ? 'text-green-700' : 'text-red-700'
+                        }`}>vs. período anterior</p>
+                      </div>
+
+                      <div className={`p-4 rounded-lg ${
+                        growthMetrics.ordersGrowth >= 0
+                          ? 'bg-gradient-to-r from-blue-50 to-blue-100'
+                          : 'bg-gradient-to-r from-red-50 to-red-100'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className={`text-sm font-medium ${
+                            growthMetrics.ordersGrowth >= 0 ? 'text-blue-800' : 'text-red-800'
+                          }`}>Crescimento de Ordens</p>
+                          {growthMetrics.ordersGrowth >= 0 ? (
+                            <TrendingUp className="h-4 w-4 text-blue-600" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                        <p className={`text-2xl font-bold ${
+                          growthMetrics.ordersGrowth >= 0 ? 'text-blue-900' : 'text-red-900'
+                        }`}>
+                          {growthMetrics.ordersGrowth >= 0 ? '+' : ''}{growthMetrics.ordersGrowth}%
+                        </p>
+                        <p className={`text-xs ${
+                          growthMetrics.ordersGrowth >= 0 ? 'text-blue-700' : 'text-red-700'
+                        }`}>vs. período anterior</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className={`p-4 rounded-lg ${
+                        growthMetrics.clientsGrowth >= 0
+                          ? 'bg-gradient-to-r from-purple-50 to-purple-100'
+                          : 'bg-gradient-to-r from-red-50 to-red-100'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className={`text-sm font-medium ${
+                            growthMetrics.clientsGrowth >= 0 ? 'text-purple-800' : 'text-red-800'
+                          }`}>Novos Clientes</p>
+                          {growthMetrics.clientsGrowth >= 0 ? (
+                            <Users className="h-4 w-4 text-purple-600" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                        <p className={`text-2xl font-bold ${
+                          growthMetrics.clientsGrowth >= 0 ? 'text-purple-900' : 'text-red-900'
+                        }`}>
+                          {growthMetrics.clientsGrowth >= 0 ? '+' : ''}{growthMetrics.clientsGrowth}%
+                        </p>
+                        <p className={`text-xs ${
+                          growthMetrics.clientsGrowth >= 0 ? 'text-purple-700' : 'text-red-700'
+                        }`}>vs. período anterior</p>
+                      </div>
+
+                      <div className={`p-4 rounded-lg ${
+                        growthMetrics.avgOrderValueGrowth >= 0
+                          ? 'bg-gradient-to-r from-orange-50 to-orange-100'
+                          : 'bg-gradient-to-r from-red-50 to-red-100'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className={`text-sm font-medium ${
+                            growthMetrics.avgOrderValueGrowth >= 0 ? 'text-orange-800' : 'text-red-800'
+                          }`}>Ticket Médio</p>
+                          {growthMetrics.avgOrderValueGrowth >= 0 ? (
+                            <TrendingUp className="h-4 w-4 text-orange-600" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4 text-red-600" />
+                          )}
+                        </div>
+                        <p className={`text-2xl font-bold ${
+                          growthMetrics.avgOrderValueGrowth >= 0 ? 'text-orange-900' : 'text-red-900'
+                        }`}>
+                          {growthMetrics.avgOrderValueGrowth >= 0 ? '+' : ''}{growthMetrics.avgOrderValueGrowth}%
+                        </p>
+                        <p className={`text-xs ${
+                          growthMetrics.avgOrderValueGrowth >= 0 ? 'text-orange-700' : 'text-red-700'
+                        }`}>vs. período anterior</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -714,41 +925,85 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <CardTitle className="flex items-center gap-2">
                   <PieChart className="h-5 w-5" />
                   Resumo Executivo
+                  {isLoadingExecutive && (
+                    <div className="ml-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg">
-                    <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      {totalOrdersCount}
+                {isLoadingExecutive ? (
+                  <div className="space-y-4">
+                    <div className="text-center p-4 bg-gray-100 rounded-lg animate-pulse">
+                      <div className="w-16 h-8 bg-gray-300 rounded mx-auto mb-2" />
+                      <div className="w-24 h-4 bg-gray-300 rounded mx-auto" />
                     </div>
-                    <p className="text-sm text-muted-foreground">Total de Ordens</p>
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <div className="w-16 h-4 bg-gray-300 rounded animate-pulse" />
+                          <div className="w-12 h-4 bg-gray-300 rounded animate-pulse" />
+                        </div>
+                        <div className="w-full h-2 bg-gray-300 rounded animate-pulse" />
+                      </div>
+                    ))}
                   </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg">
+                      <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        {executiveSummary.totalOrders}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Total de Ordens (30 dias)</p>
+                    </div>
 
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">Eficiência</span>
-                      <span className="text-sm font-medium">92%</span>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Eficiência</span>
+                        <span className="text-sm font-medium">{executiveSummary.efficiency}%</span>
+                      </div>
+                      <Progress value={executiveSummary.efficiency} className="h-2" />
+                      <p className="text-xs text-muted-foreground">Ordens concluídas no prazo</p>
                     </div>
-                    <Progress value={92} className="h-2" />
-                  </div>
 
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">Qualidade</span>
-                      <span className="text-sm font-medium">96%</span>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Qualidade</span>
+                        <span className="text-sm font-medium">{executiveSummary.quality}%</span>
+                      </div>
+                      <Progress value={executiveSummary.quality} className="h-2" />
+                      <p className="text-xs text-muted-foreground">Ordens sem cancelamento</p>
                     </div>
-                    <Progress value={96} className="h-2" />
-                  </div>
 
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">Pontualidade</span>
-                      <span className="text-sm font-medium">88%</span>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Pontualidade</span>
+                        <span className="text-sm font-medium">{executiveSummary.punctuality}%</span>
+                      </div>
+                      <Progress value={executiveSummary.punctuality} className="h-2" />
+                      <p className="text-xs text-muted-foreground">Entregues no dia agendado</p>
                     </div>
-                    <Progress value={88} className="h-2" />
+
+                    {executiveSummary.customerSatisfaction > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm">Satisfação</span>
+                          <span className="text-sm font-medium">{executiveSummary.customerSatisfaction}/5</span>
+                        </div>
+                        <Progress value={(executiveSummary.customerSatisfaction / 5) * 100} className="h-2" />
+                        <p className="text-xs text-muted-foreground">Avaliação média dos clientes</p>
+                      </div>
+                    )}
+
+                    {executiveSummary.avgCompletionTime > 0 && (
+                      <div className="text-center p-3 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg">
+                        <div className="text-lg font-bold text-green-700">
+                          {executiveSummary.avgCompletionTime} dias
+                        </div>
+                        <p className="text-xs text-muted-foreground">Tempo médio de conclusão</p>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
