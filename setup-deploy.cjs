@@ -4,7 +4,7 @@
  * =====================================================
  * SCRIPT DE CONFIGURAÇÃO AUTOMÁTICA DO DEPLOY
  * =====================================================
- * Execute: node setup-deploy.js
+ * Execute: node setup-deploy.cjs
  * Configura tudo automaticamente para deploy
  * =====================================================
  */
@@ -41,9 +41,9 @@ async function setupDeploy() {
         log.info('Vamos configurar o deploy automático para HostGator...\n');
         
         const ftpServer = await question('🌐 Servidor FTP (ex: ftp.seudominio.com): ') || 'ftp.fixfogoes.com.br';
-        const ftpUser = await question('👤 Usuário FTP (ex: usuario@dominio.com): ') || 'miragioc@fixfogoes.com.br';
+        const ftpUser = await question('👤 Usuário FTP (ex: usuario@dominio.com): ') || 'master@app.fixfogoes.com.br';
         const ftpPassword = await question('🔑 Senha FTP: ');
-        const cpanelUser = await question('📁 Usuário cPanel (ex: miragioc): ') || 'miragioc';
+        const cpanelUser = await question('📁 Usuário cPanel (ex: miragi67): ') || 'miragi67';
         const domain = await question('🌍 Domínio/subdomínio (ex: app.fixfogoes.com.br): ') || 'app.fixfogoes.com.br';
         
         // 2. Atualizar arquivo .env
@@ -71,17 +71,7 @@ DEPLOY_DOMAIN=${domain}
         fs.writeFileSync('.env', envContent);
         log.success('✅ Arquivo .env atualizado!');
         
-        // 3. Atualizar script de deploy
-        log.info('🔧 Atualizando script de deploy...');
-        
-        let deployScript = fs.readFileSync('deploy-hostgator.sh', 'utf8');
-        deployScript = deployScript.replace(/CPANEL_USER=".*?"/, `CPANEL_USER="${cpanelUser}"`);
-        deployScript = deployScript.replace(/DOMAIN=".*?"/, `DOMAIN="${domain}"`);
-        
-        fs.writeFileSync('deploy-hostgator.sh', deployScript);
-        log.success('✅ Script de deploy atualizado!');
-        
-        // 4. Criar arquivo de configuração do Cron Job
+        // 3. Criar arquivo de configuração do Cron Job
         log.info('⏰ Criando configuração do Cron Job...');
         
         const cronConfig = `# =====================================================
@@ -103,13 +93,10 @@ DEPLOY_DOMAIN=${domain}
 # - Dia da semana: * (todos os dias da semana)
 # 
 # COMANDO PARA COLAR NO CPANEL:
-cd /home/${cpanelUser}/public_html/${domain} && bash deploy-hostgator.sh
+cd /home2/${cpanelUser}/public_html/${domain} && git pull origin main && npm ci && npm run build && rsync -av --delete dist/ ./
 
-# ALTERNATIVA (se o comando acima não funcionar):
-/bin/bash /home/${cpanelUser}/public_html/${domain}/deploy-hostgator.sh
-
-# PARA LOGS DETALHADOS:
-cd /home/${cpanelUser}/public_html/${domain} && bash deploy-hostgator.sh >> /home/${cpanelUser}/logs/cron.log 2>&1
+# ALTERNATIVA COM LOGS:
+cd /home2/${cpanelUser}/public_html/${domain} && git pull origin main && npm ci && npm run build && rsync -av --delete dist/ ./ >> /home2/${cpanelUser}/logs/deploy.log 2>&1
 
 # =====================================================
 # CONFIGURAÇÃO COMPLETA!
@@ -129,7 +116,7 @@ cd /home/${cpanelUser}/public_html/${domain} && bash deploy-hostgator.sh >> /hom
         fs.writeFileSync('CRON-CONFIG.txt', cronConfig);
         log.success('✅ Configuração do Cron Job criada!');
         
-        // 5. Testar configurações
+        // 4. Testar configurações
         log.info('🧪 Testando configurações...');
         
         // Verificar se basic-ftp está instalado
@@ -143,29 +130,7 @@ cd /home/${cpanelUser}/public_html/${domain} && bash deploy-hostgator.sh >> /hom
             log.success('✅ basic-ftp instalado!');
         }
         
-        // 6. Criar script de teste
-        log.info('🔍 Criando script de teste...');
-        
-        const testScript = `#!/usr/bin/env node
-
-const { deploy } = require('./deploy-manual.js');
-
-console.log('🧪 TESTANDO CONFIGURAÇÕES DE DEPLOY...');
-
-deploy().then(() => {
-    console.log('✅ Teste concluído com sucesso!');
-    process.exit(0);
-}).catch((error) => {
-    console.error('❌ Erro no teste:', error.message);
-    process.exit(1);
-});
-`;
-        
-        fs.writeFileSync('test-deploy.js', testScript);
-        fs.chmodSync('test-deploy.js', '755');
-        log.success('✅ Script de teste criado!');
-        
-        // 7. Resumo final
+        // 5. Resumo final
         console.log('\n🎉 CONFIGURAÇÃO CONCLUÍDA COM SUCESSO!\n');
         
         console.log('📋 PRÓXIMOS PASSOS:');
@@ -176,13 +141,13 @@ deploy().then(() => {
         
         console.log('\n📄 ARQUIVOS CRIADOS/ATUALIZADOS:');
         console.log('- ✅ .env (credenciais FTP)');
-        console.log('- ✅ deploy-hostgator.sh (script automático)');
         console.log('- ✅ CRON-CONFIG.txt (instruções cPanel)');
-        console.log('- ✅ test-deploy.js (script de teste)');
+        console.log('- ✅ deploy-manual.cjs (script de deploy)');
+        console.log('- ✅ health-check.cjs (verificação de saúde)');
         
         console.log('\n🛠️  COMANDOS DISPONÍVEIS:');
         console.log('- npm run deploy:hostgator (deploy manual)');
-        console.log('- node test-deploy.js (testar configurações)');
+        console.log('- npm run deploy:health (verificar saúde)');
         
         rl.close();
         

@@ -34,7 +34,7 @@ async function checkHealth() {
         const essentialFiles = [
             'package.json',
             '.env',
-            'deploy-manual.js'
+            'deploy-manual.cjs'
         ];
         
         for (const file of essentialFiles) {
