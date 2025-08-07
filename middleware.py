@@ -1057,6 +1057,162 @@ def detect_site_from_request(request: Request) -> dict:
             'business_type': 'assistencia_tecnica'
         }
 
+# 🎯 MAPEAMENTO DE EQUIPAMENTOS PARA CATEGORIAS (PYTHON)
+EQUIPMENT_CATEGORY_MAP = {
+    # Fogões
+    'fogao': 'fogao_agendamento',
+    'fogão': 'fogao_agendamento',
+    'fogao 4 bocas': 'fogao_agendamento',
+    'fogao 6 bocas': 'fogao_agendamento',
+    'fogão 4 bocas': 'fogao_agendamento',
+    'fogão 6 bocas': 'fogao_agendamento',
+    'fischer': 'fogao_agendamento',
+    'brastemp': 'fogao_agendamento',
+    'consul': 'fogao_agendamento',
+
+    # Geladeiras
+    'geladeira': 'geladeira_agendamento',
+    'refrigerador': 'geladeira_agendamento',
+    'freezer': 'geladeira_agendamento',
+    'duplex': 'geladeira_agendamento',
+    'frost free': 'geladeira_agendamento',
+
+    # Máquinas de lavar
+    'lavadora': 'lavadora_agendamento',
+    'maquina de lavar': 'lavadora_agendamento',
+    'máquina de lavar': 'lavadora_agendamento',
+    'lava e seca': 'lavadora_agendamento',
+    'tanquinho': 'lavadora_agendamento',
+
+    # Fornos
+    'forno': 'forno_agendamento',
+    'forno eletrico': 'forno_agendamento',
+    'forno elétrico': 'forno_agendamento',
+    'forno a gas': 'forno_agendamento',
+    'forno à gás': 'forno_agendamento',
+
+    # Cooktops
+    'cooktop': 'cooktop_agendamento',
+    'cook top': 'cooktop_agendamento',
+    'cooktop eletrico': 'cooktop_agendamento',
+    'cooktop elétrico': 'cooktop_agendamento',
+
+    # Lava-louças e outros
+    'lava louças': 'outros_agendamento',
+    'lava-louças': 'outros_agendamento',
+    'lavavajillas': 'outros_agendamento',
+    'midea': 'outros_agendamento',
+
+    # Micro-ondas
+    'microondas': 'outros_agendamento',
+    'micro-ondas': 'outros_agendamento',
+    'micro ondas': 'outros_agendamento',
+
+    # Coifa e depurador
+    'coifa': 'outros_agendamento',
+    'depurador': 'outros_agendamento',
+    'exaustor': 'outros_agendamento',
+
+    # Ar condicionado
+    'ar condicionado': 'outros_agendamento',
+    'split': 'outros_agendamento',
+    'janela': 'outros_agendamento',
+
+    # Marcas gerais
+    'electrolux': 'outros_agendamento',
+    'whirlpool': 'outros_agendamento',
+    'ge': 'outros_agendamento',
+    'samsung': 'outros_agendamento',
+    'lg': 'outros_agendamento'
+}
+
+def get_equipment_category(equipment_description: str) -> str:
+    """Determina categoria do equipamento"""
+    description = equipment_description.lower().strip()
+
+    # Buscar por palavras-chave
+    for keyword, category in EQUIPMENT_CATEGORY_MAP.items():
+        if keyword.lower() in description:
+            return category
+
+    # Fallback para outros
+    return 'outros_agendamento'
+
+def get_value_category(value: float) -> str:
+    """Determina categoria do valor"""
+    if value >= 800:
+        return 'alto_valor'
+    elif value >= 300:
+        return 'medio_valor'
+    else:
+        return 'baixo_valor'
+
+def get_site_category(site_domain: str) -> str:
+    """Determina categoria do site"""
+    if site_domain and 'fixfogoes.com.br' in site_domain:
+        return 'fixfogoes_agendamento'
+    elif site_domain and 'fixeletros.com.br' in site_domain:
+        return 'fixeletros_agendamento'
+    else:
+        return 'fixeletros_agendamento'  # Fallback
+
+async def register_smart_google_ads_conversion(
+    agendamento_id: str,
+    equipment_description: str,
+    conversion_value: float,
+    tracking_params: dict,
+    additional_data: dict = None
+) -> bool:
+    """
+    🎯 REGISTRA CONVERSÕES INTELIGENTES (MÚLTIPLAS CATEGORIAS)
+    Em vez de uma conversão por cliente, registra categorias estratégicas
+    """
+    try:
+        # Só registrar se tiver GCLID (veio do Google Ads)
+        if not tracking_params.get('gclid'):
+            logger.info("🎯 CONVERSÃO: Sem GCLID - não é tráfego do Google Ads")
+            return False
+
+        # 🎯 GERAR ESTRATÉGIA DE CONVERSÕES
+        equipment_category = get_equipment_category(equipment_description)
+        value_category = get_value_category(conversion_value)
+        site_category = get_site_category(tracking_params.get('site_domain', ''))
+
+        logger.info(f"🎯 ESTRATÉGIA: Equipamento={equipment_category}, Valor={value_category}, Site={site_category}")
+
+        all_success = True
+
+        # 🎯 REGISTRAR CONVERSÃO PRINCIPAL (SEMPRE)
+        primary_success = await register_google_ads_conversion(
+            agendamento_id, 'agendamento', conversion_value, tracking_params, additional_data
+        )
+        all_success = all_success and primary_success
+
+        # 🎯 REGISTRAR CONVERSÃO POR EQUIPAMENTO
+        if equipment_category != 'agendamento':
+            equipment_success = await register_google_ads_conversion(
+                agendamento_id, equipment_category, conversion_value, tracking_params, additional_data
+            )
+            all_success = all_success and equipment_success
+
+        # 🎯 REGISTRAR CONVERSÃO POR VALOR
+        value_success = await register_google_ads_conversion(
+            agendamento_id, value_category, conversion_value, tracking_params, additional_data
+        )
+        all_success = all_success and value_success
+
+        # 🎯 REGISTRAR CONVERSÃO POR SITE
+        site_success = await register_google_ads_conversion(
+            agendamento_id, site_category, conversion_value, tracking_params, additional_data
+        )
+        all_success = all_success and site_success
+
+        return all_success
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao registrar conversões inteligentes: {e}")
+        return False
+
 async def register_google_ads_conversion(
     agendamento_id: str,
     conversion_type: str,

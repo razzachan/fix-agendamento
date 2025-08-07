@@ -1,5 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
-import { GoogleAdsConversion, ConversionExportData, ConversionType } from '@/types';
+import { GoogleAdsConversion, ConversionExportData } from '@/types';
+import {
+  ConversionType,
+  ConversionStrategy,
+  generateConversionStrategy,
+  GOOGLE_ADS_CONVERSION_NAMES
+} from '@/types/googleAdsConversions';
 
 export class GoogleAdsTrackingService {
   /**
@@ -52,6 +58,101 @@ export class GoogleAdsTrackingService {
       return stored ? JSON.parse(stored) : {};
     } catch {
       return {};
+    }
+  }
+
+  /**
+   * 🎯 REGISTRA CONVERSÕES INTELIGENTES (MÚLTIPLAS CATEGORIAS)
+   *
+   * ESTRATÉGIA:
+   * ✅ GOOGLE ADS: Recebe apenas conversões categorizadas simples
+   * ✅ NOSSO BANCO: Armazena todos os dados detalhados para análise
+   */
+  static async recordSmartConversion(
+    serviceOrderId: string,
+    equipmentDescription: string,
+    conversionValue: number,
+    siteDomain: string = '',
+    detailedData?: {
+      // Dados para análise interna (salvos no nosso banco)
+      equipmentBrand?: string;
+      equipmentModel?: string;
+      problemDescription?: string;
+      clientName?: string;
+      clientPhone?: string;
+      clientCity?: string;
+      serviceType?: 'diagnostico' | 'conserto' | 'manutencao';
+      initialCost?: number;
+      finalCost?: number;
+      technicianName?: string;
+      leadSource?: 'google_ads' | 'whatsapp' | 'indicacao';
+    }
+  ): Promise<boolean> {
+    try {
+      // 🎯 GERAR ESTRATÉGIA DE CONVERSÕES INTELIGENTE
+      const strategy = generateConversionStrategy(
+        equipmentDescription,
+        conversionValue,
+        siteDomain
+      );
+
+      console.log('🎯 Estratégia de conversões para Google Ads:', strategy);
+      console.log('📊 Dados detalhados salvos no banco:', detailedData);
+
+      let allSuccess = true;
+
+      // 🎯 REGISTRAR CONVERSÃO PRINCIPAL (SEMPRE)
+      // Envia para Google Ads: apenas nome da conversão + valor + GCLID
+      const primarySuccess = await this.recordConversion(
+        serviceOrderId,
+        strategy.primary,
+        conversionValue,
+        equipmentDescription,
+        detailedData // Dados detalhados salvos no nosso banco
+      );
+      allSuccess = allSuccess && primarySuccess;
+
+      // 🎯 REGISTRAR CONVERSÃO POR EQUIPAMENTO (SE DIFERENTE DA PRINCIPAL)
+      if (strategy.equipment && strategy.equipment !== strategy.primary) {
+        const equipmentSuccess = await this.recordConversion(
+          serviceOrderId,
+          strategy.equipment,
+          conversionValue,
+          equipmentDescription,
+          detailedData // Dados detalhados para nosso banco
+        );
+        allSuccess = allSuccess && equipmentSuccess;
+      }
+
+      // 🎯 REGISTRAR CONVERSÃO POR VALOR (PARA ANÁLISE DE ROI)
+      if (strategy.value) {
+        const valueSuccess = await this.recordConversion(
+          serviceOrderId,
+          strategy.value,
+          conversionValue,
+          equipmentDescription,
+          detailedData // Dados detalhados para nosso banco
+        );
+        allSuccess = allSuccess && valueSuccess;
+      }
+
+      // 🎯 REGISTRAR CONVERSÃO POR SITE (SE MÚLTIPLOS SITES)
+      if (strategy.site) {
+        const siteSuccess = await this.recordConversion(
+          serviceOrderId,
+          strategy.site,
+          conversionValue,
+          equipmentDescription,
+          detailedData // Dados detalhados para nosso banco
+        );
+        allSuccess = allSuccess && siteSuccess;
+      }
+
+      return allSuccess;
+
+    } catch (error) {
+      console.error('❌ Erro ao registrar conversões inteligentes:', error);
+      return false;
     }
   }
 

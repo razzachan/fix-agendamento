@@ -31,7 +31,66 @@ export const useGoogleAdsTracking = () => {
   }, []);
 
   /**
-   * Registra uma conversão com dados detalhados
+   * 🎯 REGISTRA CONVERSÕES INTELIGENTES (RECOMENDADO)
+   * Registra múltiplas categorias estratégicas em vez de uma por cliente
+   */
+  const recordSmartConversion = useCallback(async (
+    serviceOrderId: string,
+    equipmentDescription: string,
+    conversionValue: number,
+    detailedData?: {
+      // 📊 DADOS DETALHADOS PARA ANÁLISE INTERNA
+      equipmentBrand?: string;           // Ex: "Fischer", "Brastemp"
+      equipmentModel?: string;           // Ex: "4 bocas", "Duplex"
+      problemDescription?: string;       // Ex: "Não liga", "Vazando"
+      clientName?: string;
+      clientPhone?: string;
+      clientCity?: string;               // Para análise geográfica
+      serviceType?: 'diagnostico' | 'conserto' | 'manutencao';
+      initialCost?: number;              // Orçamento inicial
+      finalCost?: number;                // Valor final cobrado
+      technicianName?: string;
+      leadSource?: 'google_ads' | 'whatsapp' | 'indicacao';
+    }
+  ): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+
+      // Detectar site atual
+      const siteDomain = window.location.hostname;
+
+      // 🎯 USAR NOVO SISTEMA DE CONVERSÕES INTELIGENTES
+      // Google Ads recebe: conversões categorizadas simples
+      // Nosso banco recebe: todos os dados detalhados
+      const success = await TrackingSyncService.registerSmartConversion(
+        serviceOrderId,
+        equipmentDescription,
+        conversionValue,
+        siteDomain,
+        detailedData // Dados detalhados para análise interna
+      );
+
+      if (success) {
+        toast.success('Conversões registradas', {
+          description: `${equipmentDescription} - R$ ${conversionValue.toFixed(2)}`
+        });
+      } else {
+        // Não mostrar erro se não há tracking (tráfego direto)
+        console.log('ℹ️ Conversões não registradas - sem tracking ativo');
+      }
+
+      return success;
+    } catch (error) {
+      console.error('Erro ao registrar conversões:', error);
+      toast.error('Erro ao registrar conversões');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /**
+   * Registra uma conversão com dados detalhados (MÉTODO LEGADO)
    * Usa o novo sistema híbrido (middleware + frontend)
    */
   const recordConversion = useCallback(async (
@@ -387,7 +446,10 @@ export const useGoogleAdsTracking = () => {
     conversions,
     trackingParams,
     
-    // Ações
+    // 🎯 AÇÕES INTELIGENTES (RECOMENDADAS)
+    recordSmartConversion,
+
+    // Ações (legado)
     recordConversion,
     recordSchedulingConversion,
     recordCompletionConversion,
