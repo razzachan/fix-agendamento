@@ -1,4 +1,10 @@
-# Welcome to your Lovable project
+# Fix Fogões - Sistema de Gestão de Assistência Técnica
+
+🚀 **Deploy Automático Ativo** - Sistema configurado e funcionando!
+
+## 🧪 TESTE DE DEPLOY AUTOMÁTICO
+**Horário do teste:** $(date)
+**Status:** Aguardando deploy automático via Cron Job...
 
 ## Project info
 
