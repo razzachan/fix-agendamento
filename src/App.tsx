@@ -1,5 +1,5 @@
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
@@ -7,6 +7,9 @@ import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import { MapProvider } from './contexts/MapContext';
 import GoogleAdsTrackingProvider from './components/tracking/GoogleAdsTrackingProvider';
+import { AutoConversionUpload } from './services/googleAds/googleAdsApiService';
+import { trackingConfig } from './config/googleAds';
+import { DynamicValueRangesService } from './services/dynamicValueRangesService';
 
 // Pages
 import Index from './pages/Index';
@@ -60,6 +63,35 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 const queryClient = new QueryClient();
 
 function App() {
+  // 🤖 INICIALIZAR SISTEMAS AUTOMÁTICOS
+  useEffect(() => {
+    const initializeServices = async () => {
+      // 1. Inicializar faixas dinâmicas de valor
+      console.log('🎯 [App] Inicializando faixas dinâmicas de valor...');
+      await DynamicValueRangesService.initialize();
+
+      // 2. Inicializar cron de conversões se habilitado
+      if (trackingConfig.enabled) {
+        console.log('🚀 [App] Iniciando cron de conversões automáticas...');
+
+        // Iniciar upload automático a cada 30 minutos
+        AutoConversionUpload.startAutoUpload(trackingConfig.autoUploadInterval);
+
+        console.log(`✅ [App] Cron iniciado: upload a cada ${trackingConfig.autoUploadInterval} minutos`);
+      } else {
+        console.log('⚠️ [App] Tracking desabilitado - cron não iniciado');
+      }
+    };
+
+    initializeServices();
+
+    // Cleanup quando o componente for desmontado
+    return () => {
+      AutoConversionUpload.stopAutoUpload();
+      console.log('🛑 [App] Sistemas automáticos parados');
+    };
+  }, []);
+
   return (
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>

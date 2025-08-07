@@ -4,6 +4,7 @@ import {
   ConversionType,
   ConversionStrategy,
   generateConversionStrategy,
+  generateConversionStrategyDynamic,
   GOOGLE_ADS_CONVERSION_NAMES
 } from '@/types/googleAdsConversions';
 
@@ -89,14 +90,14 @@ export class GoogleAdsTrackingService {
     }
   ): Promise<boolean> {
     try {
-      // 🎯 GERAR ESTRATÉGIA DE CONVERSÕES INTELIGENTE
-      const strategy = generateConversionStrategy(
+      // 🎯 GERAR ESTRATÉGIA DE CONVERSÕES INTELIGENTE (DINÂMICA)
+      const strategy = await generateConversionStrategyDynamic(
         equipmentDescription,
         conversionValue,
         siteDomain
       );
 
-      console.log('🎯 Estratégia de conversões para Google Ads:', strategy);
+      console.log('🎯 Estratégia de conversões dinâmica para Google Ads:', strategy);
       console.log('📊 Dados detalhados salvos no banco:', detailedData);
 
       let allSuccess = true;

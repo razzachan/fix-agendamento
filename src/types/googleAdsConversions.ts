@@ -121,12 +121,81 @@ export const EQUIPMENT_CATEGORY_MAP: Record<string, EquipmentConversionType> = {
   'lg': 'outros_agendamento'
 };
 
-// 🎯 MAPEAMENTO DE VALORES PARA CATEGORIAS
+// 🎯 MAPEAMENTO DE VALORES PARA CATEGORIAS (BASEADO EM DADOS REAIS)
 export const VALUE_CATEGORY_MAP = {
   alto_valor: { min: 800, max: Infinity },
   medio_valor: { min: 300, max: 799 },
   baixo_valor: { min: 0, max: 299 }
 };
+
+// 🎯 FUNÇÃO PARA CALCULAR FAIXAS DINÂMICAS (BASEADA EM final_cost REAL)
+export async function calculateDynamicValueRanges(): Promise<typeof VALUE_CATEGORY_MAP> {
+  try {
+    // Importar supabase dinamicamente para evitar problemas de dependência
+    const { supabase } = await import('@/integrations/supabase/client');
+
+    // Buscar ordens dos últimos 6 meses com final_cost válido
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const { data: orders, error } = await supabase
+      .from('service_orders')
+      .select('final_cost')
+      .gte('created_at', sixMonthsAgo.toISOString())
+      .not('final_cost', 'is', null)
+      .gt('final_cost', 0)
+      .order('final_cost', { ascending: true });
+
+    if (error || !orders || orders.length < 10) {
+      console.log('📊 Poucos dados para faixas dinâmicas, usando valores padrão');
+      return VALUE_CATEGORY_MAP; // Fallback para valores padrão
+    }
+
+    // Extrair valores reais de final_cost
+    const values = orders
+      .map(order => parseFloat(order.final_cost?.toString() || '0'))
+      .filter(value => value > 0)
+      .sort((a, b) => a - b);
+
+    if (values.length < 10) {
+      return VALUE_CATEGORY_MAP; // Fallback se poucos dados
+    }
+
+    // Calcular percentis para faixas dinâmicas (33% e 66%)
+    const p33Index = Math.floor(values.length * 0.33);
+    const p66Index = Math.floor(values.length * 0.66);
+
+    const p33Value = values[p33Index];
+    const p66Value = values[p66Index];
+
+    const dynamicRanges = {
+      baixo_valor: { min: 0, max: p33Value - 0.01 },
+      medio_valor: { min: p33Value, max: p66Value - 0.01 },
+      alto_valor: { min: p66Value, max: Infinity }
+    };
+
+    console.log('📊 Faixas dinâmicas calculadas:', {
+      totalOrders: values.length,
+      ranges: {
+        baixo: `R$ 0 - R$ ${p33Value.toFixed(2)}`,
+        medio: `R$ ${p33Value.toFixed(2)} - R$ ${p66Value.toFixed(2)}`,
+        alto: `R$ ${p66Value.toFixed(2)}+`
+      },
+      samples: {
+        min: values[0],
+        p33: p33Value,
+        p66: p66Value,
+        max: values[values.length - 1]
+      }
+    });
+
+    return dynamicRanges;
+
+  } catch (error) {
+    console.error('❌ Erro ao calcular faixas dinâmicas:', error);
+    return VALUE_CATEGORY_MAP; // Fallback em caso de erro
+  }
+}
 
 // 🎯 FUNÇÃO PARA DETERMINAR CATEGORIA DE EQUIPAMENTO
 export function getEquipmentCategory(equipmentDescription: string): EquipmentConversionType {
@@ -143,7 +212,7 @@ export function getEquipmentCategory(equipmentDescription: string): EquipmentCon
   return 'outros_agendamento';
 }
 
-// 🎯 FUNÇÃO PARA DETERMINAR CATEGORIA DE VALOR
+// 🎯 FUNÇÃO PARA DETERMINAR CATEGORIA DE VALOR (ESTÁTICA - FALLBACK)
 export function getValueCategory(value: number): ValueConversionType {
   if (value >= VALUE_CATEGORY_MAP.alto_valor.min) {
     return 'alto_valor';
@@ -151,6 +220,26 @@ export function getValueCategory(value: number): ValueConversionType {
     return 'medio_valor';
   } else {
     return 'baixo_valor';
+  }
+}
+
+// 🎯 FUNÇÃO PARA DETERMINAR CATEGORIA DE VALOR (DINÂMICA - BASEADA EM DADOS REAIS)
+export async function getValueCategoryDynamic(value: number): Promise<ValueConversionType> {
+  try {
+    // Obter faixas dinâmicas baseadas em dados reais
+    const dynamicRanges = await calculateDynamicValueRanges();
+
+    if (value >= dynamicRanges.alto_valor.min) {
+      return 'alto_valor';
+    } else if (value >= dynamicRanges.medio_valor.min) {
+      return 'medio_valor';
+    } else {
+      return 'baixo_valor';
+    }
+  } catch (error) {
+    console.error('❌ Erro ao calcular categoria dinâmica, usando fallback:', error);
+    // Fallback para função estática
+    return getValueCategory(value);
   }
 }
 
@@ -296,7 +385,7 @@ export interface ConversionStrategy {
   site?: SiteConversionType;             // Categoria do site
 }
 
-// 🎯 FUNÇÃO PARA GERAR ESTRATÉGIA DE CONVERSÕES
+// 🎯 FUNÇÃO PARA GERAR ESTRATÉGIA DE CONVERSÕES (ESTÁTICA - FALLBACK)
 export function generateConversionStrategy(
   equipmentDescription: string,
   value: number,
@@ -308,4 +397,26 @@ export function generateConversionStrategy(
     value: getValueCategory(value),
     site: getSiteCategory(siteDomain)
   };
+}
+
+// 🎯 FUNÇÃO PARA GERAR ESTRATÉGIA DE CONVERSÕES (DINÂMICA - BASEADA EM DADOS REAIS)
+export async function generateConversionStrategyDynamic(
+  equipmentDescription: string,
+  value: number,
+  siteDomain: string
+): Promise<ConversionStrategy> {
+  try {
+    const valueCategory = await getValueCategoryDynamic(value);
+
+    return {
+      primary: 'agendamento',
+      equipment: getEquipmentCategory(equipmentDescription),
+      value: valueCategory,
+      site: getSiteCategory(siteDomain)
+    };
+  } catch (error) {
+    console.error('❌ Erro ao gerar estratégia dinâmica, usando fallback:', error);
+    // Fallback para função estática
+    return generateConversionStrategy(equipmentDescription, value, siteDomain);
+  }
 }

@@ -15,16 +15,19 @@ const path = require('path');
 const { execSync } = require('child_process');
 require('dotenv').config();
 
-// Configurações FTP (BASEADO NO CPANEL HOSTGATOR)
+// Configurações FTP (USANDO CONTA PRINCIPAL MIRAGI67)
 const FTP_CONFIG = {
-    host: process.env.FTP_SERVER || 'br594.hostgator.com.br',
-    user: process.env.FTP_USERNAME || 'master@app.fixfogoes.com.br',
-    password: process.env.FTP_PASSWORD || 'SuaSenhaFTP_AquiDepois',
+    host: 'br594.hostgator.com.br',
+    user: 'miragi67', // Conta principal com acesso total
+    password: 'Shadowspirit!23', // Mesma senha (assumindo que é a mesma)
     secure: false,
-    port: 21
+    port: 21,
+    secureOptions: {
+        rejectUnauthorized: false
+    }
 };
 
-const REMOTE_PATH = '/home2/miragi67/app.fixfogoes.com.br/master';
+const REMOTE_PATH = '/home2/miragi67/app.fixfogoes.com.br';
 const LOCAL_DIST = './dist';
 
 // Função para log colorido
@@ -35,30 +38,65 @@ const log = {
     warn: (msg) => console.log(`\x1b[33m[⚠️]\x1b[0m ${msg}`)
 };
 
+// Função para garantir que o diretório existe
+async function ensureRemoteDir(client, dirPath) {
+    try {
+        await client.ensureDir(dirPath);
+        return true;
+    } catch (e) {
+        log.warn(`Tentando criar diretório manualmente: ${dirPath}`);
+        try {
+            const parts = dirPath.split('/').filter(p => p);
+            let currentPath = '';
+
+            for (const part of parts) {
+                currentPath += '/' + part;
+                try {
+                    await client.cd('/');
+                    await client.ensureDir(currentPath);
+                } catch (e2) {
+                    // Diretório já existe, continuar
+                }
+            }
+            return true;
+        } catch (e2) {
+            log.error(`Erro ao criar diretório ${dirPath}: ${e2.message}`);
+            return false;
+        }
+    }
+}
+
 async function uploadDirectory(client, localPath, remotePath) {
     const items = fs.readdirSync(localPath);
-    
+
     for (const item of items) {
         const localItemPath = path.join(localPath, item);
         const remoteItemPath = `${remotePath}/${item}`;
-        
+
         const stat = fs.statSync(localItemPath);
-        
+
         if (stat.isDirectory()) {
             log.info(`📁 Criando diretório: ${remoteItemPath}`);
-            try {
-                await client.ensureDir(remoteItemPath);
+            const dirCreated = await ensureRemoteDir(client, remoteItemPath);
+            if (dirCreated) {
                 await uploadDirectory(client, localItemPath, remoteItemPath);
-            } catch (e) {
-                log.warn(`Erro ao criar diretório ${remoteItemPath}: ${e.message}`);
             }
         } else {
             log.info(`📄 Enviando: ${item}`);
             try {
+                // CORREÇÃO: Upload direto com caminho completo
                 await client.uploadFrom(localItemPath, remoteItemPath);
                 log.success(`✅ Enviado: ${item}`);
             } catch (e) {
                 log.error(`❌ Erro ao enviar ${item}: ${e.message}`);
+                // Tentar método alternativo
+                try {
+                    await client.cd(remotePath);
+                    await client.uploadFrom(localItemPath, item);
+                    log.success(`✅ Enviado (método alternativo): ${item}`);
+                } catch (e2) {
+                    log.error(`❌ Erro definitivo ao enviar ${item}: ${e2.message}`);
+                }
             }
         }
     }
@@ -86,10 +124,13 @@ async function deployToHostGator() {
         
         // 3. Conectar ao FTP
         log.info('🌐 Conectando ao servidor FTP...');
-        
+        log.info(`📡 Servidor: ${FTP_CONFIG.host}`);
+        log.info(`👤 Usuário: ${FTP_CONFIG.user}`);
+
         const client = new ftp.Client();
-        client.ftp.timeout = 30000; // 30 segundos
-        
+        client.ftp.timeout = 60000; // 60 segundos
+        client.ftp.verbose = true; // Debug mode
+
         await client.access(FTP_CONFIG);
         log.success('✅ Conectado ao FTP!');
         

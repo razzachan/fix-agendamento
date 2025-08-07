@@ -18,7 +18,9 @@
     "deploy": "npm run build:clean && cd dist && vercel --prod",
     "deploy:preview": "npm run build:clean && cd dist && vercel",
     "deploy:manual": "node deploy-manual.cjs",
-    "deploy:hostgator": "npm run build && npm run deploy:manual",
+    "deploy:critical": "node deploy-critical-files.cjs",
+    "deploy:fixed": "node deploy-fixed.cjs",
+    "deploy:hostgator": "npm run build && npm run deploy:fixed",
     "deploy:setup": "node setup-deploy.cjs",
     "deploy:health": "node health-check.cjs",
     "zip-dist": "npm run build:clean && echo 'Pasta dist limpa e pronta para ZIP manual!'"
