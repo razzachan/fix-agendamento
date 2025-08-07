@@ -19,6 +19,12 @@ CREATE TABLE IF NOT EXISTS google_ads_tracking_sessions (
     referer TEXT,
     request_url TEXT,
     session_active BOOLEAN DEFAULT TRUE,
+
+    -- Informações do site (NOVO)
+    site_domain TEXT, -- www.fixfogoes.com.br ou fixeletros.com.br
+    site_name TEXT, -- Fix Fogões ou Fix Eletros
+    business_name TEXT, -- Nome do negócio
+    business_type TEXT, -- Tipo de assistência técnica
     
     -- Dados de conversão (quando aplicável)
     converted BOOLEAN DEFAULT FALSE,
@@ -38,6 +44,8 @@ CREATE INDEX IF NOT EXISTS idx_tracking_sessions_utm_source ON google_ads_tracki
 CREATE INDEX IF NOT EXISTS idx_tracking_sessions_captured_at ON google_ads_tracking_sessions(captured_at);
 CREATE INDEX IF NOT EXISTS idx_tracking_sessions_active ON google_ads_tracking_sessions(session_active) WHERE session_active = TRUE;
 CREATE INDEX IF NOT EXISTS idx_tracking_sessions_ip ON google_ads_tracking_sessions(ip_address) WHERE ip_address IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tracking_sessions_site_domain ON google_ads_tracking_sessions(site_domain) WHERE site_domain IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tracking_sessions_business_type ON google_ads_tracking_sessions(business_type) WHERE business_type IS NOT NULL;
 
 -- Trigger para atualizar updated_at
 CREATE OR REPLACE FUNCTION update_tracking_sessions_updated_at()

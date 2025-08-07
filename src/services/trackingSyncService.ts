@@ -6,9 +6,51 @@
 import { GoogleAdsTrackingService } from './googleAdsTrackingService';
 
 export class TrackingSyncService {
-  private static readonly MIDDLEWARE_BASE_URL = process.env.NODE_ENV === 'production' 
+  private static readonly MIDDLEWARE_BASE_URL = process.env.NODE_ENV === 'production'
     ? 'https://fix-agendamento-production.up.railway.app'
     : 'http://localhost:8000';
+
+  /**
+   * Detecta qual site está sendo usado
+   */
+  private static getCurrentSite(): {
+    domain: string;
+    siteName: string;
+    businessName: string;
+  } {
+    if (typeof window === 'undefined') {
+      return { domain: 'unknown', siteName: 'Fix', businessName: 'Fix Eletros' };
+    }
+
+    const hostname = window.location.hostname.toLowerCase();
+
+    if (hostname.includes('fixfogoes.com.br')) {
+      return {
+        domain: 'www.fixfogoes.com.br',
+        siteName: 'Fix Fogões',
+        businessName: 'Fix Fogões'
+      };
+    } else if (hostname.includes('fixeletros.com.br')) {
+      return {
+        domain: 'fixeletros.com.br',
+        siteName: 'Fix Eletros',
+        businessName: 'Fix Eletros'
+      };
+    } else if (hostname.includes('app.fixfogoes.com.br')) {
+      return {
+        domain: 'app.fixfogoes.com.br',
+        siteName: 'Fix Fogões App',
+        businessName: 'Fix Fogões'
+      };
+    } else {
+      // Fallback para desenvolvimento ou outros domínios
+      return {
+        domain: hostname,
+        siteName: 'Fix Eletros',
+        businessName: 'Fix Eletros'
+      };
+    }
+  }
 
   /**
    * Sincroniza parâmetros de tracking com o middleware
@@ -24,6 +66,9 @@ export class TrackingSyncService {
         return false;
       }
 
+      // Detectar site atual
+      const currentSite = this.getCurrentSite();
+
       // Preparar dados para envio
       const syncData = {
         gclid: trackingParams.gclid,
@@ -36,7 +81,11 @@ export class TrackingSyncService {
         user_agent: navigator.userAgent,
         referer: document.referrer,
         request_url: window.location.href,
-        sync_source: 'frontend'
+        sync_source: 'frontend',
+        // Informações do site
+        site_domain: currentSite.domain,
+        site_name: currentSite.siteName,
+        business_name: currentSite.businessName
       };
 
       // Enviar para o middleware

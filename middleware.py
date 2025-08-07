@@ -1014,6 +1014,49 @@ async def get_latest_tracking_params(ip_address: str = None, user_agent: str = N
         logger.error(f"❌ Erro ao recuperar tracking params: {e}")
         return {}
 
+def detect_site_from_request(request: Request) -> dict:
+    """
+    Detecta qual site baseado na requisição
+    """
+    try:
+        # Obter host da requisição
+        host = request.headers.get('host', '').lower()
+        referer = request.headers.get('referer', '').lower()
+        request_url = str(request.url).lower()
+
+        # Detectar site baseado no host ou referer
+        if 'fixfogoes.com.br' in host or 'fixfogoes.com.br' in referer or 'fixfogoes.com.br' in request_url:
+            return {
+                'site_domain': 'www.fixfogoes.com.br',
+                'site_name': 'Fix Fogões',
+                'business_name': 'Fix Fogões',
+                'business_type': 'assistencia_tecnica_fogoes'
+            }
+        elif 'fixeletros.com.br' in host or 'fixeletros.com.br' in referer or 'fixeletros.com.br' in request_url:
+            return {
+                'site_domain': 'fixeletros.com.br',
+                'site_name': 'Fix Eletros',
+                'business_name': 'Fix Eletros',
+                'business_type': 'assistencia_tecnica_eletros'
+            }
+        else:
+            # Fallback para requests diretos via API/WhatsApp
+            return {
+                'site_domain': 'api.fixeletros.com.br',
+                'site_name': 'Fix Eletros API',
+                'business_name': 'Fix Eletros',
+                'business_type': 'assistencia_tecnica_api'
+            }
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao detectar site: {e}")
+        return {
+            'site_domain': 'unknown',
+            'site_name': 'Fix Eletros',
+            'business_name': 'Fix Eletros',
+            'business_type': 'assistencia_tecnica'
+        }
+
 async def register_google_ads_conversion(
     agendamento_id: str,
     conversion_type: str,
@@ -1049,7 +1092,12 @@ async def register_google_ads_conversion(
             'utm_medium': tracking_params.get('utm_medium'),
             'utm_campaign': tracking_params.get('utm_campaign'),
             'utm_term': tracking_params.get('utm_term'),
-            'utm_content': tracking_params.get('utm_content')
+            'utm_content': tracking_params.get('utm_content'),
+            # Informações do site (NOVO)
+            'site_domain': tracking_params.get('site_domain'),
+            'site_name': tracking_params.get('site_name'),
+            'business_name': tracking_params.get('business_name'),
+            'business_type': tracking_params.get('business_type')
         }
 
         # Adicionar dados extras se fornecidos
@@ -1118,10 +1166,14 @@ async def capture_google_ads_tracking(request: Request, call_next):
                 'request_url': str(request.url)
             }
 
+            # Detectar qual site baseado na URL
+            site_info = detect_site_from_request(request)
+            tracking_data.update(site_info)
+
             # Salvar no banco de dados
             await save_tracking_params(tracking_data)
 
-            logger.info(f"🎯 Google Ads tracking capturado: GCLID={gclid}, UTM_SOURCE={utm_source}, UTM_CAMPAIGN={utm_campaign}")
+            logger.info(f"🎯 Google Ads tracking capturado: SITE={site_info.get('site_name', 'Unknown')}, GCLID={gclid}, UTM_SOURCE={utm_source}, UTM_CAMPAIGN={utm_campaign}")
 
         # Continuar com a requisição
         response = await call_next(request)
@@ -5845,8 +5897,18 @@ async def sync_tracking(request: Request):
             'ip_address': request.client.host if request.client else None,
             'referer': data.get('referer', ''),
             'request_url': data.get('request_url', ''),
-            'sync_source': data.get('sync_source', 'frontend')
+            'sync_source': data.get('sync_source', 'frontend'),
+            # Informações do site (do frontend ou detectar automaticamente)
+            'site_domain': data.get('site_domain'),
+            'site_name': data.get('site_name'),
+            'business_name': data.get('business_name'),
+            'business_type': data.get('business_type')
         }
+
+        # Se não veio informação do site do frontend, detectar automaticamente
+        if not tracking_data.get('site_domain'):
+            site_info = detect_site_from_request(request)
+            tracking_data.update(site_info)
 
         # Salvar no banco
         success = await save_tracking_params(tracking_data)
