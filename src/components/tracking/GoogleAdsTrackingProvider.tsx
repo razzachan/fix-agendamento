@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { GoogleAdsTrackingService } from '@/services/googleAdsTrackingService';
+import { TrackingSyncService } from '@/services/trackingSyncService';
 
 interface GoogleAdsTrackingProviderProps {
   children: React.ReactNode;
@@ -15,7 +16,7 @@ export const GoogleAdsTrackingProvider: React.FC<GoogleAdsTrackingProviderProps>
   useEffect(() => {
     // Capturar parâmetros de tracking na inicialização da aplicação
     const trackingParams = GoogleAdsTrackingService.captureTrackingParams();
-    
+
     if (trackingParams.gclid) {
       console.log('🎯 Google Ads tracking inicializado:', {
         gclid: trackingParams.gclid.substring(0, 20) + '...',
@@ -29,6 +30,16 @@ export const GoogleAdsTrackingProvider: React.FC<GoogleAdsTrackingProviderProps>
         campaign: trackingParams.utmCampaign
       });
     }
+
+    // 🎯 SINCRONIZAR COM MIDDLEWARE
+    // Aguardar um pouco para garantir que parâmetros foram capturados
+    const syncTimeout = setTimeout(() => {
+      TrackingSyncService.ensureTrackingSync().catch(error => {
+        console.error('❌ Erro na sincronização inicial de tracking:', error);
+      });
+    }, 2000);
+
+    return () => clearTimeout(syncTimeout);
   }, []);
 
   return <>{children}</>;

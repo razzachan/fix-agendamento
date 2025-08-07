@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GoogleAdsTrackingService } from '@/services/googleAdsTrackingService';
+import { TrackingSyncService } from '@/services/trackingSyncService';
 import { GoogleAdsApiService } from '@/services/googleAds/googleAdsApiService';
 import { ConversionExportData, ConversionType } from '@/types';
 import { toast } from 'sonner';
@@ -31,6 +32,7 @@ export const useGoogleAdsTracking = () => {
 
   /**
    * Registra uma conversão com dados detalhados
+   * Usa o novo sistema híbrido (middleware + frontend)
    */
   const recordConversion = useCallback(async (
     serviceOrderId: string,
@@ -51,8 +53,10 @@ export const useGoogleAdsTracking = () => {
   ): Promise<boolean> => {
     try {
       setIsLoading(true);
-      
-      const success = await GoogleAdsTrackingService.recordConversion(
+
+      // 🎯 USAR NOVO SISTEMA HÍBRIDO
+      // Tenta middleware primeiro, depois frontend como fallback
+      const success = await TrackingSyncService.registerConversion(
         serviceOrderId,
         conversionType,
         conversionValue,
@@ -64,6 +68,9 @@ export const useGoogleAdsTracking = () => {
         toast.success('Conversão registrada', {
           description: `${conversionType} - R$ ${conversionValue.toFixed(2)}`
         });
+      } else {
+        // Não mostrar erro se não há tracking (tráfego direto)
+        console.log('ℹ️ Conversão não registrada - sem tracking ativo');
       }
 
       return success;

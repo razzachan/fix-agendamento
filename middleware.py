@@ -944,6 +944,137 @@ def recuperar_horarios_cache(dados: dict) -> Optional[List[Dict]]:
             logger.info(f"🗑️ Cache expirado removido: {chave}")
     return None
 
+# 🎯 FUNÇÕES PARA GOOGLE ADS TRACKING
+async def save_tracking_params(tracking_data: dict) -> bool:
+    """
+    Salva parâmetros de tracking no banco de dados
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Inserir na tabela google_ads_tracking_sessions
+        result = supabase.table("google_ads_tracking_sessions").insert({
+            'gclid': tracking_data.get('gclid'),
+            'utm_source': tracking_data.get('utm_source'),
+            'utm_medium': tracking_data.get('utm_medium'),
+            'utm_campaign': tracking_data.get('utm_campaign'),
+            'utm_term': tracking_data.get('utm_term'),
+            'utm_content': tracking_data.get('utm_content'),
+            'captured_at': tracking_data.get('captured_at'),
+            'user_agent': tracking_data.get('user_agent'),
+            'ip_address': tracking_data.get('ip_address'),
+            'referer': tracking_data.get('referer'),
+            'request_url': tracking_data.get('request_url'),
+            'session_active': True
+        }).execute()
+
+        if result.data:
+            logger.info(f"✅ Tracking params salvos no banco: {tracking_data.get('gclid', 'N/A')}")
+            return True
+        else:
+            logger.error(f"❌ Falha ao salvar tracking params: {result}")
+            return False
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao salvar tracking params: {e}")
+        return False
+
+async def get_latest_tracking_params(ip_address: str = None, user_agent: str = None) -> dict:
+    """
+    Recupera os parâmetros de tracking mais recentes para um usuário
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Buscar tracking mais recente (últimas 24 horas)
+        query = supabase.table("google_ads_tracking_sessions").select("*").eq("session_active", True)
+
+        if ip_address:
+            query = query.eq("ip_address", ip_address)
+
+        # Ordenar por data de captura (mais recente primeiro)
+        result = query.order("captured_at", desc=True).limit(1).execute()
+
+        if result.data and len(result.data) > 0:
+            tracking = result.data[0]
+            logger.info(f"📊 Tracking recuperado: GCLID={tracking.get('gclid', 'N/A')}")
+            return {
+                'gclid': tracking.get('gclid'),
+                'utm_source': tracking.get('utm_source'),
+                'utm_medium': tracking.get('utm_medium'),
+                'utm_campaign': tracking.get('utm_campaign'),
+                'utm_term': tracking.get('utm_term'),
+                'utm_content': tracking.get('utm_content')
+            }
+        else:
+            logger.info("📊 Nenhum tracking encontrado")
+            return {}
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao recuperar tracking params: {e}")
+        return {}
+
+async def register_google_ads_conversion(
+    agendamento_id: str,
+    conversion_type: str,
+    conversion_value: float,
+    tracking_params: dict,
+    additional_data: dict = None
+) -> bool:
+    """
+    Registra conversão do Google Ads no banco de dados
+    """
+    try:
+        # Só registrar se tiver GCLID (veio do Google Ads)
+        if not tracking_params.get('gclid'):
+            logger.info("🎯 CONVERSÃO: Sem GCLID - não é tráfego do Google Ads")
+            return False
+
+        supabase = get_supabase_client()
+
+        # Dados da conversão
+        conversion_data = {
+            'service_order_id': None,  # Será preenchido quando OS for criada
+            'agendamento_id': agendamento_id,
+            'gclid': tracking_params.get('gclid'),
+            'conversion_name': conversion_type,
+            'conversion_time': datetime.now().isoformat(),
+            'conversion_value': conversion_value,
+            'conversion_currency': 'BRL',
+            'order_id': f'AG-{agendamento_id[:8]}',
+            'service_type': conversion_type.lower(),
+            'exported': False,
+            # Parâmetros UTM
+            'utm_source': tracking_params.get('utm_source'),
+            'utm_medium': tracking_params.get('utm_medium'),
+            'utm_campaign': tracking_params.get('utm_campaign'),
+            'utm_term': tracking_params.get('utm_term'),
+            'utm_content': tracking_params.get('utm_content')
+        }
+
+        # Adicionar dados extras se fornecidos
+        if additional_data:
+            conversion_data.update({
+                'client_name': additional_data.get('client_name'),
+                'client_phone': additional_data.get('client_phone'),
+                'equipment_type': additional_data.get('equipment_type'),
+                'problem_description': additional_data.get('problem_description')
+            })
+
+        # Inserir conversão
+        result = supabase.table("google_ads_conversions").insert(conversion_data).execute()
+
+        if result.data:
+            logger.info(f"✅ CONVERSÃO REGISTRADA: {conversion_type} - R$ {conversion_value:.2f} - GCLID: {tracking_params.get('gclid')[:20]}...")
+            return True
+        else:
+            logger.error(f"❌ Falha ao registrar conversão: {result}")
+            return False
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao registrar conversão Google Ads: {e}")
+        return False
+
 app = FastAPI()
 
 # Configurar CORS
@@ -954,6 +1085,53 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 🎯 MIDDLEWARE PARA CAPTURAR PARÂMETROS DE TRACKING GOOGLE ADS
+@app.middleware("http")
+async def capture_google_ads_tracking(request: Request, call_next):
+    """
+    Middleware para capturar parâmetros de tracking do Google Ads
+    Salva GCLID e UTM parameters para uso posterior nas conversões
+    """
+    try:
+        # Capturar parâmetros de tracking da URL
+        gclid = request.query_params.get('gclid')
+        utm_source = request.query_params.get('utm_source')
+        utm_medium = request.query_params.get('utm_medium')
+        utm_campaign = request.query_params.get('utm_campaign')
+        utm_term = request.query_params.get('utm_term')
+        utm_content = request.query_params.get('utm_content')
+
+        # Se tiver parâmetros de tracking, salvar no banco
+        if gclid or utm_source:
+            tracking_data = {
+                'gclid': gclid,
+                'utm_source': utm_source,
+                'utm_medium': utm_medium,
+                'utm_campaign': utm_campaign,
+                'utm_term': utm_term,
+                'utm_content': utm_content,
+                'captured_at': datetime.now().isoformat(),
+                'user_agent': request.headers.get('user-agent', ''),
+                'ip_address': request.client.host if request.client else None,
+                'referer': request.headers.get('referer', ''),
+                'request_url': str(request.url)
+            }
+
+            # Salvar no banco de dados
+            await save_tracking_params(tracking_data)
+
+            logger.info(f"🎯 Google Ads tracking capturado: GCLID={gclid}, UTM_SOURCE={utm_source}, UTM_CAMPAIGN={utm_campaign}")
+
+        # Continuar com a requisição
+        response = await call_next(request)
+        return response
+
+    except Exception as e:
+        logger.error(f"❌ Erro no middleware de tracking: {e}")
+        # Continuar mesmo se der erro no tracking
+        response = await call_next(request)
+        return response
 
 # URL da página do Google para avaliações
 GOOGLE_REVIEW_URL = "https://g.page/r/CfjiXeK7gOSLEAg/review"
@@ -3322,7 +3500,7 @@ async def agendamento_inteligente_confirmacao(request: Request):
         logger.info(f"✅ ETAPA 2: Pré-agendamento encontrado: {agendamento_id}")
 
         # Processar confirmação final
-        return await processar_confirmacao_final(pre_agendamento, opcao_normalizada)
+        return await processar_confirmacao_final(pre_agendamento, opcao_normalizada, request)
 
     except Exception as e:
         logger.error(f"❌ ETAPA 2: Erro ao processar confirmação: {e}")
@@ -3332,12 +3510,32 @@ async def agendamento_inteligente_confirmacao(request: Request):
         )
 
 # Função para processar confirmação final (ETAPA 2)
-async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: str):
+async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: str, request: Request = None):
     """
     Processa a confirmação final usando dados do pré-agendamento
+    INCLUI: Captura de parâmetros de tracking do Google Ads
     """
     try:
         logger.info(f"🔄 ETAPA 2: Processando confirmação final - opção {opcao_escolhida}")
+
+        # 🎯 CAPTURAR PARÂMETROS DE TRACKING PARA ESTE AGENDAMENTO
+        tracking_params = {}
+        if request:
+            try:
+                # Tentar recuperar tracking da sessão atual
+                user_agent = request.headers.get('user-agent', '')
+                ip_address = request.client.host if request.client else None
+                tracking_params = await get_latest_tracking_params(ip_address, user_agent)
+
+                if tracking_params.get('gclid'):
+                    logger.info(f"🎯 TRACKING: GCLID encontrado para confirmação: {tracking_params.get('gclid')[:20]}...")
+                elif tracking_params.get('utm_source'):
+                    logger.info(f"🎯 TRACKING: UTM_SOURCE encontrado: {tracking_params.get('utm_source')}")
+                else:
+                    logger.info("🎯 TRACKING: Nenhum parâmetro de tracking encontrado")
+            except Exception as e:
+                logger.error(f"❌ Erro ao capturar tracking: {e}")
+                tracking_params = {}
 
         # Extrair dados do pré-agendamento
         horarios_oferecidos = pre_agendamento.get("horarios_oferecidos", [])
@@ -3389,6 +3587,7 @@ async def processar_confirmacao_final(pre_agendamento: dict, opcao_escolhida: st
             "email": pre_agendamento.get("email", ""),
             "tecnico": tecnico_sugerido,
             "urgente": urgente,
+            "tracking_params": tracking_params,  # 🎯 ADICIONAR TRACKING PARAMS
             "horario_agendado": horario_escolhido,
             "tipo_atendimento": pre_agendamento.get("tipo_atendimento_1", "em_domicilio"),  # ✅ TIPO REAL
             "valor_os": obter_valor_servico(
@@ -3592,6 +3791,38 @@ async def criar_os_completa(dados: dict):
         os_id = response_os.data[0]["id"]
 
         logger.info(f"✅ OS criada com sucesso: {os_numero} (ID: {os_id})")
+
+        # 🎯 REGISTRAR CONVERSÃO GOOGLE ADS (se houver tracking)
+        try:
+            # Buscar tracking params se disponível
+            tracking_params = dados.get('tracking_params', {})
+            if tracking_params and tracking_params.get('gclid'):
+                # Calcular valor da conversão (valor inicial ou estimado)
+                conversion_value = float(dados.get('valor_os', 0))
+
+                # Dados adicionais para a conversão
+                additional_data = {
+                    'client_name': dados.get('nome'),
+                    'client_phone': dados.get('telefone'),
+                    'equipment_type': dados.get('equipamento'),
+                    'problem_description': dados.get('problema')
+                }
+
+                # Registrar conversão de agendamento
+                await register_google_ads_conversion(
+                    agendamento_id=os_id,  # Usar ID da OS como referência
+                    conversion_type='Agendamento',
+                    conversion_value=conversion_value,
+                    tracking_params=tracking_params,
+                    additional_data=additional_data
+                )
+
+                logger.info(f"🎯 CONVERSÃO: Agendamento registrado - R$ {conversion_value:.2f}")
+            else:
+                logger.info("🎯 CONVERSÃO: Sem tracking params - não registrando conversão")
+        except Exception as e:
+            logger.error(f"❌ Erro ao registrar conversão: {e}")
+            # Não falhar a criação da OS por erro de tracking
 
         # 🎯 NOVA ARQUITETURA: Criar evento diretamente em calendar_events
         # Fonte única da verdade - elimina necessidade de sincronização
@@ -4624,9 +4855,10 @@ async def processar_etapa_2_confirmacao(opcao_escolhida: str, telefone_contato: 
         )
 
 # Função para confirmar agendamento final (ETAPA 2)
-async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
+async def confirmar_agendamento_final(data: dict, horario_escolhido: str, request: Request = None):
     """
     NOVA ESTRATÉGIA: Busca pré-agendamento existente (com placeholders) e atualiza com dados reais
+    INCLUI: Captura de parâmetros de tracking do Google Ads
     """
     try:
         logger.info(f"🚀 ETAPA 2: Iniciando confirmar_agendamento_final com horario_escolhido='{horario_escolhido}'")
@@ -4634,6 +4866,25 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
         # Extrair telefone dos dados recebidos
         telefone_contato = data.get("telefone_contato", data.get("telefone", ""))
         logger.info(f"📞 ETAPA 2: Telefone extraído: '{telefone_contato}'")
+
+        # 🎯 CAPTURAR PARÂMETROS DE TRACKING PARA ESTE AGENDAMENTO
+        tracking_params = {}
+        if request:
+            try:
+                # Tentar recuperar tracking da sessão atual
+                user_agent = request.headers.get('user-agent', '')
+                ip_address = request.client.host if request.client else None
+                tracking_params = await get_latest_tracking_params(ip_address, user_agent)
+
+                if tracking_params.get('gclid'):
+                    logger.info(f"🎯 TRACKING: GCLID encontrado para agendamento: {tracking_params.get('gclid')[:20]}...")
+                elif tracking_params.get('utm_source'):
+                    logger.info(f"🎯 TRACKING: UTM_SOURCE encontrado: {tracking_params.get('utm_source')}")
+                else:
+                    logger.info("🎯 TRACKING: Nenhum parâmetro de tracking encontrado")
+            except Exception as e:
+                logger.error(f"❌ Erro ao capturar tracking: {e}")
+                tracking_params = {}
 
         supabase = get_supabase_client()
         logger.info(f"✅ ETAPA 2: Supabase client criado com sucesso")
@@ -4874,6 +5125,7 @@ async def confirmar_agendamento_final(data: dict, horario_escolhido: str):
             "tecnico": tecnico_info.get('nome', 'Paulo Cesar Betoni'),
             "urgente": urgente,
             "horario_agendado": horario_escolhido,
+            "tracking_params": tracking_params,  # 🎯 ADICIONAR TRACKING PARAMS
             "tipo_atendimento": service_type,
             "valor_os": final_cost
         }
@@ -5562,6 +5814,143 @@ async def consultar_status_os(request: Request):
                 "success": False,
                 "message": f"❌ Erro interno ao consultar status. Tente novamente em alguns instantes."
             }
+        )
+
+# 🎯 ENDPOINTS PARA GOOGLE ADS TRACKING
+@app.post("/sync-tracking")
+async def sync_tracking(request: Request):
+    """
+    Endpoint para sincronizar parâmetros de tracking do frontend
+    """
+    try:
+        data = await request.json()
+
+        # Validar dados obrigatórios
+        if not data.get('gclid') and not data.get('utm_source'):
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Nenhum parâmetro de tracking fornecido"}
+            )
+
+        # Preparar dados de tracking
+        tracking_data = {
+            'gclid': data.get('gclid'),
+            'utm_source': data.get('utm_source'),
+            'utm_medium': data.get('utm_medium'),
+            'utm_campaign': data.get('utm_campaign'),
+            'utm_term': data.get('utm_term'),
+            'utm_content': data.get('utm_content'),
+            'captured_at': data.get('captured_at', datetime.now().isoformat()),
+            'user_agent': data.get('user_agent', ''),
+            'ip_address': request.client.host if request.client else None,
+            'referer': data.get('referer', ''),
+            'request_url': data.get('request_url', ''),
+            'sync_source': data.get('sync_source', 'frontend')
+        }
+
+        # Salvar no banco
+        success = await save_tracking_params(tracking_data)
+
+        if success:
+            logger.info(f"✅ SYNC: Tracking sincronizado do frontend - GCLID: {data.get('gclid', 'N/A')}")
+            return JSONResponse(
+                status_code=200,
+                content={"success": True, "message": "Tracking sincronizado com sucesso"}
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "message": "Erro ao salvar tracking"}
+            )
+
+    except Exception as e:
+        logger.error(f"❌ Erro no sync de tracking: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": "Erro interno do servidor"}
+        )
+
+@app.get("/check-tracking")
+async def check_tracking(request: Request):
+    """
+    Endpoint para verificar se há tracking ativo
+    """
+    try:
+        # Buscar tracking mais recente
+        ip_address = request.client.host if request.client else None
+        user_agent = request.headers.get('user-agent', '')
+
+        tracking_params = await get_latest_tracking_params(ip_address, user_agent)
+
+        has_tracking = bool(tracking_params.get('gclid') or tracking_params.get('utm_source'))
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "has_tracking": has_tracking,
+                "gclid": tracking_params.get('gclid'),
+                "utm_source": tracking_params.get('utm_source'),
+                "utm_campaign": tracking_params.get('utm_campaign')
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao verificar tracking: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": "Erro interno do servidor"}
+        )
+
+@app.post("/register-conversion")
+async def register_conversion_endpoint(request: Request):
+    """
+    Endpoint para registrar conversão do Google Ads
+    """
+    try:
+        data = await request.json()
+
+        # Validar dados obrigatórios
+        service_order_id = data.get('service_order_id')
+        conversion_type = data.get('conversion_type')
+        conversion_value = data.get('conversion_value', 0)
+
+        if not service_order_id or not conversion_type:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "service_order_id e conversion_type são obrigatórios"}
+            )
+
+        # Buscar tracking params
+        ip_address = request.client.host if request.client else None
+        user_agent = request.headers.get('user-agent', '')
+        tracking_params = await get_latest_tracking_params(ip_address, user_agent)
+
+        # Registrar conversão
+        success = await register_google_ads_conversion(
+            agendamento_id=service_order_id,
+            conversion_type=conversion_type,
+            conversion_value=float(conversion_value),
+            tracking_params=tracking_params,
+            additional_data=data.get('additional_data', {})
+        )
+
+        if success:
+            return JSONResponse(
+                status_code=200,
+                content={"success": True, "message": "Conversão registrada com sucesso"}
+            )
+        else:
+            return JSONResponse(
+                status_code=200,
+                content={"success": False, "message": "Nenhum tracking ativo - conversão não registrada"}
+            )
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao registrar conversão: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": "Erro interno do servidor"}
         )
 
 @app.post("/fix-missing-client-ids")
