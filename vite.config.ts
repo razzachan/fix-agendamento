@@ -42,7 +42,8 @@ export default defineConfig(({ mode, command }) => {
     }),
     mode === 'development' &&
     componentTagger(),
-    VitePWA({
+    // PWA apenas em produção para evitar problemas de cache em desenvolvimento
+    mode === 'production' && VitePWA({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
