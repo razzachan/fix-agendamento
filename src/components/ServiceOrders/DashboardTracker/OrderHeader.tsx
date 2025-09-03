@@ -29,6 +29,11 @@ const OrderHeader: React.FC<OrderHeaderProps> = ({ serviceOrder, orderNumber }) 
         <Badge variant="outline" className={getStatusColor(serviceOrder.status)}>
           {serviceFlow.find(step => step.status === serviceOrder.status)?.label || serviceOrder.status}
         </Badge>
+        {serviceOrder.serviceAttendanceType && (
+          <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+            {serviceOrder.serviceAttendanceType === 'em_domicilio' ? 'Em Domicílio' : serviceOrder.serviceAttendanceType === 'coleta_conserto' ? 'Coleta Conserto' : 'Coleta Diagnóstico'}
+          </Badge>
+        )}
       </div>
 
       <div className="space-y-1">

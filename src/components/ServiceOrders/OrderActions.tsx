@@ -95,7 +95,8 @@ const OrderActions: React.FC<OrderActionsProps> = ({ order, onDelete }) => {
       const now = new Date().toISOString();
       const success = await updateServiceOrder(order.id, {
         status: 'completed',
-        completedDate: now
+        completedDate: now,
+        payment_status: 'completed' // ✅ Definir payment_status ao concluir
       });
       
       if (success) {

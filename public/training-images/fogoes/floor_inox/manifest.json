@@ -1,0 +1,58 @@
+{
+  "3fc85293ba311a93f4e2e099b4328c6e.jpg": {
+    "hash": "3fc85293ba311a93f4e2e099b4328c6e",
+    "contentType": "image/jpeg",
+    "size": 67682,
+    "originalName": "inox_floor_6.jpg",
+    "migratedAt": "2025-08-13T22:21:19.702Z"
+  },
+  "18d2a66938b28436f3ebc10eba987d5a.jpg": {
+    "hash": "18d2a66938b28436f3ebc10eba987d5a",
+    "contentType": "image/jpeg",
+    "size": 34343,
+    "originalName": "inox_floor_3.jpeg",
+    "migratedAt": "2025-08-13T22:21:19.687Z"
+  },
+  "fe7978345f429cb578e366baceadd25d.jpg": {
+    "hash": "fe7978345f429cb578e366baceadd25d",
+    "contentType": "image/jpeg",
+    "size": 38633,
+    "originalName": "inox_floor_12.jpg",
+    "migratedAt": "2025-08-13T22:21:19.681Z"
+  },
+  "e7ab3f9a109f9216ad6ce995cab1b64d.jpg": {
+    "hash": "e7ab3f9a109f9216ad6ce995cab1b64d",
+    "contentType": "image/jpeg",
+    "size": 29184,
+    "originalName": "inox_floor_9.jpg",
+    "migratedAt": "2025-08-13T22:21:19.710Z"
+  },
+  "3330323917f037b13605b7aaf73e5517.jpg": {
+    "hash": "3330323917f037b13605b7aaf73e5517",
+    "contentType": "image/jpeg",
+    "size": 23764,
+    "originalName": "inox_floor_3.jpg",
+    "migratedAt": "2025-08-13T22:21:19.690Z"
+  },
+  "db52e37aeb670c51a48af5c989f61b42.jpg": {
+    "hash": "db52e37aeb670c51a48af5c989f61b42",
+    "contentType": "image/jpeg",
+    "size": 21444,
+    "originalName": "inox_floor_4.jpg",
+    "migratedAt": "2025-08-13T22:21:19.695Z"
+  },
+  "a72a9a92fd89ff6a012598c67de23cf2.jpg": {
+    "hash": "a72a9a92fd89ff6a012598c67de23cf2",
+    "contentType": "image/jpeg",
+    "size": 47534,
+    "originalName": "inox_floor_7.jpg",
+    "migratedAt": "2025-08-13T22:21:19.705Z"
+  },
+  "d37661f71f367f52c25cef143515704b.jpg": {
+    "hash": "d37661f71f367f52c25cef143515704b",
+    "contentType": "image/jpeg",
+    "size": 58986,
+    "originalName": "inox_floor_8.jpg",
+    "migratedAt": "2025-08-13T22:21:19.707Z"
+  }
+}

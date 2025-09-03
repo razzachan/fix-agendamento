@@ -12,6 +12,7 @@
 const ftp = require('basic-ftp');
 const fs = require('fs');
 const path = require('path');
+const posixPath = path.posix;
 const { execSync } = require('child_process');
 require('dotenv').config();
 
@@ -38,65 +39,43 @@ const log = {
     warn: (msg) => console.log(`\x1b[33m[⚠️]\x1b[0m ${msg}`)
 };
 
-// Função para garantir que o diretório existe
-async function ensureRemoteDir(client, dirPath) {
+// Garante diretório ABSOLUTO no servidor (não depende do diretório atual)
+async function ensureRemoteDirAbs(client, absPath) {
     try {
-        await client.ensureDir(dirPath);
+        await client.ensureDir(absPath);
         return true;
     } catch (e) {
-        log.warn(`Tentando criar diretório manualmente: ${dirPath}`);
-        try {
-            const parts = dirPath.split('/').filter(p => p);
-            let currentPath = '';
-
-            for (const part of parts) {
-                currentPath += '/' + part;
-                try {
-                    await client.cd('/');
-                    await client.ensureDir(currentPath);
-                } catch (e2) {
-                    // Diretório já existe, continuar
-                }
-            }
-            return true;
-        } catch (e2) {
-            log.error(`Erro ao criar diretório ${dirPath}: ${e2.message}`);
-            return false;
-        }
+        log.error(`Erro ao garantir diretório ${absPath}: ${e.message}`);
+        return false;
     }
 }
 
-async function uploadDirectory(client, localPath, remotePath) {
+// Faz upload recursivo SEM alterar diretório corrente (usa caminhos absolutos)
+async function uploadDirectory(client, localPath, remoteRel = '') {
     const items = fs.readdirSync(localPath);
 
     for (const item of items) {
         const localItemPath = path.join(localPath, item);
-        const remoteItemPath = `${remotePath}/${item}`;
+        const currentRel = remoteRel ? `${remoteRel}/${item}` : item;
+        const remoteDirAbs = `${REMOTE_PATH}${remoteRel ? '/' + remoteRel : ''}`;
+        const remoteItemAbs = `${REMOTE_PATH}/${currentRel}`;
 
         const stat = fs.statSync(localItemPath);
 
         if (stat.isDirectory()) {
-            log.info(`📁 Criando diretório: ${remoteItemPath}`);
-            const dirCreated = await ensureRemoteDir(client, remoteItemPath);
-            if (dirCreated) {
-                await uploadDirectory(client, localItemPath, remoteItemPath);
+            log.info(`📁 Criando diretório: ${remoteDirAbs}/${item}`);
+            const ok = await ensureRemoteDirAbs(client, `${remoteDirAbs}/${item}`);
+            if (ok) {
+                await uploadDirectory(client, localItemPath, currentRel);
             }
         } else {
-            log.info(`📄 Enviando: ${item}`);
+            log.info(`📄 Enviando: ${remoteItemAbs}`);
             try {
-                // CORREÇÃO: Upload direto com caminho completo
-                await client.uploadFrom(localItemPath, remoteItemPath);
-                log.success(`✅ Enviado: ${item}`);
+                await ensureRemoteDirAbs(client, remoteDirAbs);
+                await client.uploadFrom(localItemPath, remoteItemAbs);
+                log.success(`✅ Enviado: ${remoteItemAbs}`);
             } catch (e) {
-                log.error(`❌ Erro ao enviar ${item}: ${e.message}`);
-                // Tentar método alternativo
-                try {
-                    await client.cd(remotePath);
-                    await client.uploadFrom(localItemPath, item);
-                    log.success(`✅ Enviado (método alternativo): ${item}`);
-                } catch (e2) {
-                    log.error(`❌ Erro definitivo ao enviar ${item}: ${e2.message}`);
-                }
+                log.error(`❌ Erro definitivo ao enviar ${remoteItemAbs}: ${e.message}`);
             }
         }
     }

@@ -1,0 +1,37 @@
+{
+  "a9e36880762eba3d3f3fa87791b11c81.jpg": {
+    "hash": "a9e36880762eba3d3f3fa87791b11c81",
+    "contentType": "image/jpeg",
+    "size": 59013,
+    "originalName": "premium_cooktop_10.jpg",
+    "migratedAt": "2025-08-13T22:21:19.623Z"
+  },
+  "2382e163dc12fc30dbb870ec7a32bbb5.jpg": {
+    "hash": "2382e163dc12fc30dbb870ec7a32bbb5",
+    "contentType": "image/jpeg",
+    "size": 45144,
+    "originalName": "premium_cooktop_6.jpg",
+    "migratedAt": "2025-08-13T22:21:19.634Z"
+  },
+  "d4dd4a7b127f970025eca5b594638e62.jpg": {
+    "hash": "d4dd4a7b127f970025eca5b594638e62",
+    "contentType": "image/jpeg",
+    "size": 210438,
+    "originalName": "premium_cooktop_5.jpg",
+    "migratedAt": "2025-08-13T22:21:19.631Z"
+  },
+  "b0085fd7204409d66add733eff25b569.jpg": {
+    "hash": "b0085fd7204409d66add733eff25b569",
+    "contentType": "image/jpeg",
+    "size": 96847,
+    "originalName": "premium_cooktop_7.jpg",
+    "migratedAt": "2025-08-13T22:21:19.637Z"
+  },
+  "1240e4049773a86d6823fad0abcd94bb.jpg": {
+    "hash": "1240e4049773a86d6823fad0abcd94bb",
+    "contentType": "image/jpeg",
+    "size": 134321,
+    "originalName": "premium_cooktop_8.jpg",
+    "migratedAt": "2025-08-13T22:21:19.641Z"
+  }
+}

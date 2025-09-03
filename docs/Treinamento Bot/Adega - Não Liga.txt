@@ -1,0 +1,14 @@
+sintomas:
+- não liga
+- nao liga
+- não funciona
+- nao funciona
+
+causas:
+- Alimentação elétrica/fusível
+- Placa eletrônica
+- Termostato de segurança
+- Chave/interruptor
+
+mensagens:
+- Vamos conferir as possibilidades e seguir com a coleta para avaliação completa em bancada.

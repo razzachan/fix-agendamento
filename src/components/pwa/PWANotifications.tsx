@@ -21,6 +21,10 @@ import {
 } from 'lucide-react';
 import { usePWA } from '@/hooks/usePWA';
 import { toast } from 'sonner';
+import { subscribeUserToPush } from '@/services/push/pushSubscriptionService';
+import { savePushSubscription } from '@/services/push/pushApi';
+import { useAuth } from '@/contexts/AuthContext';
+import { sendPush } from '@/services/push/pushSendApi';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -39,6 +43,8 @@ interface NotificationSettings {
  * Componente para gerenciar notificações PWA
  */
 export function PWANotifications() {
+  const { user } = useAuth();
+
   const [settings, setSettings] = useState<NotificationSettings>({
     enabled: false,
     newOrders: true,
@@ -92,9 +98,18 @@ export function PWANotifications() {
       if (granted) {
         setPermissionStatus('granted');
         saveSettings({ ...settings, enabled: true });
+
+        // Assinar push e salvar no backend (Supabase)
+        if (user?.id) {
+          const subscription = await subscribeUserToPush();
+          if (subscription) {
+            await savePushSubscription(user.id, subscription);
+          }
+        }
+
         toast.success('Notificações ativadas com sucesso!');
-        
-        // Enviar notificação de teste
+
+        // Enviar notificação de teste local
         await sendNotification({
           title: 'Fix Fogões',
           body: 'Notificações ativadas! Você receberá atualizações importantes.',
@@ -136,20 +151,17 @@ export function PWANotifications() {
     }
 
     try {
-      await sendNotification({
+      // Envia push via Edge Function (server-side)
+      await sendPush({
+        userId: user?.id,
         title: 'Notificação de Teste',
         body: 'Esta é uma notificação de teste do Fix Fogões',
-        icon: '/favicon.svg',
-        tag: 'test',
-        actions: [
-          { action: 'view', title: 'Ver Detalhes' },
-          { action: 'dismiss', title: 'Dispensar' }
-        ]
+        icon: '/icons/icon-192.png'
       });
-      toast.success('Notificação de teste enviada!');
+      toast.success('Push de teste enviado!');
     } catch (error) {
-      console.error('Erro ao enviar notificação de teste:', error);
-      toast.error('Erro ao enviar notificação de teste');
+      console.error('Erro ao enviar push de teste:', error);
+      toast.error('Erro ao enviar push');
     }
   };
 
@@ -242,8 +254,21 @@ export function PWANotifications() {
                   <Smartphone className="h-4 w-4 mr-2" />
                   Testar Notificação
                 </Button>
-                
-                <Button 
+
+                <Button onClick={async () => {
+                  try {
+                    await sendPush({ title: 'Aviso Geral', body: 'Push enviado para todos os dispositivos ativos.' });
+                    toast.success('Push enviado para todos!');
+                  } catch (e) {
+                    console.error(e);
+                    toast.error('Falha ao enviar push geral');
+                  }
+                }} variant="outline">
+                  <Bell className="h-4 w-4 mr-2" />
+                  Push para Todos
+                </Button>
+
+                <Button
                   onClick={handleDisableNotifications} 
                   variant="outline"
                   disabled={!settings.enabled}

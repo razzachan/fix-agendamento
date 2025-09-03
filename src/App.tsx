@@ -13,6 +13,7 @@ import { DynamicValueRangesService } from './services/dynamicValueRangesService'
 
 // Pages
 import Index from './pages/Index';
+import Analytics from './pages/Analytics';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ServiceOrders from './pages/ServiceOrders';
@@ -55,10 +56,16 @@ import { ClientProfilePassword } from './pages/client/ClientProfilePassword';
 import Reports from './pages/Reports';
 import PWASettings from './pages/PWASettings';
 import AI from './pages/AI';
+import BotStudio from './pages/BotStudio';
+import AIRouterDashboard from './pages/ai-router-dashboard';
+
+import WhatsApp from './pages/WhatsApp';
+import AdminBotTracing from './pages/AdminBotTracing';
 import ForceLogout from './pages/ForceLogout';
 // Components
 import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { PWAUpdateManager } from '@/components/pwa/PWAUpdateManager';
 
 const queryClient = new QueryClient();
 
@@ -117,6 +124,7 @@ function App() {
           disableTransitionOnChange
         >
           <Toaster />
+          <PWAUpdateManager autoUpdate={false} showToast={true} />
           <GoogleAdsTrackingProvider>
             <AuthProvider>
               <MapProvider>
@@ -148,6 +156,8 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+
+
 
               {/* Rotas acessíveis a admin, técnicos e oficinas */}
               <Route
@@ -282,10 +292,50 @@ function App() {
                 }
               />
               <Route
+                path="/analytics"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><Analytics /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/ai"
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <AppLayout><AI /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/whatsapp"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><WhatsApp /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/bot"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><BotStudio /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/bot-tracing"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><AdminBotTracing /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/ai-router"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><AIRouterDashboard /></AppLayout>
                   </ProtectedRoute>
                 }
               />

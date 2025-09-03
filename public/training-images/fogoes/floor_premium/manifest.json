@@ -1,0 +1,72 @@
+{
+  "1cfb88e1da9623db332240c1b3f89ebe.jpg": {
+    "hash": "1cfb88e1da9623db332240c1b3f89ebe",
+    "contentType": "image/jpeg",
+    "size": 32344,
+    "originalName": "premium_floor_1.jpg",
+    "migratedAt": "2025-08-13T22:21:19.715Z"
+  },
+  "f3af3120e8645093e01dd229794202eb.jpg": {
+    "hash": "f3af3120e8645093e01dd229794202eb",
+    "contentType": "image/jpeg",
+    "size": 28871,
+    "originalName": "premium_floor_10.jpg",
+    "migratedAt": "2025-08-13T22:21:19.718Z"
+  },
+  "fdacb48991f2ebe9cdb1a1d11c5ea775.jpg": {
+    "hash": "fdacb48991f2ebe9cdb1a1d11c5ea775",
+    "contentType": "image/jpeg",
+    "size": 105667,
+    "originalName": "premium_floor_11.jpg",
+    "migratedAt": "2025-08-13T22:21:19.721Z"
+  },
+  "58a98baaa3074429edacbe0f8a07455a.jpg": {
+    "hash": "58a98baaa3074429edacbe0f8a07455a",
+    "contentType": "image/jpeg",
+    "size": 187616,
+    "originalName": "premium_floor_12.jpg",
+    "migratedAt": "2025-08-13T22:21:19.725Z"
+  },
+  "81d9878ec25dde4aadd4054b2561272b.jpg": {
+    "hash": "81d9878ec25dde4aadd4054b2561272b",
+    "contentType": "image/jpeg",
+    "size": 38089,
+    "originalName": "premium_floor_2.jpg",
+    "migratedAt": "2025-08-13T22:21:19.728Z"
+  },
+  "9440566c5050c292010e38a8566e1496.jpg": {
+    "hash": "9440566c5050c292010e38a8566e1496",
+    "contentType": "image/jpeg",
+    "size": 36248,
+    "originalName": "premium_floor_3.jpg",
+    "migratedAt": "2025-08-13T22:21:19.731Z"
+  },
+  "61ae70758d1b079487a0e7df6d82b101.jpg": {
+    "hash": "61ae70758d1b079487a0e7df6d82b101",
+    "contentType": "image/jpeg",
+    "size": 16732,
+    "originalName": "premium_floor_6.jpeg",
+    "migratedAt": "2025-08-13T22:21:19.733Z"
+  },
+  "364eeecdf264f8332a1a73a12f21c165.png": {
+    "hash": "364eeecdf264f8332a1a73a12f21c165",
+    "contentType": "image/png",
+    "size": 856350,
+    "originalName": "premium_floor_7.png",
+    "migratedAt": "2025-08-13T22:21:19.738Z"
+  },
+  "73f2250d4257628490ebbb3c2c1ab29f.png": {
+    "hash": "73f2250d4257628490ebbb3c2c1ab29f",
+    "contentType": "image/png",
+    "size": 183805,
+    "originalName": "premium_floor_8.png",
+    "migratedAt": "2025-08-13T22:21:19.741Z"
+  },
+  "6bfbf4264b5cd3371167a3a067af47a8.jpg": {
+    "hash": "6bfbf4264b5cd3371167a3a067af47a8",
+    "contentType": "image/jpeg",
+    "size": 129977,
+    "originalName": "premium_floor_9.jpg",
+    "migratedAt": "2025-08-13T22:21:19.744Z"
+  }
+}

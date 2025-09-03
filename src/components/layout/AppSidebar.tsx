@@ -4,6 +4,7 @@ import { useTheme } from 'next-themes';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useSidebarBadges } from '@/hooks/useSidebarBadges';
+import { useWhatsAppStatus } from '@/hooks/useWhatsAppStatus';
 import {
   LayoutDashboard,
   FileText,
@@ -26,7 +27,9 @@ import {
   Search,
   Menu,
   Moon,
-  Sun
+  Sun,
+  Bot,
+  MessageCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +43,7 @@ const AppSidebar: React.FC = () => {
 
   // Hook para badges de notificação
   const { badges, isLoading: badgesLoading, isConnected, refreshBadges, lastUpdate } = useSidebarBadges();
+  const wa = useWhatsAppStatus(5000);
 
   // Estados do novo sidebar
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -177,7 +181,10 @@ const AppSidebar: React.FC = () => {
     { to: '/tracking', icon: MapPin, label: 'Rastreamento' },
     { to: '/finance', icon: DollarSign, label: 'Financeiro' },
     { to: '/reports', icon: BarChart3, label: 'Relatórios' },
+    { to: '/analytics', icon: BarChart3, label: 'Analytics' },
     { to: '/ai', icon: Brain, label: 'IA' },
+    { to: '/bot', icon: Bot, label: 'Assistente IA' },
+    { to: '/admin/whatsapp', icon: MessageCircle, label: 'WhatsApp' },
     { to: '/settings', icon: Settings, label: 'Configurações' },
     { to: '/pwa-settings', icon: Smartphone, label: 'PWA & Mobile' }
   ];
@@ -304,10 +311,10 @@ const AppSidebar: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`} />
+              <div className="flex items-center gap-3">
+                <div className={`w-2 h-2 rounded-full ${wa.connected ? 'bg-green-400' : 'bg-red-400'}`} />
                 <span className="text-xs text-gray-600 dark:text-gray-300">
-                  {isConnected ? 'Online' : 'Offline'}
+                  WhatsApp {wa.connected ? 'Online' : 'Offline'}
                 </span>
               </div>
             </div>

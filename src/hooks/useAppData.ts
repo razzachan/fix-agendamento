@@ -8,6 +8,7 @@ import { useFinancialTransactions } from './data/useFinancialTransactions';
 import { useAgendamentosData } from './data/useAgendamentosData';
 
 export function useAppData() {
+  console.log('🚀 [useAppData] HOOK EXECUTADO!');
   const [appDataVersion, setAppDataVersion] = useState(0);
 
   const { 
