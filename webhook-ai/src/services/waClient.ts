@@ -144,8 +144,8 @@ class WhatsAppClient extends EventEmitter {
         try {
           const state = await this.client.getState();
           console.log('[WA] State:', state);
-        } catch (e) {
-          console.log('[WA] Não foi possível obter state:', e.message);
+        } catch (e: any) {
+          console.log('[WA] Não foi possível obter state:', e?.message || String(e));
         }
 
         // Método 2: Usar info.wid
@@ -163,8 +163,8 @@ class WhatsAppClient extends EventEmitter {
               meId = me.id._serialized || me.id.user || me.number;
               pushname = me.pushname || me.name;
             }
-          } catch (e) {
-            console.log('[WA] Não foi possível obter contatos:', e.message);
+          } catch (e: any) {
+            console.log('[WA] Não foi possível obter contatos:', e?.message || String(e));
           }
         }
 
@@ -179,10 +179,11 @@ class WhatsAppClient extends EventEmitter {
 
                   // Método 1: Store.Conn
                   // @ts-ignore
-                  if (window.Store && window.Store.Conn && window.Store.Conn.wid) {
+                  // @ts-ignore
+                  if ((window as any).Store && (window as any).Store.Conn && (window as any).Store.Conn.wid) {
                     return {
-                      id: window.Store.Conn.wid._serialized || window.Store.Conn.wid.user,
-                      pushname: window.Store.Conn.pushname
+                      id: (window as any).Store.Conn.wid._serialized || (window as any).Store.Conn.wid.user,
+                      pushname: (window as any).Store.Conn.pushname
                     };
                   }
 
@@ -200,8 +201,9 @@ class WhatsAppClient extends EventEmitter {
                   const headerElement = document.querySelector('[data-testid="default-user"]') ||
                                       document.querySelector('[title*="+"]') ||
                                       document.querySelector('header [title]');
-                  if (headerElement && headerElement.title) {
-                    const title = headerElement.title;
+                  const he = headerElement as HTMLElement | null;
+                  if (he && (he as any).title) {
+                    const title = (he as any).title as string;
                     const phoneMatch = title.match(/\+?(\d{10,15})/);
                     if (phoneMatch) {
                       return {
@@ -213,8 +215,9 @@ class WhatsAppClient extends EventEmitter {
 
                   // Método 4: Procurar elementos com números de telefone
                   const phoneElements = document.querySelectorAll('[title*="+"], [aria-label*="+"]');
-                  for (const element of phoneElements) {
-                    const text = element.title || element.getAttribute('aria-label') || '';
+                  for (const el of Array.from(phoneElements)) {
+                    const he2 = el as HTMLElement;
+                    const text = (he2 as any).title || he2.getAttribute('aria-label') || '';
                     const phoneMatch = text.match(/\+?(\d{10,15})/);
                     if (phoneMatch) {
                       return {
@@ -235,8 +238,8 @@ class WhatsAppClient extends EventEmitter {
                 pushname = result.pushname;
               }
             }
-          } catch (e) {
-            console.log('[WA] Não foi possível executar JavaScript na página:', e.message);
+          } catch (e: any) {
+            console.log('[WA] Não foi possível executar JavaScript na página:', e?.message || String(e));
           }
         }
 
@@ -295,8 +298,8 @@ class WhatsAppClient extends EventEmitter {
                   meId = me.id._serialized || me.id.user || me.number;
                   pushname = me.pushname || me.name;
                 }
-              } catch (e) {
-                console.log('[WA] WORKAROUND: Não foi possível obter contatos:', e.message);
+              } catch (e: any) {
+                console.log('[WA] WORKAROUND: Não foi possível obter contatos:', e?.message || String(e));
               }
             }
 
@@ -311,10 +314,11 @@ class WhatsAppClient extends EventEmitter {
 
                       // Método 1: Store.Conn
                       // @ts-ignore
-                      if (window.Store && window.Store.Conn && window.Store.Conn.wid) {
+                      // @ts-ignore
+                      if ((window as any).Store && (window as any).Store.Conn && (window as any).Store.Conn.wid) {
                         return {
-                          id: window.Store.Conn.wid._serialized || window.Store.Conn.wid.user,
-                          pushname: window.Store.Conn.pushname
+                          id: (window as any).Store.Conn.wid._serialized || (window as any).Store.Conn.wid.user,
+                          pushname: (window as any).Store.Conn.pushname
                         };
                       }
 
@@ -332,8 +336,9 @@ class WhatsAppClient extends EventEmitter {
                       const headerElement = document.querySelector('[data-testid="default-user"]') ||
                                           document.querySelector('[title*="+"]') ||
                                           document.querySelector('header [title]');
-                      if (headerElement && headerElement.title) {
-                        const title = headerElement.title;
+                      const he = headerElement as HTMLElement | null;
+                      if (he && (he as any).title) {
+                        const title = (he as any).title as string;
                         const phoneMatch = title.match(/\+?(\d{10,15})/);
                         if (phoneMatch) {
                           return {
@@ -345,8 +350,9 @@ class WhatsAppClient extends EventEmitter {
 
                       // Método 4: Procurar elementos com números de telefone
                       const phoneElements = document.querySelectorAll('[title*="+"], [aria-label*="+"]');
-                      for (const element of phoneElements) {
-                        const text = element.title || element.getAttribute('aria-label') || '';
+                      for (const el of Array.from(phoneElements)) {
+                        const he2 = el as HTMLElement;
+                        const text = (he2 as any).title || he2.getAttribute('aria-label') || '';
                         const phoneMatch = text.match(/\+?(\d{10,15})/);
                         if (phoneMatch) {
                           return {
@@ -367,8 +373,8 @@ class WhatsAppClient extends EventEmitter {
                     pushname = result.pushname;
                   }
                 }
-              } catch (e) {
-                console.log('[WA] WORKAROUND: Não foi possível executar JavaScript:', e.message);
+              } catch (e: any) {
+                console.log('[WA] WORKAROUND: Não foi possível executar JavaScript:', e?.message || String(e));
               }
             }
 
@@ -635,7 +641,7 @@ class WhatsAppClient extends EventEmitter {
                 if (!msg || msg.fromMe) continue; // Ignorar mensagens próprias
 
                 const timestamp = msg.t * 1000; // Converter para milliseconds
-                if (timestamp > fiveMinutesAgo && timestamp > (window.lastPollingCheck || 0)) {
+                if (timestamp > fiveMinutesAgo && timestamp > ((window as any).lastPollingCheck || 0)) {
                   recentMessages.push({
                     id: msg.id._serialized || msg.id.id,
                     from: msg.from._serialized || msg.from,
@@ -647,7 +653,7 @@ class WhatsAppClient extends EventEmitter {
               }
             }
 
-            window.lastPollingCheck = now;
+            (window as any).lastPollingCheck = now;
             return recentMessages;
           } catch (error) {
             console.error('Erro no polling de mensagens:', error);

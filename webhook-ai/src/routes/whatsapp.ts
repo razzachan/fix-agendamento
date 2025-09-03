@@ -96,7 +96,7 @@ whatsappRouter.post('/reset', async (_req, res) => {
   try {
     await waClient.reset();
     res.json({ success: true, message: 'WhatsApp resetado, novo QR será gerado' });
-  } catch (e) {
+  } catch (e: any) {
     res.status(500).json({ error: true, message: e?.message || String(e) });
   }
 });

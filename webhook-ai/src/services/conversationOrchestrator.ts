@@ -1448,13 +1448,13 @@ async function executeAIDecision(
           console.log('[DEBUG] SAUDAÇÃO DETECTADA - Usando GPT humanizado');
           try {
             // Criar prompt específico para saudação natural
-            const saudacaoPrompt = `${buildSystemPrompt((bot as any)?.personality?.systemPrompt, blocks)}
+            const saudacaoPrompt = `${buildSystemPrompt(((await getActiveBot()) as any)?.personality?.systemPrompt, undefined)}
 
 Mensagem do usuário: "${body}"
 
 Responda de forma natural e brasileira como uma pessoa real faria. Cumprimente de volta e depois pergunte como pode ajudar com equipamentos domésticos.`;
 
-            const response = await chatComplete([
+            const response = await chatComplete({ provider: 'openai', model: process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini' }, [
               { role: 'system', content: saudacaoPrompt },
               { role: 'user', content: body || '' }
             ]);
@@ -1564,7 +1564,7 @@ Responda de forma natural e brasileira como uma pessoa real faria. Cumprimente d
           console.log('[DEBUG] PERGUNTA ALEATÓRIA DETECTADA - Usando GPT humanizado');
           try {
             // Criar prompt específico para perguntas aleatórias
-            const perguntaPrompt = `${buildSystemPrompt((bot as any)?.personality?.systemPrompt, blocks)}
+            const perguntaPrompt = `${buildSystemPrompt(((await getActiveBot()) as any)?.personality?.systemPrompt, undefined)}
 
 Mensagem do usuário: "${body}"
 
@@ -1575,7 +1575,7 @@ Exemplos:
 - "Você gosta de futebol?" → "Ah, eu curto sim! E você, torce pra qual time? Mas me diz, precisa de ajuda com algum equipamento em casa?"
 - "Me conta uma piada" → "Haha, não sou muito bom com piadas não! 😅 Mas sou ótimo com equipamentos! Posso te ajudar com alguma coisa?"`;
 
-            const response = await chatComplete([
+            const response = await chatComplete({ provider: 'openai', model: process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini' }, [
               { role: 'system', content: perguntaPrompt },
               { role: 'user', content: body || '' }
             ]);
@@ -1665,7 +1665,7 @@ function sanitizeAIText(text: string): string {
 
 async function executeAIOrçamento(decision: any, session?: SessionRecord, body?: string): Promise<string> {
   try {
-    const dados = decision.dados_extrair || {};
+    let dados: any = decision.dados_extrair || {};
     const { buildQuote } = await import('./toolsRuntime.js');
 
     // Determinar tipo de serviço baseado no equipamento
@@ -1733,13 +1733,13 @@ async function executeAIOrçamento(decision: any, session?: SessionRecord, body?
       }
 
       // Verificar se precisamos coletar mais informações para orçamento preciso
-      const needsMoreInfo = !dados.mount || !dados.num_burners;
+      let needsMoreInfo = !dados.mount || !dados.num_burners;
 
       console.log('[FOGÃO DEBUG]', {
         mount: dados.mount,
         num_burners: dados.num_burners,
         needsMoreInfo,
-        fogao_info_collected: session.state?.fogao_info_collected,
+        fogao_info_collected: (session as any)?.state?.fogao_info_collected,
         body: body
       });
 
@@ -1764,12 +1764,12 @@ async function executeAIOrçamento(decision: any, session?: SessionRecord, body?
       }
 
       // Se ainda faltam informações, perguntar (mas só uma vez por conversa de fogão)
-      if (needsMoreInfo && !session.state?.fogao_info_collected) {
+      if (needsMoreInfo && !(session as any)?.state?.fogao_info_collected) {
         // Garantir que session.state existe
-        if (!session.state) session.state = {};
+        if (!(session as any).state) (session as any).state = {} as any;
 
         // Marcar que já tentamos coletar info para evitar loop
-        session.state.fogao_info_collected = true;
+        (session as any).state.fogao_info_collected = true;
 
         let pergunta = "Para dar um orçamento mais preciso, preciso saber:\n\n";
 
