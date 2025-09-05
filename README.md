@@ -3,6 +3,24 @@
 ![Webhook AI CI](https://github.com/razzachan/fix-agendamento/actions/workflows/webhook-ai-ci.yml/badge.svg)
 
 
+## Analytics & Continuous Improvement
+
+- Eventos de analytics gravados em `bot_analytics_events` (Supabase)
+- Workflow semanal gera relatório e propõe PR de ajustes de copy
+- Smoke self-contained diário garante E2E básico sem secrets
+
+### Variáveis de ambiente (webhook-ai)
+- SUPABASE_URL
+- SUPABASE_SERVICE_ROLE_KEY
+- MOCK_SUPABASE=true (para dev/CI sem Supabase)
+- API_URL (para scripts de smoke e toolsRuntime)
+- BOT_TOKEN (para scripts de smoke e middleware)
+
+### Bootstrap de tabela
+Arquivo SQL:
+- <code>webhook-ai/scripts/supabase-bootstrap.sql</code>
+
+
 🚀 **Deploy Automático Ativo** - Sistema configurado e funcionando!
 
 ## 🧪 TESTE DE DEPLOY AUTOMÁTICO

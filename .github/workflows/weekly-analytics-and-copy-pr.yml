@@ -1,0 +1,33 @@
+name: Weekly analytics + copy improvement PR
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Mondays 09:00 UTC
+  workflow_dispatch:
+
+jobs:
+  analyze-and-propose:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Run analysis
+        run: node webhook-ai/scripts/analytics-report.mjs
+
+      - name: Propose PR with copy tweaks
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node webhook-ai/scripts/propose-copy-pr.mjs
+

@@ -18,6 +18,7 @@ import {
 import { supabase } from './supabase.js';
 
 async function logAIRoute(event: string, payload: any) {
+  // Envia para tabela legada e também para analytics unificado
   try {
     await supabase.from('bot_ai_router_logs').insert({
       event,
@@ -25,8 +26,12 @@ async function logAIRoute(event: string, payload: any) {
       created_at: new Date().toISOString(),
     } as any);
   } catch (e) {
-    console.warn('[AI-ROUTER-LOG] Failed', e);
+    console.warn('[AI-ROUTER-LOG] Failed (legacy)', e);
   }
+  try {
+    const { logEvent } = await import('./analytics.js');
+    await logEvent({ type: `ai_router:${event}`, data: payload });
+  } catch {}
 }
 
 function detectPriorityIntent(text: string): string | null {

@@ -1,6 +1,8 @@
 name: Webhook AI Smoke (self-contained)
 
 on:
+  schedule:
+    - cron: '0 6 * * *' # Daily 06:00 UTC
   workflow_dispatch:
   push:
     branches: [ main, master ]
@@ -43,11 +45,11 @@ jobs:
               }
               if (url === '/api/bot/tools/buildQuote' && method === 'POST') {
                 res.writeHead(200, { 'Content-Type': 'application/json' })
-                return res.end(JSON.stringify({ price: 120, service_type: 'domicilio', causes: ['Queimador entupido'] }))
+                return res.end(JSON.stringify({ result: { price: 120, service_type: 'domicilio', causes: ['Queimador entupido'] } }))
               }
               if (url === '/api/bot/tools/getAvailability' && method === 'POST') {
                 res.writeHead(200, { 'Content-Type': 'application/json' })
-                return res.end(JSON.stringify({ slots: ['09:00', '10:30', '14:00'] }))
+                return res.end(JSON.stringify({ result: { slots: ['09:00', '10:30', '14:00'] } }))
               }
               res.writeHead(404, { 'Content-Type': 'application/json' })
               res.end(JSON.stringify({ error: 'not found' }))
