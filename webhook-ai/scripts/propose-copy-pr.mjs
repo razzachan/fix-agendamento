@@ -18,7 +18,7 @@ content = content.replace(
 fs.writeFileSync(file, content)
 
 sh('git add webhook-ai/src/services/copy.ts')
-sh('git commit -m "copy: tweak greeting fallback for engagement A/B"')
+sh('git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" commit -m "copy: tweak greeting fallback for engagement A/B"')
 const remote = sh('git remote get-url origin')
 const prTitle = 'copy: tweak greeting fallback for engagement A/B'
 sh(`git push -u origin ${branch}`)

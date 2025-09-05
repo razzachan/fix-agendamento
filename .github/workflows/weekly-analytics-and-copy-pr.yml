@@ -32,5 +32,6 @@ jobs:
       - name: Propose PR with copy tweaks
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node webhook-ai/scripts/propose-copy-pr.mjs
 
