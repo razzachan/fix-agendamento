@@ -1,0 +1,86 @@
+name: Webhook AI Smoke (self-contained)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'webhook-ai/scripts/smoke-*.mjs'
+      - '.github/workflows/webhook-ai-smoke-self-contained.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start stub API (background)
+        run: |
+          cat > stub-api.mjs <<'EOF'
+          import http from 'http'
+          const port = process.env.PORT || 3100
+          const token = process.env.BOT_TOKEN || 'test-token'
+          const server = http.createServer((req, res) => {
+            const { method, url, headers } = req
+            const chunks = []
+            req.on('data', c => chunks.push(c))
+            req.on('end', () => {
+              const body = chunks.length ? Buffer.concat(chunks).toString('utf8') : ''
+              const okToken = (headers['x-bot-token'] || headers['X-Bot-Token'] || '') === token
+              if (!okToken) {
+                res.writeHead(401, { 'Content-Type': 'application/json' })
+                return res.end(JSON.stringify({ error: 'missing or invalid token' }))
+              }
+              if (url === '/api/bot/tools/buildQuote' && method === 'POST') {
+                res.writeHead(200, { 'Content-Type': 'application/json' })
+                return res.end(JSON.stringify({ price: 120, service_type: 'domicilio', causes: ['Queimador entupido'] }))
+              }
+              if (url === '/api/bot/tools/getAvailability' && method === 'POST') {
+                res.writeHead(200, { 'Content-Type': 'application/json' })
+                return res.end(JSON.stringify({ slots: ['09:00', '10:30', '14:00'] }))
+              }
+              res.writeHead(404, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: 'not found' }))
+            })
+          })
+          server.listen(port, () => console.log('stub api listening', port))
+          EOF
+          node stub-api.mjs &
+          echo $! > stub.pid
+
+      - name: Wait for stub API
+        run: |
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3100/api/bot/tools/getAvailability -H 'x-bot-token: test-token' -X POST --data '{}'; then
+              echo "Stub is up" && break
+            fi
+            sleep 1
+          done
+
+      - name: Run smoke: orçamento
+        env:
+          API_URL: http://127.0.0.1:3100
+          BOT_TOKEN: test-token
+        run: node webhook-ai/scripts/smoke-orcamento.mjs
+
+      - name: Run smoke: agendamento
+        env:
+          API_URL: http://127.0.0.1:3100
+          BOT_TOKEN: test-token
+        run: node webhook-ai/scripts/smoke-agendamento.mjs
+
+      - name: Stop stub API
+        if: always()
+        run: |
+          if [ -f stub.pid ]; then kill $(cat stub.pid) || true; fi
+
