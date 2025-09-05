@@ -6,7 +6,7 @@ import { logInbound, logOutbound } from '../conversation.js';
 export async function processStatus(body: any) {
   const to = extractSenderPhone(body);
   if (!to) return { ok: false, reason: 'no_phone' };
-  await logInbound(to, (body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.text?.body) || '');
+  await logInbound(to, body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.text?.body || '');
 
   const normalized = normalizePhone(to) || '';
   const last8 = normalized.slice(-8);
@@ -21,12 +21,18 @@ export async function processStatus(body: any) {
 
   if (error) {
     console.error('[Status] DB error', error);
-    await sendText(to, 'Tive um problema ao consultar seu status agora. Tente novamente em instantes.');
+    await sendText(
+      to,
+      'Tive um problema ao consultar seu status agora. Tente novamente em instantes.'
+    );
     return { ok: false, reason: 'db_error' };
   }
 
   if (!data || data.length === 0) {
-    await sendText(to, 'Não localizei uma OS pelo seu número. Me envie o número da OS (ex.: OS #123) ou o CPF/CNPJ para eu localizar.');
+    await sendText(
+      to,
+      'Não localizei uma OS pelo seu número. Me envie o número da OS (ex.: OS #123) ou o CPF/CNPJ para eu localizar.'
+    );
     return { ok: true, found: 0 };
   }
 
@@ -38,10 +44,7 @@ export async function processStatus(body: any) {
     return `${on} • ${o.equipment_type || 'Equipamento'} • Status: ${o.status}${val} • Agendado: ${sched}`;
   });
 
-  const msg = [
-    'Aqui está o status das suas últimas solicitações:',
-    ...lines
-  ].join('\n');
+  const msg = ['Aqui está o status das suas últimas solicitações:', ...lines].join('\n');
 
   // Tentar template customizado 'status_latest_orders'
   const templates = await getTemplates();
@@ -57,4 +60,3 @@ export async function processStatus(body: any) {
   await logOutbound(to, msg);
   return { ok: true, found: data.length, template: 'default' };
 }
-

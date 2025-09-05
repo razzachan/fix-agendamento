@@ -16,7 +16,6 @@ const __recentMessages = new Map<string, number>(); // key = from::text, value =
 
 let __inboundSetupDone = false;
 
-
 export async function setupWAInboundAdapter() {
   if (__inboundSetupDone) {
     console.log('[Adapter] 🔧 Setup já foi feito, pulando...');
@@ -30,20 +29,18 @@ export async function setupWAInboundAdapter() {
         changes: [
           {
             value: {
-              messages: [
-                { from, type: 'text', text: { body: text } }
-              ]
-            }
-          }
-        ]
-      }
-    ]
+              messages: [{ from, type: 'text', text: { body: text } }],
+            },
+          },
+        ],
+      },
+    ],
   });
 
   const { isGloballyPaused } = await import('./pause.js');
   // Listener para mensagens with mídia (classificação visual)
 
-  waClient.onAnyMessage(async (msg:any, meta?: { id?: string; ts?: number; type?: string }) => {
+  waClient.onAnyMessage(async (msg: any, meta?: { id?: string; ts?: number; type?: string }) => {
     try {
       if (!msg || !msg.hasMedia) return;
       let media = null as any;
@@ -51,24 +48,26 @@ export async function setupWAInboundAdapter() {
         media = await msg.downloadMedia?.();
       } catch (err) {
         console.warn('[Adapter] Falha no downloadMedia(), tentando novamente em 500ms...', err);
-        await new Promise(r=>setTimeout(r, 500));
-        try { media = await msg.downloadMedia?.(); } catch {}
+        await new Promise((r) => setTimeout(r, 500));
+        try {
+          media = await msg.downloadMedia?.();
+        } catch {}
       }
 
-	      // Guard de ID único por mensagem (mídia): evita reprocessar mesma mídia em reconexões
-	      try {
-	        const metaId = meta?.id as string | undefined;
-	        if (metaId) {
-	          const keyId = `id::${metaId}`;
-	          const lastId = __recentMessages.get(keyId) || 0;
-	          const nowId = Date.now();
-	          if (nowId - lastId < 60 * 1000) {
-	            console.warn('[Adapter] (media) Ignorando duplicata por ID:', metaId);
-	            return;
-	          }
-	          __recentMessages.set(keyId, nowId);
-	        }
-	      } catch {}
+      // Guard de ID único por mensagem (mídia): evita reprocessar mesma mídia em reconexões
+      try {
+        const metaId = meta?.id as string | undefined;
+        if (metaId) {
+          const keyId = `id::${metaId}`;
+          const lastId = __recentMessages.get(keyId) || 0;
+          const nowId = Date.now();
+          if (nowId - lastId < 60 * 1000) {
+            console.warn('[Adapter] (media) Ignorando duplicata por ID:', metaId);
+            return;
+          }
+          __recentMessages.set(keyId, nowId);
+        }
+      } catch {}
 
       if (!media || !media.mimetype?.startsWith('image/')) return;
 
@@ -94,24 +93,31 @@ export async function setupWAInboundAdapter() {
       // Tentativa 1: API local de classificação
       try {
         const base = process.env.API_URL || 'http://localhost:3001';
-        const headers:any = { 'Content-Type':'application/json' };
+        const headers: any = { 'Content-Type': 'application/json' };
         if (process.env.BOT_TOKEN) headers['x-bot-token'] = process.env.BOT_TOKEN;
         const resp = await fetch(`${base}/api/vision/classify-stove`, {
-          method:'POST',
+          method: 'POST',
           headers,
-          body: JSON.stringify({ imageBase64: `data:${media.mimetype};base64,${media.data}` })
+          body: JSON.stringify({ imageBase64: `data:${media.mimetype};base64,${media.data}` }),
         });
-        const data = await resp.json().catch(()=>null);
-        if (resp.ok && data?.ok && ((data?.type && data.type !== 'indeterminado') || (data?.segment && data.segment !== 'indeterminado'))) {
+        const data = await resp.json().catch(() => null);
+        if (
+          resp.ok &&
+          data?.ok &&
+          ((data?.type && data.type !== 'indeterminado') ||
+            (data?.segment && data.segment !== 'indeterminado'))
+        ) {
           classificationResult = {
             segment: data.segment,
             type: data.type,
             confidence: data.confidence,
-            source: 'api'
+            source: 'api',
           };
           console.log('[Adapter] Classificação via API:', classificationResult);
         } else {
-          console.log('[Adapter] API retornou resultado indeterminado ou inválido, tentando GPT-4o Vision...');
+          console.log(
+            '[Adapter] API retornou resultado indeterminado ou inválido, tentando GPT-4o Vision...'
+          );
         }
       } catch (apiError) {
         console.log('[Adapter] API indisponível, tentando GPT-4o Vision...');
@@ -123,26 +129,29 @@ export async function setupWAInboundAdapter() {
           const { chatComplete } = await import('./llmClient.js');
           const imageData = `data:${media.mimetype};base64,${media.data}`;
 
-          const visionResponse = await chatComplete({
-            provider: 'openai',
-            model: 'gpt-4o',
-            temperature: 0.1,
-            maxTokens: 300
-          }, [
+          const visionResponse = await chatComplete(
             {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: 'Analise esta imagem de fogão e responda APENAS com um JSON no formato: {"type": "floor|cooktop|indeterminado", "segment": "basico|inox|premium|indeterminado", "burners": "4|5|6|indeterminado"}. Critérios: type=floor se for fogão de piso, cooktop se for cooktop/embutido. segment=basico se for simples/branco, inox se for inox, premium se for vidro/moderno. burners=número de bocas visíveis.'
-                },
-                {
-                  type: 'image_url',
-                  image_url: { url: imageData }
-                }
-              ]
-            }
-          ]);
+              provider: 'openai',
+              model: 'gpt-4o',
+              temperature: 0.1,
+              maxTokens: 300,
+            },
+            [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Analise esta imagem de fogão e responda APENAS com um JSON no formato: {"type": "floor|cooktop|indeterminado", "segment": "basico|inox|premium|indeterminado", "burners": "4|5|6|indeterminado"}. Critérios: type=floor se for fogão de piso, cooktop se for cooktop/embutido. segment=basico se for simples/branco, inox se for inox, premium se for vidro/moderno. burners=número de bocas visíveis.',
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: { url: imageData },
+                  },
+                ],
+              },
+            ]
+          );
 
           // Alguns modelos retornam bloco de código (```json ... ```). Sanitizar antes do parse.
           const cleaned = String(visionResponse || '')
@@ -156,7 +165,7 @@ export async function setupWAInboundAdapter() {
             type: visionData.type || 'indeterminado',
             burners: visionData.burners || 'indeterminado',
             confidence: 0.8,
-            source: 'gpt4o-vision'
+            source: 'gpt4o-vision',
           };
           console.log('[Adapter] Classificação via GPT-4o Vision:', classificationResult);
         } catch (visionError) {
@@ -197,14 +206,16 @@ export async function setupWAInboundAdapter() {
     }
 
     // Comandos rápidos de pausa por conversa
-    if (text === "'") { // pausa
+    if (text === "'") {
+      // pausa
       const session = await getOrCreateSession('whatsapp', from);
       const st = { ...(session.state || {}), paused: true };
       await (await import('./sessionStore.js')).setSessionState(session.id, st);
       await waClient.sendText(from, 'Bot pausado para esta conversa. Envie = para reativar.');
       return;
     }
-    if (text === "=") { // despausa
+    if (text === '=') {
+      // despausa
       const session = await getOrCreateSession('whatsapp', from);
       const st = { ...(session.state || {}), paused: false };
       await (await import('./sessionStore.js')).setSessionState(session.id, st);
@@ -239,26 +250,30 @@ export async function setupWAInboundAdapter() {
     //   console.log('[Adapter] Bot desligado (status != published). Ignorando mensagem.');
     //   return;
     // }
-    console.log('[Adapter] Status do bot:', last?.status || 'não encontrado', '- Processando mensagem...');
+    console.log(
+      '[Adapter] Status do bot:',
+      last?.status || 'não encontrado',
+      '- Processando mensagem...'
+    );
 
-
-	    // Anti-duplicação logo no início do processamento textual
-	    try {
-	      const nowTs = Date.now();
-	      const key = `${from}::${text}`;
-	      const last = __recentMessages.get(key) || 0;
-	      if (nowTs - last < 10000) { // Aumentado para 10 segundos
-	        console.warn('[Adapter] (text) Ignorando duplicata recente de', from, 'texto:', text);
-	        return;
-	      }
-	      __recentMessages.set(key, nowTs);
-	      // Limpeza simples
-	      if (__recentMessages.size > 5000) {
-	        for (const [k, v] of __recentMessages) {
-	          if (nowTs - v > 5 * 60 * 1000) __recentMessages.delete(k);
-	        }
-	      }
-	    } catch {}
+    // Anti-duplicação logo no início do processamento textual
+    try {
+      const nowTs = Date.now();
+      const key = `${from}::${text}`;
+      const last = __recentMessages.get(key) || 0;
+      if (nowTs - last < 10000) {
+        // Aumentado para 10 segundos
+        console.warn('[Adapter] (text) Ignorando duplicata recente de', from, 'texto:', text);
+        return;
+      }
+      __recentMessages.set(key, nowTs);
+      // Limpeza simples
+      if (__recentMessages.size > 5000) {
+        for (const [k, v] of __recentMessages) {
+          if (nowTs - v > 5 * 60 * 1000) __recentMessages.delete(k);
+        }
+      }
+    } catch {}
 
     // Carregar/abrir sessão e registrar inbound
     const session = await getOrCreateSession('whatsapp', from);
@@ -273,40 +288,55 @@ export async function setupWAInboundAdapter() {
 
     // Re-greeting humanizado se for retorno após ausência
     try {
-      const norm = text.normalize('NFD').replace(/\p{Diacritic}/gu,'').trim().toLowerCase();
-      const isGreetingOnly = /^(ola|oi|bom dia|boa tarde|boa noite|opa|e ai|tudo bem)[.!? ]*$/.test(norm);
+      const norm = text
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .trim()
+        .toLowerCase();
+      const isGreetingOnly = /^(ola|oi|bom dia|boa tarde|boa noite|opa|e ai|tudo bem)[.!? ]*$/.test(
+        norm
+      );
       const st = (session?.state || {}) as any;
       const lastIn = st.last_in_at ? new Date(st.last_in_at) : null;
       const lastOut = st.last_out_at ? new Date(st.last_out_at) : null;
       const lastTs = lastIn || lastOut;
       const now = new Date();
-      const gapMin = lastTs ? Math.floor((now.getTime() - lastTs.getTime())/60000) : null;
-      const cooldownOk = !st.reengaged_at || (now.getTime() - new Date(st.reengaged_at).getTime()) > 2*60*1000;
+      const gapMin = lastTs ? Math.floor((now.getTime() - lastTs.getTime()) / 60000) : null;
+      const cooldownOk =
+        !st.reengaged_at || now.getTime() - new Date(st.reengaged_at).getTime() > 2 * 60 * 1000;
 
       if (isGreetingOnly && gapMin !== null && gapMin > 60 && cooldownOk) {
-        const hasContext = !!(st?.dados_coletados && (st.dados_coletados.equipamento || st.dados_coletados.problema));
+        const hasContext = !!(
+          st?.dados_coletados &&
+          (st.dados_coletados.equipamento || st.dados_coletados.problema)
+        );
         let msg = '';
-        if (gapMin >= 24*60) {
+        if (gapMin >= 24 * 60) {
           msg = hasContext
-            ? `Olá de novo! Da última vez falamos sobre seu ${st.dados_coletados.equipamento || ''}${st.dados_coletados.problema? ' ('+st.dados_coletados.problema+')':''}. Quer continuar de onde paramos ou começar um novo atendimento?`
+            ? `Olá de novo! Da última vez falamos sobre seu ${st.dados_coletados.equipamento || ''}${st.dados_coletados.problema ? ' (' + st.dados_coletados.problema + ')' : ''}. Quer continuar de onde paramos ou começar um novo atendimento?`
             : 'Olá de novo! Quer retomar de onde paramos ou começar um novo atendimento?';
         } else {
           msg = hasContext
-            ? `Que bom te ver por aqui de novo. Retomamos do seu ${st.dados_coletados.equipamento || 'atendimento anterior'}${st.dados_coletados.problema? ' ('+st.dados_coletados.problema+')':''}?`
+            ? `Que bom te ver por aqui de novo. Retomamos do seu ${st.dados_coletados.equipamento || 'atendimento anterior'}${st.dados_coletados.problema ? ' (' + st.dados_coletados.problema + ')' : ''}?`
             : 'Que bom te ver por aqui de novo. Quer continuar de onde paramos?';
         }
         await waClient.sendText(from, msg);
         await logMessage(session.id, 'out', msg);
-        await (await import('./sessionStore.js')).setSessionState(session.id, { ...(st||{}), reengaged_at: now.toISOString(), last_out_at: now.toISOString() });
+        await (
+          await import('./sessionStore.js')
+        ).setSessionState(session.id, {
+          ...(st || {}),
+          reengaged_at: now.toISOString(),
+          last_out_at: now.toISOString(),
+        });
         return;
       }
     } catch {}
 
-
     // Já carregamos a sessão e registramos o inbound acima
     // Enviar saudação curta uma única vez por conversa (mais natural)
     try {
-      const greeted = !!(session?.state?.greeted);
+      const greeted = !!session?.state?.greeted;
       if (!greeted) {
         // Se houver template 'greeting' configurado, use-o; caso contrário, use fallback curto
         let greetingText = 'Olá, farei seu atendimento. Como posso ajudar?';
@@ -319,14 +349,21 @@ export async function setupWAInboundAdapter() {
         await waClient.sendText(from, greetingText);
         await logMessage(session.id, 'out', greetingText);
         const { setSessionState } = await import('./sessionStore.js');
-        await setSessionState(session.id, { ...(session.state || {}), greeted: true, last_out_at: new Date().toISOString() });
+        await setSessionState(session.id, {
+          ...(session.state || {}),
+          greeted: true,
+          last_out_at: new Date().toISOString(),
+        });
         // Se a mensagem do cliente for apenas uma saudação, não prossiga para evitar duas mensagens em sequência
-        const norm = text.normalize('NFD').replace(/\p{Diacritic}/gu,'').trim().toLowerCase();
+        const norm = text
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .trim()
+          .toLowerCase();
         const isJustGreeting = /^(ola|oi|bom dia|boa tarde|boa noite)[.!? ]*$/.test(norm);
         if (isJustGreeting) return;
       }
     } catch {}
-
 
     // Test mode: só processa mensagens do número whitelisted
     try {
@@ -355,7 +392,9 @@ export async function setupWAInboundAdapter() {
       console.log('[Adapter] Tentando LLM primeiro para', from);
       try {
         // Expor estado corrente para sanitizer evitar inventar marca em respostas naturais
-        try { (global as any).current_session_state_for_sanitizer = (session as any)?.state || null; } catch {}
+        try {
+          (global as any).current_session_state_for_sanitizer = (session as any)?.state || null;
+        } catch {}
         let reply = await orchestrateInbound(from, text, session);
 
         // Se o orquestrador decidir não repetir (cooldown) e já temos dados, force orçamento
@@ -366,7 +405,13 @@ export async function setupWAInboundAdapter() {
           if (hasMount && hasBurners) {
             const { buildQuote } = await import('./toolsRuntime.js');
             const mount = st.visual_type === 'floor' ? 'piso' : 'cooktop';
-            const quote = await buildQuote({ service_type: 'domicilio', equipment: 'fogão', power_type: 'gás', mount, num_burners: st.visual_burners } as any);
+            const quote = await buildQuote({
+              service_type: 'domicilio',
+              equipment: 'fogão',
+              power_type: 'gás',
+              mount,
+              num_burners: st.visual_burners,
+            } as any);
             if (quote) {
               reply = `Orçamento estimado: R$ ${quote?.value ?? quote?.min ?? '—'} (faixa R$ ${quote?.min ?? '—'} a R$ ${quote?.max ?? '—'}). Podemos prosseguir com o agendamento?`;
             }
@@ -375,16 +420,25 @@ export async function setupWAInboundAdapter() {
 
         // Se a resposta do orquestrador vier no formato { text, options }, enviar botões
         try {
-          if (reply && typeof reply === 'object' && (reply as any).text && Array.isArray((reply as any).options)) {
+          if (
+            reply &&
+            typeof reply === 'object' &&
+            (reply as any).text &&
+            Array.isArray((reply as any).options)
+          ) {
             const r: any = reply;
-            const options = (r.options as Array<{ id?: string, text: string }>).map((o, i) => ({ id: o.id || String(i+1), text: o.text }));
+            const options = (r.options as Array<{ id?: string; text: string }>).map((o, i) => ({
+              id: o.id || String(i + 1),
+              text: o.text,
+            }));
             await waClient.sendButtons(from, r.text, options);
             await logMessage(session.id, 'out', r.text + ' [buttons]');
             return;
           }
         } catch {}
 
-        const preview = typeof reply === 'string' ? reply.slice(0, 100) : JSON.stringify(reply).slice(0, 100);
+        const preview =
+          typeof reply === 'string' ? reply.slice(0, 100) : JSON.stringify(reply).slice(0, 100);
         console.log('[Adapter] LLM respondeu:', preview);
         if (reply) {
           if (typeof reply === 'string') {
@@ -392,7 +446,10 @@ export async function setupWAInboundAdapter() {
             await logMessage(session.id, 'out', reply);
           } else if ((reply as any).text && Array.isArray((reply as any).options)) {
             const r: any = reply;
-            const options = (r.options as Array<{ id?: string, text: string }>).map((o, i) => ({ id: o.id || String(i+1), text: o.text }));
+            const options = (r.options as Array<{ id?: string; text: string }>).map((o, i) => ({
+              id: o.id || String(i + 1),
+              text: o.text,
+            }));
             await waClient.sendButtons(from, r.text, options);
             await logMessage(session.id, 'out', r.text + ' [buttons]');
           } else {
@@ -442,4 +499,3 @@ export async function setupWAInboundAdapter() {
 
   console.log('[Adapter] 🔧 Setup do adapter concluído! Handlers registrados.');
 }
-

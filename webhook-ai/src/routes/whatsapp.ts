@@ -36,7 +36,6 @@ whatsappRouter.get('/qr-image', (_req, res) => {
   res.send(html);
 });
 
-
 whatsappRouter.post('/reset', async (_req, res) => {
   await waClient.reset();
   res.json({ ok: true });
@@ -100,4 +99,3 @@ whatsappRouter.post('/reset', async (_req, res) => {
     res.status(500).json({ error: true, message: e?.message || String(e) });
   }
 });
-

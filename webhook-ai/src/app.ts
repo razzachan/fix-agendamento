@@ -24,7 +24,10 @@ const app = express();
 app.use(json({ limit: '2mb' }));
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+  );
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
@@ -35,15 +38,26 @@ app.use('/pause', pauseRouter);
 
 // Test mode routes
 app.get('/test-mode/status', (_req, res) => {
-  import('./services/testMode.js').then(m => res.json(m.getTestModeStatus())).catch(()=>res.status(500).json({error:true}));
+  import('./services/testMode.js')
+    .then((m) => res.json(m.getTestModeStatus()))
+    .catch(() => res.status(500).json({ error: true }));
 });
 app.post('/test-mode/enable', (_req, res) => {
-  import('./services/testMode.js').then(m => { m.setTestModeEnabled(true); res.json({ ok: true }); }).catch(()=>res.status(500).json({ok:false}));
+  import('./services/testMode.js')
+    .then((m) => {
+      m.setTestModeEnabled(true);
+      res.json({ ok: true });
+    })
+    .catch(() => res.status(500).json({ ok: false }));
 });
 app.post('/test-mode/disable', (_req, res) => {
-  import('./services/testMode.js').then(m => { m.setTestModeEnabled(false); res.json({ ok: true }); }).catch(()=>res.status(500).json({ok:false}));
+  import('./services/testMode.js')
+    .then((m) => {
+      m.setTestModeEnabled(false);
+      res.json({ ok: true });
+    })
+    .catch(() => res.status(500).json({ ok: false }));
 });
-
 
 app.get('/health', async (_req, res) => {
   try {
@@ -57,7 +71,9 @@ app.get('/health', async (_req, res) => {
       const sb = createClient(url, key, { auth: { persistSession: false } });
       const { error } = await sb.from('bot_sessions').select('id').limit(1);
       supa = error ? 'error' : 'ok';
-    } catch { supa = 'error'; }
+    } catch {
+      supa = 'error';
+    }
     res.json({ status: 'ok', service: 'webhook-ai', whatsapp: st, supabase: supa });
   } catch (e) {
     res.status(500).json({ status: 'error', message: String(e) });
@@ -100,7 +116,8 @@ app.post('/test-message', async (req, res) => {
     const session = await getOrCreateSession('wa', String(from));
     const reply = await orchestrateInbound(from, body, session);
 
-    const preview = typeof reply === 'string' ? reply.slice(0, 200) : JSON.stringify(reply).slice(0, 200);
+    const preview =
+      typeof reply === 'string' ? reply.slice(0, 200) : JSON.stringify(reply).slice(0, 200);
     console.log('[TEST] Resposta gerada:', preview);
 
     try {
@@ -143,7 +160,8 @@ app.post('/test-real-message', async (req, res) => {
     const reply = await orchestrateInbound(yourRealNumber, messageText);
 
     // Log da resposta
-    const preview = typeof reply === 'string' ? reply.slice(0, 200) : JSON.stringify(reply).slice(0, 200);
+    const preview =
+      typeof reply === 'string' ? reply.slice(0, 200) : JSON.stringify(reply).slice(0, 200);
     console.log('[TEST] 📱 Resposta para mensagem real:', preview);
 
     try {
@@ -160,7 +178,7 @@ app.post('/test-real-message', async (req, res) => {
       from: yourRealNumber,
       message: messageText,
       reply: reply,
-      note: '📱 Simulação de mensagem real - Bot funcionando perfeitamente!'
+      note: '📱 Simulação de mensagem real - Bot funcionando perfeitamente!',
     });
   } catch (error) {
     console.error('[TEST] Erro ao simular mensagem real:', error);
@@ -183,4 +201,3 @@ app.listen(Number(env.PORT), '0.0.0.0', async () => {
     console.error('[WA] init error', e);
   }
 });
-

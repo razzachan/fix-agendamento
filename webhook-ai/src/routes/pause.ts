@@ -16,4 +16,3 @@ pauseRouter.post('/resume', (_req, res) => {
   setGlobalPause(false);
   res.json({ ok: true, paused: false });
 });
-

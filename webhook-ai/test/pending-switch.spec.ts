@@ -12,10 +12,11 @@ describe('Confirmação de troca de equipamento (pendingEquipmentSwitch)', () =>
   });
 
   it('quando pending existe e usuário confirma (sim), troca equipamento e reseta orçamento', async () => {
-    await setSessionState(session.id, { ...(session.state||{}),
+    await setSessionState(session.id, {
+      ...(session.state || {}),
       dados_coletados: { equipamento: 'fogão a gás', marca: 'Brastemp', problema: 'não acende' },
       orcamento_entregue: true,
-      pendingEquipmentSwitch: 'fogão elétrico'
+      pendingEquipmentSwitch: 'fogão elétrico',
     });
 
     const out = await orchestrateInbound(FROM, 'sim, pode trocar', session);
@@ -31,10 +32,11 @@ describe('Confirmação de troca de equipamento (pendingEquipmentSwitch)', () =>
   });
 
   it('quando pending existe e usuário nega (não), mantém equipamento e limpa pending', async () => {
-    await setSessionState(session.id, { ...(session.state||{}),
+    await setSessionState(session.id, {
+      ...(session.state || {}),
       dados_coletados: { equipamento: 'fogão a gás' },
       orcamento_entregue: true,
-      pendingEquipmentSwitch: 'fogão de indução'
+      pendingEquipmentSwitch: 'fogão de indução',
     });
 
     const out = await orchestrateInbound(FROM, 'não, manter', session);
@@ -48,4 +50,3 @@ describe('Confirmação de troca de equipamento (pendingEquipmentSwitch)', () =>
     expect(st.pendingEquipmentSwitch).toBeFalsy();
   });
 });
-

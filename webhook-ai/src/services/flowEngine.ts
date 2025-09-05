@@ -2,7 +2,7 @@ import { supabase } from './supabase.js';
 import { getActiveBot, getTemplates, renderTemplate } from './botConfig.js';
 import { sendText } from './whatsapp.js';
 
-async function resolveContextVars(to: string){
+async function resolveContextVars(to: string) {
   const phone = to;
   let name = '';
   try {
@@ -27,7 +27,7 @@ async function resolveContextVars(to: string){
       if (so?.client_name) name = so.client_name;
     }
   } catch {}
-  return { phone, contact: phone, name } as Record<string,string>;
+  return { phone, contact: phone, name } as Record<string, string>;
 }
 
 export async function tryHandleByFlows(to: string, message: string) {
@@ -43,7 +43,10 @@ export async function tryHandleByFlows(to: string, message: string) {
 
   // Match simples por keyword
   const lower = message.toLowerCase();
-  const match = flows.find((f: any) => (f.trigger?.type === 'keyword') && lower.includes(String(f.trigger?.value || '').toLowerCase()));
+  const match = flows.find(
+    (f: any) =>
+      f.trigger?.type === 'keyword' && lower.includes(String(f.trigger?.value || '').toLowerCase())
+  );
   if (!match) return false;
 
   // MVP+: primeira ação: send_template ou execute_tool
@@ -55,8 +58,10 @@ export async function tryHandleByFlows(to: string, message: string) {
     const tpl = templates.find((t: any) => t.key === step.params?.key);
     if (!tpl) return false;
     // Suporte opcional a variáveis do template
-    let vars: Record<string,string> = {};
-    try { if (step.params?.vars) vars = JSON.parse(String(step.params.vars)); } catch {}
+    let vars: Record<string, string> = {};
+    try {
+      if (step.params?.vars) vars = JSON.parse(String(step.params.vars));
+    } catch {}
     const context = await resolveContextVars(to);
     const body = renderTemplate(tpl.content, { ...context, ...vars });
     await sendText(to, body);
@@ -69,7 +74,7 @@ export async function tryHandleByFlows(to: string, message: string) {
       if (!tool) return false;
       let inputStr = String(step.params?.input || '{}');
       // Suporte a placeholders simples
-      const today = new Date().toISOString().slice(0,10);
+      const today = new Date().toISOString().slice(0, 10);
       inputStr = inputStr.replace(/\{\{\s*today\s*\}\}/g, today);
       const ctx = await resolveContextVars(to);
       inputStr = inputStr.replace(/\{\{\s*phone\s*\}\}/g, ctx.phone || '');
@@ -81,9 +86,10 @@ export async function tryHandleByFlows(to: string, message: string) {
       const text = typeof result === 'string' ? result : 'Ação executada.';
       await sendText(to, text);
       return true;
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   }
 
   return false;
 }
-

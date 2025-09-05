@@ -5,7 +5,7 @@ import { logInbound, logOutbound } from '../conversation.js';
 export async function processFeedback(body: any) {
   const to = extractSenderPhone(body);
   if (!to) return { ok: false };
-  await logInbound(to, (body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.text?.body) || '');
+  await logInbound(to, body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.text?.body || '');
 
   const templates = await getTemplates();
   const tpl = templates.find((t: any) => t.key === 'feedback_request');
@@ -21,4 +21,3 @@ export async function processFeedback(body: any) {
   await logOutbound(to, fallback);
   return { ok: true, template: 'default' };
 }
-

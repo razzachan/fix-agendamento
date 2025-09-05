@@ -25,16 +25,20 @@ export async function fetchNeuralChains(): Promise<NeuralChain[]> {
 
 function includesAny(text: string, terms: string[]): boolean {
   const b = text.toLowerCase();
-  return terms.some(t => b.includes(String(t || '').toLowerCase()));
+  return terms.some((t) => b.includes(String(t || '').toLowerCase()));
 }
 
-export function activateChains(chains: NeuralChain[], message: string, session?: SessionRecord): ChainDirectives {
+export function activateChains(
+  chains: NeuralChain[],
+  message: string,
+  session?: SessionRecord
+): ChainDirectives {
   const base: ChainDirectives = { prefer_services: [], allowed_tools: [], boost_blocks: [] };
   const stage = (session as any)?.state?.funil_etapa || null;
   for (const c of chains) {
     const act = c.activation || {};
     const okTerms = Array.isArray(act.termsAny) ? includesAny(message, act.termsAny) : true;
-    const okStage = Array.isArray(act.stageAny) ? (!stage || act.stageAny.includes(stage)) : true;
+    const okStage = Array.isArray(act.stageAny) ? !stage || act.stageAny.includes(stage) : true;
     if (okTerms && okStage) {
       const run = c.run_config || {};
       if (Array.isArray(run.prefer_services)) base.prefer_services.push(...run.prefer_services);
@@ -51,10 +55,11 @@ export function activateChains(chains: NeuralChain[], message: string, session?:
 
 export function renderDirectivesForPrompt(d: ChainDirectives): string {
   const lines: string[] = [];
-  if (d.prefer_services.length) lines.push(`Serviços preferenciais para este caso: ${d.prefer_services.join(', ')}`);
+  if (d.prefer_services.length)
+    lines.push(`Serviços preferenciais para este caso: ${d.prefer_services.join(', ')}`);
   if (d.allowed_tools.length) lines.push(`Ferramentas permitidas: ${d.allowed_tools.join(', ')}`);
-  if (d.boost_blocks.length) lines.push(`Priorize conhecimento dos blocos: ${d.boost_blocks.join(', ')}`);
+  if (d.boost_blocks.length)
+    lines.push(`Priorize conhecimento dos blocos: ${d.boost_blocks.join(', ')}`);
   if (!lines.length) return '';
   return `Diretrizes de execução (neural chain):\n${lines.join('\n')}`;
 }
-

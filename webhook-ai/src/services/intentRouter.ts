@@ -56,4 +56,3 @@ function looksLikeConfirmation(body: any): boolean {
   const txt = extractText(body).toLowerCase();
   return txt.includes('confirmo') || txt.includes('confirmar agendamento');
 }
-

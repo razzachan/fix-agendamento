@@ -1,11 +1,16 @@
 import { supabase } from './supabase.js';
 
-const USE_MOCK = (process.env.MOCK_SUPABASE === 'true');
+const USE_MOCK = process.env.MOCK_SUPABASE === 'true';
 
 export async function getActiveBot() {
   if (USE_MOCK) {
     // Retorna um bot mínimo para testes, evitando chamadas reais ao Supabase
-    return { id: 'test-bot', blocks: [], updated_at: new Date().toISOString(), created_at: new Date().toISOString() } as any;
+    return {
+      id: 'test-bot',
+      blocks: [],
+      updated_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    } as any;
   }
   // Busca a última configuração do bot (mais recente por updated_at/created_at)
   const { data, error } = await supabase
@@ -39,4 +44,3 @@ export function renderTemplate(content: string, vars: Record<string, string>) {
     return vars[key] ?? '';
   });
 }
-

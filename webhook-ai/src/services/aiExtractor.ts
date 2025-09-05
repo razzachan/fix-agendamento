@@ -13,12 +13,16 @@ export type AiFunnelFields = {
 function extractJsonBlock(text: string): any | null {
   if (!text) return null;
   // Attempt strict JSON first
-  try { return JSON.parse(text); } catch {}
+  try {
+    return JSON.parse(text);
+  } catch {}
   // Fallback: find first JSON object starting with { and ending with matching }
   const cand = String(text);
   const idx = cand.indexOf('{');
   if (idx < 0) return null;
-  let depth = 0, inStr = false, esc = false;
+  let depth = 0,
+    inStr = false,
+    esc = false;
   for (let i = idx; i < cand.length; i++) {
     const ch = cand[i];
     if (inStr) {
@@ -28,10 +32,17 @@ function extractJsonBlock(text: string): any | null {
     } else {
       if (ch === '"') inStr = true;
       else if (ch === '{') depth++;
-      else if (ch === '}') { depth--; if (depth === 0) {
-        const json = cand.slice(idx, i + 1);
-        try { return JSON.parse(json); } catch { return null; }
-      }}
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          const json = cand.slice(idx, i + 1);
+          try {
+            return JSON.parse(json);
+          } catch {
+            return null;
+          }
+        }
+      }
     }
   }
   return null;
@@ -65,17 +76,35 @@ function normalizeBurners(v?: string): string | undefined {
 
 function normalizeEquipments(arr?: string[]): string[] | undefined {
   if (!arr || !Array.isArray(arr)) return undefined;
-  const map: Record<string,string> = {
-    'fogao': 'fogão', 'fogão': 'fogão', 'cooktop':'cooktop',
-    'forno': 'forno', 'forno elétrico': 'forno elétrico', 'forno eletrico': 'forno elétrico',
-    'microondas':'micro-ondas', 'micro-ondas':'micro-ondas', 'micro ondas':'micro-ondas',
-    'lava louças':'lava-louças', 'lava-louças':'lava-louças', 'lava louça':'lava-louças', 'lava-louça':'lava-louças', 'lavalouças':'lava-louças', 'lavalouca':'lava-louças',
-    'máquina de lavar louças':'lava-louças', 'maquina de lavar loucas':'lava-louças',
-    'lavadora':'lavadora', 'máquina de lavar':'lavadora', 'maquina de lavar':'lavadora',
-    'lava e seca':'lava e seca', 'lava-seca':'lava e seca',
-    'secadora':'secadora', 'coifa':'coifa', 'depurador':'coifa', 'exaustor':'coifa'
+  const map: Record<string, string> = {
+    fogao: 'fogão',
+    fogão: 'fogão',
+    cooktop: 'cooktop',
+    forno: 'forno',
+    'forno elétrico': 'forno elétrico',
+    'forno eletrico': 'forno elétrico',
+    microondas: 'micro-ondas',
+    'micro-ondas': 'micro-ondas',
+    'micro ondas': 'micro-ondas',
+    'lava louças': 'lava-louças',
+    'lava-louças': 'lava-louças',
+    'lava louça': 'lava-louças',
+    'lava-louça': 'lava-louças',
+    lavalouças: 'lava-louças',
+    lavalouca: 'lava-louças',
+    'máquina de lavar louças': 'lava-louças',
+    'maquina de lavar loucas': 'lava-louças',
+    lavadora: 'lavadora',
+    'máquina de lavar': 'lavadora',
+    'maquina de lavar': 'lavadora',
+    'lava e seca': 'lava e seca',
+    'lava-seca': 'lava e seca',
+    secadora: 'secadora',
+    coifa: 'coifa',
+    depurador: 'coifa',
+    exaustor: 'coifa',
   };
-  const out = arr.map(x => map[normStr(x)||''] || normStr(x) || '').filter(Boolean) as string[];
+  const out = arr.map((x) => map[normStr(x) || ''] || normStr(x) || '').filter(Boolean) as string[];
   return Array.from(new Set(out));
 }
 
@@ -95,21 +124,34 @@ export async function aiGuessFunnelFields(text: string): Promise<AiFunnelFields 
       '  "num_burners": "4"|"5"|"6"|null',
       '}',
       'Regras: não invente; se não souber um campo, use null. Não peça dados pessoais.',
-      'Responda apenas JSON válido.'
+      'Responda apenas JSON válido.',
     ].join('\n');
 
     const user = `Mensagem: ${text}`;
-    const out = await chatComplete({ provider: 'openai', model: process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini', temperature: 0, maxTokens: 300 }, [
-      { role: 'system', content: sys },
-      { role: 'user', content: user }
-    ]);
+    const out = await chatComplete(
+      {
+        provider: 'openai',
+        model: process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini',
+        temperature: 0,
+        maxTokens: 300,
+      },
+      [
+        { role: 'system', content: sys },
+        { role: 'user', content: user },
+      ]
+    );
 
     const parsed = extractJsonBlock(out);
     if (!parsed || typeof parsed !== 'object') return null;
-    const equipamentos = normalizeEquipments(parsed.equipamentos || parsed.equipment || [] as string[]) || [];
+    const equipamentos =
+      normalizeEquipments(parsed.equipamentos || parsed.equipment || ([] as string[])) || [];
     const eq = equipamentos[0];
     const marca = normStr(parsed.marca || parsed.brand);
-    const problema = parsed.problema ? String(parsed.problema).trim() : (parsed.problem ? String(parsed.problem).trim() : undefined);
+    const problema = parsed.problema
+      ? String(parsed.problema).trim()
+      : parsed.problem
+        ? String(parsed.problem).trim()
+        : undefined;
     const mount = normalizeMount(parsed.mount);
     const num_burners = normalizeBurners(parsed.num_burners);
     const result: AiFunnelFields = {
@@ -118,11 +160,10 @@ export async function aiGuessFunnelFields(text: string): Promise<AiFunnelFields 
       marca: marca,
       problema: problema,
       mount,
-      num_burners
+      num_burners,
     };
     return result;
   } catch {
     return null;
   }
 }
-
