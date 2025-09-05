@@ -278,6 +278,10 @@ export async function setupWAInboundAdapter() {
     // Carregar/abrir sessão e registrar inbound
     const session = await getOrCreateSession('whatsapp', from);
     await logMessage(session.id, 'in', text);
+    try {
+      const { logEvent } = await import('./analytics.js');
+      await logEvent({ type: 'msg:in', session_id: session.id, from, channel: 'whatsapp', data: { text } });
+    } catch {}
 
     // Atualizar timestamp de última entrada
     try {
@@ -352,6 +356,10 @@ export async function setupWAInboundAdapter() {
         }
         await waClient.sendText(from, greetingText);
         await logMessage(session.id, 'out', greetingText);
+        try {
+          const { logEvent } = await import('./analytics.js');
+          await logEvent({ type: 'msg:out', session_id: session.id, from, channel: 'whatsapp', data: { greetingText } });
+        } catch {}
         const { setSessionState } = await import('./sessionStore.js');
         await setSessionState(session.id, {
           ...(session.state || {}),
@@ -448,6 +456,10 @@ export async function setupWAInboundAdapter() {
           if (typeof reply === 'string') {
             await waClient.sendText(from, reply);
             await logMessage(session.id, 'out', reply);
+            try {
+              const { logEvent } = await import('./analytics.js');
+              await logEvent({ type: 'msg:out', session_id: session.id, from, channel: 'whatsapp', data: { reply } });
+            } catch {}
           } else if ((reply as any).text && Array.isArray((reply as any).options)) {
             const r: any = reply;
             const options = (r.options as Array<{ id?: string; text: string }>).map((o, i) => ({
