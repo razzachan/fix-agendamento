@@ -1,0 +1,31 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "test",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "15555555555",
+              "phone_number_id": "736083499589357"
+            },
+            "messages": [
+              {
+                "from": "5548988332664",
+                "id": "wamid.test123",
+                "timestamp": "1692901234",
+                "text": {
+                  "body": "Oi, tudo bem?"
+                },
+                "type": "text"
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}

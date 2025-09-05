@@ -136,9 +136,16 @@ const EventItem: React.FC<EventItemProps> = ({
             {badgeData.label}
           </Badge>
           
-          <div className="flex items-center text-sm font-medium mt-1 bg-gray-50 px-3 py-1.5 rounded-full">
-            <CalendarClock className="h-4 w-4 mr-1.5 text-purple-500" />
-            {formatTime(service.scheduledStartTime)} - {formatTime(service.scheduledEndTime)}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center text-sm font-medium mt-1 bg-gray-50 px-3 py-1.5 rounded-full">
+              <CalendarClock className="h-4 w-4 mr-1.5 text-purple-500" />
+              {formatTime(service.scheduledStartTime)} - {formatTime(service.scheduledEndTime)}
+            </div>
+            {service.attendanceType && (
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                {service.attendanceType === 'em_domicilio' ? 'Em Domicílio' : service.attendanceType === 'coleta_conserto' ? 'Coleta Conserto' : 'Coleta Diagnóstico'}
+              </Badge>
+            )}
           </div>
         </div>
       </div>

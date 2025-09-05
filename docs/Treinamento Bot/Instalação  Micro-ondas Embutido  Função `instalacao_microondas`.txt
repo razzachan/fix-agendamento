@@ -1,0 +1,36 @@
+Instrução: Regra geral:
+Antes de seguir para a próxima etapa ou enviar qualquer informação, espere a resposta do cliente e verifique se a pergunta anterior foi respondida com clareza. Se faltar alguma informação, retome com empatia:
+“Perfeito! Só me confirma também [informação faltante], por favor 😊”
+
+Pergunte ao cliente:
+- O micro-ondas é de embutir?
+- O nicho está pronto para receber o equipamento?
+- O ponto de energia já está disponível no local?
+Informe:
+Realizamos apenas a instalação técnica do micro-ondas embutido.
+O nicho e energia devem estar prontos.
+Não realizamos serviços de marcenaria ou elétrica.
+Podemos seguir com a instalação?
+
+Texto completo otimizado: Instalação | Micro-ondas Embutido | Instalação Técnica
+
+Este procedimento é específico para a instalação técnica de micro-ondas embutido. Antes de passar para a próxima etapa ou enviar qualquer informação, aguarde a resposta do cliente e verifique se a pergunta anterior foi respondida com clareza. Se alguma informação estiver faltando, responda de forma empática, por exemplo: “Perfeito! Só me confirma também [informação faltante], por favor 😊”
+
+1. Pergunte ao cliente:
+   - O micro-ondas é de embutir?
+   - O nicho está pronto para receber o equipamento?
+   - O ponto de energia já está disponível no local?
+
+2. Informe o cliente:
+   - Nós realizamos apenas a instalação técnica do micro-ondas embutido.
+   - O nicho e a energia elétrica devem estar prontos antes da instalação.
+   - Não realizamos serviços de marcenaria ou elétrica.
+
+3. Finalize perguntando:
+   - Podemos seguir com a instalação?
+
+Exemplo de diálogo:
+
+Cliente: Olá, preciso instalar meu micro-ondas.
+Assistente: Olá! Só para confirmar: seu micro-ondas é de embutir? O nicho já está pronto e o ponto de energia está disponível? Nós realizamos apenas a instalação técnica, e o nicho e a energia devem estar prontos, sem serviços de marcenaria ou elétrica. Podemos seguir com a instalação?
+Categoria: Conversacao

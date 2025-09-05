@@ -38,6 +38,11 @@ const OrderHeader: React.FC<OrderHeaderProps> = ({ order, onOrderUpdated }) => {
           <Badge variant="outline" className={getStatusColor(order.status)}>
             {currentStep?.label || order.status}
           </Badge>
+          {order.serviceAttendanceType && (
+            <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+              {order.serviceAttendanceType === 'em_domicilio' ? 'Em Domicílio' : order.serviceAttendanceType === 'coleta_conserto' ? 'Coleta Conserto' : 'Coleta Diagnóstico'}
+            </Badge>
+          )}
           <WarrantyBadge serviceOrder={order} />
           {onOrderUpdated && (
             <StatusChangeButton order={order} onOrderUpdated={onOrderUpdated} />

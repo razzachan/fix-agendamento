@@ -64,7 +64,9 @@ const TechnicianManagement: React.FC<TechnicianManagementProps> = ({ isAdmin }) 
   };
 
   const handleEditTechnician = (technician: Technician) => {
-    setTechnicianToEdit(technician);
+    // Sempre usar os dados mais recentes (inclui weight salvo pela tabela)
+    const fresh = technicians.find(t=>t.id===technician.id) || technician;
+    setTechnicianToEdit(fresh);
     setIsEditDialogOpen(true);
   };
 
@@ -115,6 +117,28 @@ const TechnicianManagement: React.FC<TechnicianManagementProps> = ({ isAdmin }) 
                   setIsDeleteDialogOpen(true);
                 }}
                 isLoading={isLoading}
+                onUpdateWeight={async (id, weight)=>{
+                  try {
+                    const t = technicians.find(t=>t.id===id);
+                    if (!t) return;
+                    await technicianService.updateTechnician({
+                      id,
+                      name: t.name,
+                      email: t.email,
+                      phone: t.phone||undefined,
+                      specialties: t.specialties||undefined,
+                      isActive: (t as any).isActive !== false,
+                      groups: (t as any).groups || undefined,
+                      weight,
+                    });
+                    toast.success('Prioridade do técnico atualizada');
+                    // Agora que a coluna existe, refetch para sincronizar do banco
+                    fetchTechnicians();
+                  } catch (e) {
+                    console.error('Falha ao atualizar prioridade', e);
+                    toast.error('Falha ao atualizar prioridade');
+                  }
+                }}
               />
             </TabsContent>
             

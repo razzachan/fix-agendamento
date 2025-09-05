@@ -58,6 +58,7 @@ export function mapServiceOrder(order: any): ServiceOrder {
     serviceAttendanceType: validAttendanceType as "em_domicilio" | "coleta_conserto" | "coleta_diagnostico",
     initialCost: order.initial_cost ? parseFloat(order.initial_cost.toString()) : 0, // ✅ Valor inicial (sinal)
     finalCost: order.final_cost ? parseFloat(order.final_cost.toString()) : 0, // ✅ Valor final total
+    paymentStatus: order.payment_status || null, // ✅ Status do pagamento
     clientDescription: order.description,
     archived: order.archived || false,
 

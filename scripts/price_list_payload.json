@@ -1,0 +1,16 @@
+{
+  "items": [
+    {"service_type":"domicilio","region":"default","urgency":"normal","base":320,"min":290,"max":450,"priority":1,"notes":"Atendimento domiciliar padrão (valor médio para fogões)"},
+    {"service_type":"domicilio_coifa","region":"default","urgency":"normal","base":490,"min":490,"max":490,"priority":1,"notes":"Visita diagnóstico coifa"},
+    {"service_type":"coleta_diagnostico","region":"default","urgency":"normal","base":350,"min":350,"max":350,"priority":1,"notes":"Coleta + diagnóstico; desconta do conserto"},
+    {"service_type":"coleta_conserto","region":"default","urgency":"normal","base":350,"min":350,"max":350,"priority":1,"notes":"Micro-ondas/forno bancada"},
+    {"service_type":"domicilio_fogao_cooktop4_nacional","region":"default","urgency":"normal","base":290,"min":290,"max":290,"priority":1,"notes":"Cooktop 4 bocas nacional"},
+    {"service_type":"domicilio_fogao_cooktop5_nacional","region":"default","urgency":"normal","base":320,"min":320,"max":320,"priority":1,"notes":"Cooktop 5 bocas nacional"},
+    {"service_type":"domicilio_fogao_cooktop4_importado","region":"default","urgency":"normal","base":450,"min":450,"max":450,"priority":1,"notes":"Cooktop 4 bocas importado"},
+    {"service_type":"domicilio_fogao_cooktop5_importado","region":"default","urgency":"normal","base":490,"min":490,"max":490,"priority":1,"notes":"Cooktop 5 bocas importado"},
+    {"service_type":"domicilio_fogao_piso4_nacional","region":"default","urgency":"normal","base":320,"min":320,"max":320,"priority":1,"notes":"Piso 4 bocas nacional"},
+    {"service_type":"domicilio_fogao_piso5_nacional","region":"default","urgency":"normal","base":370,"min":370,"max":370,"priority":1,"notes":"Piso 5 bocas nacional"},
+    {"service_type":"domicilio_fogao_piso6_nacional","region":"default","urgency":"normal","base":450,"min":450,"max":450,"priority":1,"notes":"Piso 6 bocas nacional"}
+  ]
+}
+

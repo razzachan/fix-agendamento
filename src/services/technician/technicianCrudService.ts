@@ -3,6 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Technician } from '@/types';
 import { mapTechnicianData } from './technicianDataMapper';
 
+const API_BASE = (window as any).__API_URL__ || '';
+const withToken = (headers: Record<string,string> = {})=>{
+  const t = (window as any).BOT_TOKEN || (import.meta as any)?.env?.VITE_BOT_TOKEN || '';
+  return t ? { ...headers, 'x-bot-token': t } : headers;
+};
+
 /**
  * Service dedicated to technician CRUD operations
  */
@@ -17,26 +23,28 @@ export const technicianCrudService = {
     specialties?: string[];
     userId?: string;
     isActive?: boolean;
+    groups?: ('A'|'B'|'C')[];
+    weight?: number;
   }): Promise<Technician | null> {
     try {
-      const { data, error } = await supabase
-        .from('technicians')
-        .insert({
+      // Prefer API (service role) to bypass RLS issues
+      const r = await fetch(`${API_BASE}/api/technicians`, {
+        method:'POST',
+        headers: withToken({ 'Content-Type':'application/json' }),
+        body: JSON.stringify({
           name: technicianData.name,
           email: technicianData.email,
           phone: technicianData.phone || null,
           specialties: technicianData.specialties || [],
-          user_id: technicianData.userId || null,
-          is_active: technicianData.isActive !== false,
+          userId: technicianData.userId || null,
+          isActive: technicianData.isActive !== false,
+          groups: technicianData.groups || ['A','B'],
+          weight: technicianData.weight ?? 0,
         })
-        .select('*')
-        .single();
-
-      if (error) {
-        throw error;
-      }
-      
-      return mapTechnicianData(data);
+      });
+      const j = await r.json();
+      if (!r.ok || !j?.ok) throw j;
+      return mapTechnicianData(j.technician);
     } catch (error) {
       console.error('Erro ao criar técnico:', error);
       throw error;
@@ -53,26 +61,27 @@ export const technicianCrudService = {
     phone?: string;
     specialties?: string[];
     isActive?: boolean;
+    groups?: ('A'|'B'|'C')[];
+    weight?: number;
   }): Promise<Technician | null> {
     try {
-      const { data, error } = await supabase
-        .from('technicians')
-        .update({
+      // Prefer API (service role) to bypass RLS issues
+      const r = await fetch(`${API_BASE}/api/technicians/${technicianData.id}`, {
+        method:'PATCH',
+        headers: withToken({ 'Content-Type':'application/json' }),
+        body: JSON.stringify({
           name: technicianData.name,
           email: technicianData.email,
           phone: technicianData.phone || null,
           specialties: technicianData.specialties || [],
-          is_active: technicianData.isActive,
+          isActive: technicianData.isActive,
+          groups: technicianData.groups || undefined,
+          weight: (typeof technicianData.weight === 'number' && !Number.isNaN(technicianData.weight)) ? technicianData.weight : undefined,
         })
-        .eq('id', technicianData.id)
-        .select('*')
-        .single();
-
-      if (error) {
-        throw error;
-      }
-      
-      return mapTechnicianData(data);
+      });
+      const j = await r.json();
+      if (!r.ok || !j?.ok) throw j;
+      return mapTechnicianData(j.technician);
     } catch (error) {
       console.error('Erro ao atualizar técnico:', error);
       throw error;

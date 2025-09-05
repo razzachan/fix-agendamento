@@ -1,0 +1,58 @@
+{
+  "fdb02685cc3dd05e822b1bed1efcbd40.jpg": {
+    "hash": "fdb02685cc3dd05e822b1bed1efcbd40",
+    "contentType": "image/jpeg",
+    "size": 38500,
+    "originalName": "basic_floor_1.jpg",
+    "migratedAt": "2025-08-13T22:21:19.647Z"
+  },
+  "142c20f7d902710b840b4480913336f5.jpg": {
+    "hash": "142c20f7d902710b840b4480913336f5",
+    "contentType": "image/jpeg",
+    "size": 23708,
+    "originalName": "basic_floor_10.jpg",
+    "migratedAt": "2025-08-13T22:21:19.649Z"
+  },
+  "e4a625a51619c6396c6a97800f99368e.jpg": {
+    "hash": "e4a625a51619c6396c6a97800f99368e",
+    "contentType": "image/jpeg",
+    "size": 22736,
+    "originalName": "basic_floor_11.jpg",
+    "migratedAt": "2025-08-13T22:21:19.653Z"
+  },
+  "4a019f082882c5f962609d6e39b908ee.jpg": {
+    "hash": "4a019f082882c5f962609d6e39b908ee",
+    "contentType": "image/jpeg",
+    "size": 42163,
+    "originalName": "basic_floor_12.jpeg",
+    "migratedAt": "2025-08-13T22:21:19.656Z"
+  },
+  "bb9c0d6d6e30fa669bd2498b406bd3fd.webp": {
+    "hash": "bb9c0d6d6e30fa669bd2498b406bd3fd",
+    "contentType": "image/webp",
+    "size": 5446,
+    "originalName": "basic_floor_2.webp",
+    "migratedAt": "2025-08-13T22:21:19.658Z"
+  },
+  "7e8a91aba7b0c20fbe514957ac7694cb.webp": {
+    "hash": "7e8a91aba7b0c20fbe514957ac7694cb",
+    "contentType": "image/webp",
+    "size": 18818,
+    "originalName": "basic_floor_5.webp",
+    "migratedAt": "2025-08-13T22:21:19.661Z"
+  },
+  "c37988e41a8c5fbc72e19c8a423482cf.jpg": {
+    "hash": "c37988e41a8c5fbc72e19c8a423482cf",
+    "contentType": "image/jpeg",
+    "size": 22256,
+    "originalName": "basic_floor_8.jpg",
+    "migratedAt": "2025-08-13T22:21:19.664Z"
+  },
+  "b203518a00fea7cb67f9e92aeade4e3d.jpg": {
+    "hash": "b203518a00fea7cb67f9e92aeade4e3d",
+    "contentType": "image/jpeg",
+    "size": 31475,
+    "originalName": "basic_floor_9.jpg",
+    "migratedAt": "2025-08-13T22:21:19.667Z"
+  }
+}

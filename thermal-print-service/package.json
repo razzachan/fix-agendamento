@@ -9,17 +9,10 @@
     "install-service": "node install-service.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
     "cors": "^2.8.5",
-    "escpos": "^3.0.0-alpha.6",
-    "escpos-usb": "^3.0.0-alpha.4",
-    "escpos-serialport": "^3.0.0-alpha.4",
-    "escpos-bluetooth": "^3.0.0-alpha.4",
-    "node-bluetooth": "^1.2.1",
-    "serialport": "^12.0.0",
+    "express": "^4.18.2",
     "qrcode": "^1.5.3",
-    "jimp": "^0.22.10",
-    "node-windows": "^1.0.0-beta.8"
+    "vite_react_shadcn_ts": "file:.."
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

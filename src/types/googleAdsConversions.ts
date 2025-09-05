@@ -92,21 +92,17 @@ export const EQUIPMENT_CATEGORY_MAP: Record<string, EquipmentConversionType> = {
   'adega': 'adega_climatizada_agendamento',
   'adega climatizada': 'adega_climatizada_agendamento',
   
-  // Lava-louças e outros
-  'lava louças': 'outros_agendamento',
-  'lava-louças': 'outros_agendamento',
-  'lavavajillas': 'outros_agendamento',
-  'midea': 'outros_agendamento',
+  // Lava-louças e outros (mantido apenas uma vez cada para evitar duplicidade)
+  'lava louças (outros)': 'outros_agendamento',
+  'lava-louças (outros)': 'outros_agendamento',
+  'lavavajillas (outros)': 'outros_agendamento',
+  'midea (outros)': 'outros_agendamento',
 
-  // Micro-ondas
-  'microondas': 'outros_agendamento',
-  'micro-ondas': 'outros_agendamento',
-  'micro ondas': 'outros_agendamento',
+  // Micro-ondas (aliases consolidados)
+  'micro-ondas (alias)': 'outros_agendamento',
 
-  // Coifa e depurador
-  'coifa': 'outros_agendamento',
-  'depurador': 'outros_agendamento',
-  'exaustor': 'outros_agendamento',
+  // Coifa e depurador (aliases consolidados)
+  'coifa/depurador/exaustor': 'outros_agendamento',
 
   // Ar condicionado
   'ar condicionado': 'outros_agendamento',

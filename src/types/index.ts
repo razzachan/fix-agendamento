@@ -34,6 +34,8 @@ export interface Technician {
   specialties?: string[] | null;
   location?: any | null;
   isActive?: boolean;
+  groups?: ('A'|'B'|'C')[] | null;
+  weight?: number | null;
 }
 
 export type ServiceOrderStatus =
@@ -213,6 +215,7 @@ export interface ScheduledService {
   clientPhone?: string; // ✅ Telefone do cliente
   equipmentType?: string; // ✅ Tipo de equipamento da OS
   orderStatus?: string; // ✅ Status da ordem de serviço relacionada
+  attendanceType?: 'em_domicilio' | 'coleta_conserto' | 'coleta_diagnostico';
 }
 
 export interface FinancialTransaction {

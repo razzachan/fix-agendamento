@@ -70,6 +70,12 @@ export async function updateServiceOrder(id: string, updates: Partial<ServiceOrd
         console.log(`updateServiceOrder: Setting completed_date for completed status`);
         updateData.completed_date = new Date().toISOString();
       }
+
+      // ✅ Automatically set payment_status when status is changed to 'completed'
+      if (updates.status === 'completed' && !updates.paymentStatus) {
+        console.log(`updateServiceOrder: Setting payment_status to 'completed' for completed status`);
+        updateData.payment_status = 'completed';
+      }
     }
 
     if (updates.scheduledDate !== undefined) updateData.scheduled_date = updates.scheduledDate;
@@ -85,6 +91,7 @@ export async function updateServiceOrder(id: string, updates: Partial<ServiceOrd
     if (updates.pickupZipCode !== undefined) updateData.pickup_zip_code = updates.pickupZipCode;
     if (updates.currentLocation !== undefined) updateData.current_location = updates.currentLocation;
     if (updates.serviceAttendanceType !== undefined) updateData.service_attendance_type = updates.serviceAttendanceType;
+    if (updates.paymentStatus !== undefined) updateData.payment_status = updates.paymentStatus;
 
     // First, fetch current order data for comparison
     const { data: currentOrder, error: fetchError } = await supabase

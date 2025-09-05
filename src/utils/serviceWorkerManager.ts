@@ -139,8 +139,11 @@ export class ServiceWorkerManager {
   }
 }
 
-// Inicializar automaticamente
-ServiceWorkerManager.getInstance();
+// 🚨 SERVICE WORKER DESABILITADO TEMPORARIAMENTE PARA DEBUG
+console.log('🚫 [SW Manager] Service Worker DESABILITADO para debug de cache');
 
-// Exportar para uso global
-(window as any).swManager = ServiceWorkerManager.getInstance();
+// Inicializar automaticamente - COMENTADO
+// ServiceWorkerManager.getInstance();
+
+// Exportar para uso global - COMENTADO
+// (window as any).swManager = ServiceWorkerManager.getInstance();

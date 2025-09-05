@@ -15,6 +15,8 @@ export const mapTechnicianData = (data: any): Technician => {
     specialties: data.specialties || null,
     location: data.location || null,
     isActive: data.is_active !== false, // Mapeia is_active para isActive (default: true)
+    groups: data.groups || null,
+    weight: typeof data.weight === 'number' ? data.weight : null,
   };
 
   return technician;

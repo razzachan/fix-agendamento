@@ -1,0 +1,33 @@
+Pergunte:
+
+“O micro-ondas é de bancada ou embutido?”
+Espere a resposta.
+
+Pergunte:
+
+“Qual a marca?”
+Espere a resposta.
+
+Pergunte:
+
+“E qual o problema apresentado?”
+Espere a resposta.
+
+Com base na descrição, crie uma explicação com possíveis causas, sem dar solução técnica.
+
+Em seguida:
+
+Se bancada:
+
+O valor da manutenção é fixo em R$350,00.(aplicar quebra de linha)
+Coletamos e entregamos em até 7 dias úteis. (aplicar quebra de linha)
+Pagamento: 50% na coleta e 50% na entrega. (aplicar quebra de linha)
+O serviço tem 3 meses de garantia e aceitamos cartão e dividimos também se precisar (aplicar quebra de linha)
+Gostaria de agendar?
+
+Se embutido:
+
+Podemos ajudar. Coletamos, diagnosticamos e entregamos em até 5 dias úteis. (aplicar quebra de linha)
+Aceitamos cartão e dividimos também. (aplicar quebra de linha)
+O serviço tem 3 meses de garantia. (aplicar quebra de linha)
+Gostaria de agendar? (aplicar quebra de linha)

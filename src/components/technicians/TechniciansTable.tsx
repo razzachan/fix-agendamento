@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Technician } from '@/types';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ interface TechniciansTableProps {
   isAdmin: boolean;
   onEdit: (technician: Technician) => void;
   onDelete: (id: string) => void;
+  onUpdateWeight?: (id: string, weight: number) => Promise<void> | void;
   isLoading?: boolean;
 }
 
@@ -18,8 +19,10 @@ const TechniciansTable: React.FC<TechniciansTableProps> = ({
   isAdmin,
   onEdit,
   onDelete,
+  onUpdateWeight,
   isLoading = false
 }) => {
+  const [pendingWeights, setPendingWeights] = useState<Record<string, number>>({});
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -38,6 +41,7 @@ const TechniciansTable: React.FC<TechniciansTableProps> = ({
     );
   }
 
+  const sorted = [...technicians].sort((a,b)=>((b as any).weight ?? 0) - ((a as any).weight ?? 0));
   return (
     <Table>
       <TableHeader>
@@ -46,11 +50,12 @@ const TechniciansTable: React.FC<TechniciansTableProps> = ({
           <TableHead>Email</TableHead>
           <TableHead>Telefone</TableHead>
           <TableHead>Especialidades</TableHead>
+          <TableHead>Prioridade</TableHead>
           {isAdmin && <TableHead className="text-right">Ações</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
-        {technicians.map((technician) => (
+        {sorted.map((technician) => (
           <TableRow key={technician.id}>
             <TableCell className="font-medium">{technician.name}</TableCell>
             <TableCell>{technician.email}</TableCell>
@@ -59,6 +64,48 @@ const TechniciansTable: React.FC<TechniciansTableProps> = ({
               {technician.specialties && technician.specialties.length > 0
                 ? technician.specialties.join(', ')
                 : "-"}
+            </TableCell>
+            <TableCell>
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-2 py-1 rounded bg-muted hover:bg-muted/80"
+                  onClick={(e)=>{
+                    e.preventDefault(); e.stopPropagation();
+                    const curr = pendingWeights[technician.id] ?? ((technician as any).weight ?? 0);
+                    setPendingWeights(prev=>({ ...prev, [technician.id]: curr + 10 }));
+                  }}
+                >
+                  +10
+                </button>
+                <span className="text-sm text-muted-foreground min-w-[2ch] text-center">
+                  {pendingWeights[technician.id] ?? ((technician as any).weight ?? 0)}
+                </span>
+                <button
+                  className="px-2 py-1 rounded bg-muted hover:bg-muted/80"
+                  onClick={(e)=>{
+                    e.preventDefault(); e.stopPropagation();
+                    const curr = pendingWeights[technician.id] ?? ((technician as any).weight ?? 0);
+                    const next = Math.max(0, curr - 10);
+                    setPendingWeights(prev=>({ ...prev, [technician.id]: next }));
+                  }}
+                >
+                  -10
+                </button>
+                <button
+                  className="px-2 py-1 rounded bg-primary text-white hover:opacity-90"
+                  onClick={async (e)=>{
+                    e.preventDefault(); e.stopPropagation();
+                    const val = pendingWeights[technician.id] ?? ((technician as any).weight ?? 0);
+                    if (onUpdateWeight) {
+                      await onUpdateWeight(technician.id, val);
+                    } else {
+                      onEdit({ ...technician, weight: val } as any);
+                    }
+                  }}
+                >
+                  Salvar
+                </button>
+              </div>
             </TableCell>
             {isAdmin && (
               <TableCell className="text-right">

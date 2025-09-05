@@ -3343,7 +3343,7 @@ async def verificar_duplicata_agendamento(data: dict) -> dict:
         agora = datetime.now()
         janela_tempo = agora - timedelta(hours=4)
 
-        logger.info(f"🛡️ Verificando duplicatas para: CPF={cpf}, Tel={telefone}, Nome={nome}")
+        logger.info(f"🛡️ [ANTI-LOOP FIX] Verificando duplicatas para: CPF={cpf}, Tel={telefone}, Nome={nome}")
 
         # 1. VERIFICAR DUPLICATAS EXATAS EM SERVICE_ORDERS
         if cpf or telefone:
@@ -3384,7 +3384,8 @@ async def verificar_duplicata_agendamento(data: dict) -> dict:
                     # Se similaridade > 60%, considerar duplicata (mais rigoroso)
                     if total_checks > 0 and (similaridade / total_checks) > 0.6:
                         tempo_criacao = datetime.fromisoformat(os.get("created_at", "").replace("Z", "+00:00"))
-                        minutos_atras = int((agora - tempo_criacao.replace(tzinfo=None)).total_seconds() / 60)
+                        minutos_calculados = int((agora - tempo_criacao.replace(tzinfo=None)).total_seconds() / 60)
+                        minutos_atras = max(0, minutos_calculados)  # Garantir que não seja negativo
 
                         logger.warning(f"🚨 DUPLICATA DETECTADA: OS {os.get('order_number')} criada há {minutos_atras} minutos")
 
@@ -3398,27 +3399,41 @@ async def verificar_duplicata_agendamento(data: dict) -> dict:
 
         # 2. VERIFICAR DUPLICATAS EM AGENDAMENTOS_AI (pré-agendamentos) - MAIS RIGOROSO
         if telefone:
+            # Janela mais restrita para pré-agendamentos (últimos 15 minutos apenas)
+            janela_pre_agendamento = agora - timedelta(minutes=15)
+
             response_ai = supabase.table("agendamentos_ai").select("*").eq(
                 "telefone", telefone
-            ).gte("created_at", janela_tempo.isoformat()).execute()
+            ).gte("created_at", janela_pre_agendamento.isoformat()).execute()
 
             if response_ai.data and len(response_ai.data) > 0:
-                # Verificar se há pré-agendamentos muito recentes (últimos 30 minutos)
-                janela_recente = agora - timedelta(minutes=30)
-                agendamentos_recentes = [
-                    ag for ag in response_ai.data
-                    if datetime.fromisoformat(ag.get("created_at", "").replace("Z", "+00:00")).replace(tzinfo=None) > janela_recente
-                ]
+                # Filtrar apenas agendamentos realmente recentes (últimos 15 minutos)
+                agendamentos_recentes = []
+                for ag in response_ai.data:
+                    try:
+                        tempo_criacao = datetime.fromisoformat(ag.get("created_at", "").replace("Z", "+00:00")).replace(tzinfo=None)
+                        minutos_calculados = int((agora - tempo_criacao).total_seconds() / 60)
+
+                        # Só considerar se for realmente recente (0-15 minutos) e não negativo
+                        if 0 <= minutos_calculados <= 15:
+                            agendamentos_recentes.append(ag)
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro ao processar data do agendamento: {e}")
+                        continue
 
                 if agendamentos_recentes:
-                    logger.warning(f"🚨 PRÉ-AGENDAMENTO RECENTE: {len(agendamentos_recentes)} para telefone {telefone} nos últimos 30 min")
+                    logger.warning(f"🚨 PRÉ-AGENDAMENTO RECENTE: {len(agendamentos_recentes)} para telefone {telefone} nos últimos 15 min")
+
+                    # Calcular minutos do mais recente
+                    tempo_criacao = datetime.fromisoformat(agendamentos_recentes[0].get("created_at", "").replace("Z", "+00:00")).replace(tzinfo=None)
+                    minutos_ago = max(0, int((agora - tempo_criacao).total_seconds() / 60))
 
                     return {
                         "is_duplicate": True,
                         "duplicate_type": "recent_pre_scheduling",
                         "count": len(agendamentos_recentes),
                         "latest": agendamentos_recentes[0],
-                        "minutes_ago": int((agora - datetime.fromisoformat(agendamentos_recentes[0].get("created_at", "").replace("Z", "+00:00")).replace(tzinfo=None)).total_seconds() / 60)
+                        "minutes_ago": minutos_ago
                     }
 
         logger.info("✅ Nenhuma duplicata detectada")

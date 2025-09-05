@@ -26,7 +26,7 @@
     <meta name="msapplication-tap-highlight" content="no" />
 
     <!-- Manifest -->
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/assets/manifest-cbH4b58J.webmanifest" />
 
     <!-- Apple Touch Icons -->
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
@@ -37,34 +37,23 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="shortcut icon" href="/favicon.png" />
-    <link rel="modulepreload" crossorigin href="/assets/vendor-BJaCQb1B-Cbr5T7rF.js">
-    <link rel="modulepreload" crossorigin href="/assets/ui-Dn8Aqb0j-DnN0Mb9-.js">
-    <link rel="modulepreload" crossorigin href="/assets/charts-B0ZRp5vW-CsJwuvNu.js">
-    <link rel="modulepreload" crossorigin href="/assets/utils-mnyH58Xp-D78SC-Vr.js">
-    <link rel="modulepreload" crossorigin href="/assets/maps-DgedmEtj-ex3DfE3h.js">
-  <link rel="manifest" href="/assets/manifest-cbH4b58J.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script>  <script type="module" crossorigin src="/assets/index-DkQvJVUb.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-83-L6JCf.css">
-<link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+    <link rel="shortcut icon" href="/favicon.png" />
+    <!-- Vite dev entrypoint; Vite will replace this with hashed assets on build -->
+    <script>
+      // Expor token do bot no window para as chamadas da UI (somente não sensível)
+      window.BOT_TOKEN = (function(){ try { return (import.meta && import.meta.env && import.meta.env.VITE_BOT_TOKEN) || ''; } catch { return ''; } })();
+      window.__API_URL__ = (function(){ try { return (import.meta && import.meta.env && import.meta.env.VITE_API_URL) || ''; } catch { return ''; } })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-C67dPm8w.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-C0Yfakdp.js">
+    <link rel="modulepreload" crossorigin href="/assets/ui-CvXZ6xB1.js">
+    <link rel="modulepreload" crossorigin href="/assets/charts-CHk0KVF9.js">
+    <link rel="modulepreload" crossorigin href="/assets/utils-Cm7qYSum.js">
+    <link rel="modulepreload" crossorigin href="/assets/maps-DtoSc9qE.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-Dv_HLUv9.css">
+  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
 
   <body>
     <div id="root"></div>
-    <!-- GPT Engineer script removido para produção -->
-
-
-    <!-- Service Worker Registration -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('✅ Service Worker registrado:', registration);
-            })
-            .catch((error) => {
-              console.log('❌ Erro no Service Worker:', error);
-            });
-        });
-      }
-    </script>
   </body>
 </html>

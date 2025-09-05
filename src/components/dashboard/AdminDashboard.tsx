@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   TrendingUp,
   TrendingDown,
-  TrendingDown,
   Users,
   Wrench,
   Calendar,
@@ -80,6 +79,76 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   getStatusColor,
   getStatusLabel
 }) => {
+  // 🔍 LOG PARA DEBUG DOS VALORES RECEBIDOS
+  console.log('🎯 [AdminDashboard] VALORES RECEBIDOS:', {
+    totalRevenue,
+    pendingRevenue,
+    serviceOrdersCount: serviceOrders.length,
+    serviceOrders: serviceOrders.map(o => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      initialCost: o.initialCost,
+      finalCost: o.finalCost,
+      paymentStatus: o.paymentStatus,
+      status: o.status
+    }))
+  });
+
+  // 🚨 CALCULAR VALORES INTERNAMENTE (FALLBACK)
+  const calculateRevenueFromOrders = () => {
+    let totalReceived = 0;
+    let totalPending = 0;
+
+    serviceOrders.forEach(order => {
+      // Converter strings para números (dados do Supabase vêm como string)
+      const initialCost = Number(order.initialCost) || 0;
+      const finalCost = Number(order.finalCost) || 0;
+      const paymentStatus = order.paymentStatus;
+
+      console.log('🔍 [AdminDashboard] Processando ordem:', {
+        id: order.id.substring(0, 8),
+        orderNumber: order.orderNumber,
+        initialCost,
+        finalCost,
+        paymentStatus,
+        status: order.status
+      });
+
+      if (paymentStatus === 'completed') {
+        totalReceived += finalCost;
+      } else if (paymentStatus === 'partial' || paymentStatus === 'advance_paid') {
+        totalReceived += initialCost;
+        if (finalCost > initialCost) {
+          totalPending += (finalCost - initialCost);
+        }
+      } else if (initialCost > 0) {
+        totalReceived += initialCost;
+        if (finalCost > initialCost) {
+          totalPending += (finalCost - initialCost);
+        }
+      } else if (finalCost > 0) {
+        totalPending += finalCost;
+      }
+    });
+
+    return { totalReceived, totalPending };
+  };
+
+  const { totalReceived: calculatedReceived, totalPending: calculatedPending } = calculateRevenueFromOrders();
+
+  // 🚨 USAR VALORES CALCULADOS SE OS RECEBIDOS FOREM 0
+  const finalTotalRevenue = totalRevenue > 0 ? totalRevenue : calculatedReceived;
+  const finalPendingRevenue = pendingRevenue > 0 ? pendingRevenue : calculatedPending;
+
+  console.log('🎯 [AdminDashboard] VALORES FINAIS:', {
+    totalRevenueRecebido: totalRevenue,
+    pendingRevenueRecebido: pendingRevenue,
+    calculatedReceived,
+    calculatedPending,
+    finalTotalRevenue,
+    finalPendingRevenue
+  });
+
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -142,7 +211,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Calcular métricas avançadas
   const totalOrders = pendingOrders + inProgressOrders + completedOrders;
   const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
-  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const avgOrderValue = totalOrders > 0 ? finalTotalRevenue / totalOrders : 0;
 
   // Ordens recentes (últimas 5)
   const recentOrders = serviceOrders
@@ -313,11 +382,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-purple-900">{formatCurrency(totalRevenue)}</div>
+            <div className="text-3xl font-bold text-purple-900">{formatCurrency(finalTotalRevenue)}</div>
             <div className="flex items-center gap-2 mt-2">
               <div className="flex items-center gap-1">
                 <TrendingUp className="h-3 w-3 text-purple-600" />
-                <span className="text-xs text-purple-700 font-medium">+{revenueGrowth}%</span>
+                <span className="text-xs text-purple-700 font-medium">+{growthMetrics.revenueGrowth}%</span>
               </div>
               <p className="text-xs text-purple-700">crescimento mensal</p>
             </div>
@@ -378,7 +447,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="text-2xl font-bold text-orange-600">{formatCurrency(pendingRevenue)}</div>
+              <div className="text-2xl font-bold text-orange-600">{formatCurrency(finalPendingRevenue)}</div>
               <p className="text-xs text-muted-foreground">
                 Aguardando recebimento
               </p>
@@ -462,7 +531,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     })}
                   </div>
                 )}
-                </div>
+
               </CardContent>
             </Card>
 
@@ -680,7 +749,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     ))}
                   </div>
                 )}
-                </div>
+
               </CardContent>
             </Card>
 

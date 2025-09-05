@@ -303,7 +303,8 @@ export class UnifiedCalendarService {
       finalCost: data.final_cost || null,
       clientPhone: data.client_phone || null,
       equipmentType: data.equipment_type || null,
-      orderStatus: data.status // Em calendar_events, status já é o status final
+      orderStatus: data.status, // Em calendar_events, status já é o status final
+      attendanceType: data.tipo_servico || undefined
     };
   }
 

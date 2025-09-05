@@ -366,11 +366,19 @@ export class PWAService {
       return;
     }
 
+    // Evitar registros manuais duplicados
+    // - Em produção, o vite-plugin-pwa injeta o registerSW automaticamente
+    // - Em desenvolvimento, mantemos SW desativado para não causar problemas de cache
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      console.log('✅ [PWAService] Service Worker registrado:', registration.scope);
+      if (import.meta.env.PROD) {
+        console.log('ℹ️ [PWAService] Registro do SW gerenciado pelo VitePWA (autoUpdate).');
+        return;
+      } else {
+        console.log('ℹ️ [PWAService] SW desativado no modo desenvolvimento para evitar cache.');
+        return;
+      }
     } catch (error) {
-      console.error('❌ [PWAService] Erro ao registrar Service Worker:', error);
+      console.error('❌ [PWAService] Erro ao gerenciar registro do Service Worker:', error);
     }
   }
 

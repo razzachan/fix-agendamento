@@ -1,0 +1,18 @@
+sintomas:
+- parou de esfriar
+- não gela
+- nao gela
+- não esfria
+- nao esfria
+
+causas:
+- Ventilador do evaporador defeituoso
+- Condensador sujo
+- Gás refrigerante insuficiente
+- Compressor com falha
+- Sensor/termostato (NTC)
+- Placa eletrônica
+- Vedação da porta danificada
+
+mensagens:
+- Explicaremos as possíveis causas com base no seu relato e coletaremos para diagnóstico preciso, sem compromisso de valor final até o laudo.
