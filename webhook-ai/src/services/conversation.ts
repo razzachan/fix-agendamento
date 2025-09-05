@@ -24,7 +24,10 @@ export async function ensureThread(contact: string, channel: 'whatsapp' | 'web' 
     .insert({ bot_id, contact, channel })
     .select('id')
     .single();
-  if (error) { console.error('[conversation] create thread error', error); return null; }
+  if (error) {
+    console.error('[conversation] create thread error', error);
+    return null;
+  }
   return data.id as string;
 }
 
@@ -35,7 +38,7 @@ export async function logInbound(contact: string, content: string) {
     thread_id: threadId,
     direction: 'inbound',
     type: 'text',
-    content
+    content,
   });
 }
 
@@ -46,7 +49,7 @@ export async function logOutbound(contact: string, content: string) {
     thread_id: threadId,
     direction: 'outbound',
     type: 'text',
-    content
+    content,
   });
 }
 
@@ -70,4 +73,3 @@ export async function closeThread(contact: string) {
     .update({ closed_at: new Date().toISOString() })
     .eq('id', thread.id);
 }
-

@@ -17,14 +17,14 @@ export async function processConfirmation(body: any) {
       address: canonical.address,
       item,
       attendanceType: item.serviceAttendanceType || canonical.attendanceType,
-      description: item.clientDescription || canonical.description || ''
+      description: item.clientDescription || canonical.description || '',
     });
 
     // Aplicar regras de custo
     await applyCostRules(orderId, {
       attendanceType: item.serviceAttendanceType || canonical.attendanceType,
       itemValue: item.serviceValue,
-      mode: 'on_create'
+      mode: 'on_create',
     });
 
     // Criar evento de agenda
@@ -34,7 +34,7 @@ export async function processConfirmation(body: any) {
         end: canonical.scheduling.chosen.end,
         technicianId: canonical.scheduling.chosen.technicianId,
         address: canonical.address?.full,
-        description: item.clientDescription || canonical.description || ''
+        description: item.clientDescription || canonical.description || '',
       });
       created.push({ orderId, eventId });
     } else {
@@ -45,4 +45,3 @@ export async function processConfirmation(body: any) {
   // 3) Retornar algo para logs externos
   return { ok: true, created };
 }
-

@@ -16,8 +16,16 @@ class WhatsAppClient extends EventEmitter {
   private client: any;
   private status: WAStatus = { connected: false, me: null, qr: null };
   private started = false;
-  private messageHandlers: Array<(from: string, body: string, meta?: { id?: string; ts?: number; type?: string }) => Promise<void> | void> = [];
-  private anyMessageHandlers: Array<(msg: any, meta?: { id?: string; ts?: number; type?: string }) => Promise<void> | void> = [];
+  private messageHandlers: Array<
+    (
+      from: string,
+      body: string,
+      meta?: { id?: string; ts?: number; type?: string }
+    ) => Promise<void> | void
+  > = [];
+  private anyMessageHandlers: Array<
+    (msg: any, meta?: { id?: string; ts?: number; type?: string }) => Promise<void> | void
+  > = [];
 
   constructor() {
     super();
@@ -35,10 +43,15 @@ class WhatsAppClient extends EventEmitter {
         `${process.env.LOCALAPPDATA}/Google/Chrome/Application/chrome.exe`,
         // Microsoft Edge
         'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-        'C:/Program Files/Microsoft/Edge/Application/msedge.exe'
+        'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
       ].filter(Boolean) as string[];
       for (const p of candidates) {
-        try { if (fs.existsSync(p)) { execPath = p; break; } } catch {}
+        try {
+          if (fs.existsSync(p)) {
+            execPath = p;
+            break;
+          }
+        } catch {}
       }
     }
     // Forçar modo visível por enquanto para estabilizar a autenticação
@@ -59,17 +72,28 @@ class WhatsAppClient extends EventEmitter {
     const defaultData = path.join(os.homedir(), '.wwebjs_auth', 'fixbot-v2');
     const chromeUserData = path.join(os.homedir(), '.wwebjs_chrome');
     const dataPath = process.env.WA_DATA_PATH || defaultData;
-    try { fs.mkdirSync(dataPath, { recursive: true }); } catch {}
-    try { fs.mkdirSync(chromeUserData, { recursive: true }); } catch {}
+    try {
+      fs.mkdirSync(dataPath, { recursive: true });
+    } catch {}
+    try {
+      fs.mkdirSync(chromeUserData, { recursive: true });
+    } catch {}
 
     this.client = new Client({
       authStrategy: new LocalAuth({ clientId: 'fixbot-v2', dataPath }),
-      puppeteer: { headless, args, executablePath: execPath, ignoreHTTPSErrors: true, devtools: false },
+      puppeteer: {
+        headless,
+        args,
+        executablePath: execPath,
+        ignoreHTTPSErrors: true,
+        devtools: false,
+      },
       // Pin de versão conhecido e cache remoto — evita loop em "Conectando" após scan
       webVersion: '2.3000.1026598401',
       webVersionCache: {
         type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1026598401.html'
+        remotePath:
+          'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1026598401.html',
       },
       takeoverOnConflict: true,
       takeoverTimeoutMs: 0,
@@ -102,7 +126,7 @@ class WhatsAppClient extends EventEmitter {
         body: msg.body?.slice(0, 100),
         type: msg.type,
         fromMe: msg.fromMe,
-        timestamp: msg.timestamp
+        timestamp: msg.timestamp,
       });
     });
 
@@ -113,7 +137,7 @@ class WhatsAppClient extends EventEmitter {
         body: msg.body?.slice(0, 100),
         type: msg.type,
         fromMe: msg.fromMe,
-        timestamp: msg.timestamp
+        timestamp: msg.timestamp,
       });
     });
 
@@ -180,10 +204,16 @@ class WhatsAppClient extends EventEmitter {
                   // Método 1: Store.Conn
                   // @ts-ignore
                   // @ts-ignore
-                  if ((window as any).Store && (window as any).Store.Conn && (window as any).Store.Conn.wid) {
+                  if (
+                    (window as any).Store &&
+                    (window as any).Store.Conn &&
+                    (window as any).Store.Conn.wid
+                  ) {
                     return {
-                      id: (window as any).Store.Conn.wid._serialized || (window as any).Store.Conn.wid.user,
-                      pushname: (window as any).Store.Conn.pushname
+                      id:
+                        (window as any).Store.Conn.wid._serialized ||
+                        (window as any).Store.Conn.wid.user,
+                      pushname: (window as any).Store.Conn.pushname,
                     };
                   }
 
@@ -193,14 +223,15 @@ class WhatsAppClient extends EventEmitter {
                   if (WAWebMain && WAWebMain.Conn && WAWebMain.Conn.wid) {
                     return {
                       id: WAWebMain.Conn.wid._serialized || WAWebMain.Conn.wid.user,
-                      pushname: WAWebMain.Conn.pushname
+                      pushname: WAWebMain.Conn.pushname,
                     };
                   }
 
                   // Método 3: Procurar no DOM
-                  const headerElement = document.querySelector('[data-testid="default-user"]') ||
-                                      document.querySelector('[title*="+"]') ||
-                                      document.querySelector('header [title]');
+                  const headerElement =
+                    document.querySelector('[data-testid="default-user"]') ||
+                    document.querySelector('[title*="+"]') ||
+                    document.querySelector('header [title]');
                   const he = headerElement as HTMLElement | null;
                   if (he && (he as any).title) {
                     const title = (he as any).title as string;
@@ -208,13 +239,15 @@ class WhatsAppClient extends EventEmitter {
                     if (phoneMatch) {
                       return {
                         id: phoneMatch[1] + '@c.us',
-                        pushname: title.replace(/\+?\d{10,15}/, '').trim()
+                        pushname: title.replace(/\+?\d{10,15}/, '').trim(),
                       };
                     }
                   }
 
                   // Método 4: Procurar elementos com números de telefone
-                  const phoneElements = document.querySelectorAll('[title*="+"], [aria-label*="+"]');
+                  const phoneElements = document.querySelectorAll(
+                    '[title*="+"], [aria-label*="+"]'
+                  );
                   for (const el of Array.from(phoneElements)) {
                     const he2 = el as HTMLElement;
                     const text = (he2 as any).title || he2.getAttribute('aria-label') || '';
@@ -222,7 +255,7 @@ class WhatsAppClient extends EventEmitter {
                     if (phoneMatch) {
                       return {
                         id: phoneMatch[1] + '@c.us',
-                        pushname: text.replace(/\+?\d{10,15}/, '').trim() || 'Bot'
+                        pushname: text.replace(/\+?\d{10,15}/, '').trim() || 'Bot',
                       };
                     }
                   }
@@ -239,7 +272,10 @@ class WhatsAppClient extends EventEmitter {
               }
             }
           } catch (e: any) {
-            console.log('[WA] Não foi possível executar JavaScript na página:', e?.message || String(e));
+            console.log(
+              '[WA] Não foi possível executar JavaScript na página:',
+              e?.message || String(e)
+            );
           }
         }
 
@@ -299,7 +335,10 @@ class WhatsAppClient extends EventEmitter {
                   pushname = me.pushname || me.name;
                 }
               } catch (e: any) {
-                console.log('[WA] WORKAROUND: Não foi possível obter contatos:', e?.message || String(e));
+                console.log(
+                  '[WA] WORKAROUND: Não foi possível obter contatos:',
+                  e?.message || String(e)
+                );
               }
             }
 
@@ -315,10 +354,16 @@ class WhatsAppClient extends EventEmitter {
                       // Método 1: Store.Conn
                       // @ts-ignore
                       // @ts-ignore
-                      if ((window as any).Store && (window as any).Store.Conn && (window as any).Store.Conn.wid) {
+                      if (
+                        (window as any).Store &&
+                        (window as any).Store.Conn &&
+                        (window as any).Store.Conn.wid
+                      ) {
                         return {
-                          id: (window as any).Store.Conn.wid._serialized || (window as any).Store.Conn.wid.user,
-                          pushname: (window as any).Store.Conn.pushname
+                          id:
+                            (window as any).Store.Conn.wid._serialized ||
+                            (window as any).Store.Conn.wid.user,
+                          pushname: (window as any).Store.Conn.pushname,
                         };
                       }
 
@@ -328,14 +373,15 @@ class WhatsAppClient extends EventEmitter {
                       if (WAWebMain && WAWebMain.Conn && WAWebMain.Conn.wid) {
                         return {
                           id: WAWebMain.Conn.wid._serialized || WAWebMain.Conn.wid.user,
-                          pushname: WAWebMain.Conn.pushname
+                          pushname: WAWebMain.Conn.pushname,
                         };
                       }
 
                       // Método 3: Procurar no DOM
-                      const headerElement = document.querySelector('[data-testid="default-user"]') ||
-                                          document.querySelector('[title*="+"]') ||
-                                          document.querySelector('header [title]');
+                      const headerElement =
+                        document.querySelector('[data-testid="default-user"]') ||
+                        document.querySelector('[title*="+"]') ||
+                        document.querySelector('header [title]');
                       const he = headerElement as HTMLElement | null;
                       if (he && (he as any).title) {
                         const title = (he as any).title as string;
@@ -343,13 +389,15 @@ class WhatsAppClient extends EventEmitter {
                         if (phoneMatch) {
                           return {
                             id: phoneMatch[1] + '@c.us',
-                            pushname: title.replace(/\+?\d{10,15}/, '').trim()
+                            pushname: title.replace(/\+?\d{10,15}/, '').trim(),
                           };
                         }
                       }
 
                       // Método 4: Procurar elementos com números de telefone
-                      const phoneElements = document.querySelectorAll('[title*="+"], [aria-label*="+"]');
+                      const phoneElements = document.querySelectorAll(
+                        '[title*="+"], [aria-label*="+"]'
+                      );
                       for (const el of Array.from(phoneElements)) {
                         const he2 = el as HTMLElement;
                         const text = (he2 as any).title || he2.getAttribute('aria-label') || '';
@@ -357,7 +405,7 @@ class WhatsAppClient extends EventEmitter {
                         if (phoneMatch) {
                           return {
                             id: phoneMatch[1] + '@c.us',
-                            pushname: text.replace(/\+?\d{10,15}/, '').trim() || 'Bot'
+                            pushname: text.replace(/\+?\d{10,15}/, '').trim() || 'Bot',
                           };
                         }
                       }
@@ -374,7 +422,10 @@ class WhatsAppClient extends EventEmitter {
                   }
                 }
               } catch (e: any) {
-                console.log('[WA] WORKAROUND: Não foi possível executar JavaScript:', e?.message || String(e));
+                console.log(
+                  '[WA] WORKAROUND: Não foi possível executar JavaScript:',
+                  e?.message || String(e)
+                );
               }
             }
 
@@ -422,7 +473,7 @@ class WhatsAppClient extends EventEmitter {
       }
       // auto-retry leve para manter QR disponível em dev
       try {
-        await new Promise(res => setTimeout(res, 2000));
+        await new Promise((res) => setTimeout(res, 2000));
         if (this.started) {
           console.log('[WA] Tentando reconectar...');
           this.initClient();
@@ -457,7 +508,9 @@ class WhatsAppClient extends EventEmitter {
       return;
     }
     // Força reinicialização (ex.: recuperação de erro)
-    try { await this.client.destroy(); } catch {}
+    try {
+      await this.client.destroy();
+    } catch {}
     this.started = false;
     this.status = { connected: false, me: null, qr: null };
     this.initClient();
@@ -469,16 +522,25 @@ class WhatsAppClient extends EventEmitter {
   }
 
   // Handler simplificado (texto)
-  public onMessage(handler: (from: string, body: string, meta?: { id?: string; ts?: number; type?: string }) => Promise<void> | void) {
+  public onMessage(
+    handler: (
+      from: string,
+      body: string,
+      meta?: { id?: string; ts?: number; type?: string }
+    ) => Promise<void> | void
+  ) {
     this.messageHandlers.push(handler);
-    console.log('[WA] 🔧 Registrando handler de mensagem. Total handlers:', this.messageHandlers.length);
+    console.log(
+      '[WA] 🔧 Registrando handler de mensagem. Total handlers:',
+      this.messageHandlers.length
+    );
 
     // Garante apenas um listener real no client
     if (!(this as any)._boundMessageListener) {
       console.log('[WA] 🔧 Criando listener de mensagem no client');
       (this as any)._boundMessageListener = async (msg: any) => {
         try {
-          const preview = msg?.body ? String(msg.body).slice(0, 80) : `[${msg.type||'unknown'}]`;
+          const preview = msg?.body ? String(msg.body).slice(0, 80) : `[${msg.type || 'unknown'}]`;
           console.log('[WA] 📨 MENSAGEM RECEBIDA de', msg.from, 'texto:', preview);
           console.log('[WA] 📨 Detalhes da mensagem:', {
             from: msg.from,
@@ -487,10 +549,14 @@ class WhatsAppClient extends EventEmitter {
             type: msg.type,
             fromMe: msg.fromMe,
             timestamp: msg.timestamp,
-            id: msg?.id?._serialized || msg?.id?.id
+            id: msg?.id?._serialized || msg?.id?.id,
           });
 
-          const meta = { id: msg?.id?._serialized || msg?.id?.id, ts: msg?.timestamp, type: msg?.type };
+          const meta = {
+            id: msg?.id?._serialized || msg?.id?.id,
+            ts: msg?.timestamp,
+            type: msg?.type,
+          };
           console.log('[WA] 📨 Processando com', this.messageHandlers.length, 'handlers');
 
           for (const h of this.messageHandlers) {
@@ -513,14 +579,24 @@ class WhatsAppClient extends EventEmitter {
   }
 
   // Handler raw para acessar mídias/imagens
-  public onAnyMessage(handler: (msg: any, meta?: { id?: string; ts?: number; type?: string }) => Promise<void> | void) {
+  public onAnyMessage(
+    handler: (msg: any, meta?: { id?: string; ts?: number; type?: string }) => Promise<void> | void
+  ) {
     this.anyMessageHandlers.push(handler);
     if (!(this as any)._boundAnyMessageListener) {
       (this as any)._boundAnyMessageListener = async (msg: any) => {
         try {
-          const meta = { id: msg?.id?._serialized || msg?.id?.id, ts: msg?.timestamp, type: msg?.type };
+          const meta = {
+            id: msg?.id?._serialized || msg?.id?.id,
+            ts: msg?.timestamp,
+            type: msg?.type,
+          };
           for (const h of this.anyMessageHandlers) {
-            try { await h(msg, meta); } catch (e) { console.error('[WA] onAnyMessage handler error', e); }
+            try {
+              await h(msg, meta);
+            } catch (e) {
+              console.error('[WA] onAnyMessage handler error', e);
+            }
           }
         } catch (e) {
           console.error('[WA] onAnyMessage dispatch error', e);
@@ -530,13 +606,13 @@ class WhatsAppClient extends EventEmitter {
     }
   }
 
-  public async sendButtons(to: string, text: string, buttons: Array<{id: string, text: string}>) {
+  public async sendButtons(to: string, text: string, buttons: Array<{ id: string; text: string }>) {
     // whatsapp-web.js mudou a API - usando fallback direto para texto simples
     try {
       // Tentativa com nova API se disponível
       const { Buttons } = await import('whatsapp-web.js');
       if (Buttons && typeof Buttons === 'function') {
-        const btns = buttons.map(b => ({ id: b.id, body: b.text }));
+        const btns = buttons.map((b) => ({ id: b.id, body: b.text }));
         const msg = new Buttons(text, btns);
         return (this.client as any).sendMessage(to, msg);
       }
@@ -545,20 +621,26 @@ class WhatsAppClient extends EventEmitter {
     }
 
     // Fallback: texto simples com numeração
-    const fallback = text + '\n\n' + buttons.map((b,i)=> `${i+1}) ${b.text}`).join('\n');
+    const fallback = text + '\n\n' + buttons.map((b, i) => `${i + 1}) ${b.text}`).join('\n');
     return (this.client as any).sendMessage(to, fallback);
   }
 
-  public async sendList(to: string, text: string, options: Array<{id: string, text: string}>, title='Opções', sectionTitle='Escolha:') {
+  public async sendList(
+    to: string,
+    text: string,
+    options: Array<{ id: string; text: string }>,
+    title = 'Opções',
+    sectionTitle = 'Escolha:'
+  ) {
     try {
       const List = (await import('whatsapp-web.js')).List as any;
-      const rows = options.map(o => ({ id: o.id, title: o.text }));
+      const rows = options.map((o) => ({ id: o.id, title: o.text }));
       const sections = [{ title: sectionTitle, rows }];
       const list = new List(text, 'Selecionar', sections, title);
       return (this.client as any).sendMessage(to, list);
     } catch (e) {
       console.warn('[WA] sendList falhou, fallback para texto simples', e);
-      const fallback = text + '\n' + options.map((o,i)=> `${i+1}) ${o.text}`).join('\n');
+      const fallback = text + '\n' + options.map((o, i) => `${i + 1}) ${o.text}`).join('\n');
       return (this.client as any).sendMessage(to, fallback);
     }
   }
@@ -568,7 +650,9 @@ class WhatsAppClient extends EventEmitter {
   }
 
   public async reset() {
-    try { await this.client.destroy(); } catch {}
+    try {
+      await this.client.destroy();
+    } catch {}
     this.status = { connected: false, me: null, qr: null };
     this.started = false;
     this.initClient();
@@ -593,7 +677,7 @@ class WhatsAppClient extends EventEmitter {
           const path = await import('path');
           const authDir = path.join(process.cwd(), '.wwebjs_auth');
           if (fs.existsSync(authDir)) {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // aguarda 2s
+            await new Promise((resolve) => setTimeout(resolve, 2000)); // aguarda 2s
             fs.rmSync(authDir, { recursive: true, force: true });
             console.log('[WA] Sessão limpa manualmente');
           }
@@ -632,22 +716,27 @@ class WhatsAppClient extends EventEmitter {
             const chats = Store.Chat.models || [];
             const recentMessages = [];
             const now = Date.now();
-            const fiveMinutesAgo = now - (5 * 60 * 1000);
+            const fiveMinutesAgo = now - 5 * 60 * 1000;
 
-            for (const chat of chats.slice(0, 10)) { // Verificar apenas os 10 chats mais recentes
+            for (const chat of chats.slice(0, 10)) {
+              // Verificar apenas os 10 chats mais recentes
               if (!chat.msgs || !chat.msgs.models) continue;
 
-              for (const msg of chat.msgs.models.slice(-5)) { // Últimas 5 mensagens de cada chat
+              for (const msg of chat.msgs.models.slice(-5)) {
+                // Últimas 5 mensagens de cada chat
                 if (!msg || msg.fromMe) continue; // Ignorar mensagens próprias
 
                 const timestamp = msg.t * 1000; // Converter para milliseconds
-                if (timestamp > fiveMinutesAgo && timestamp > ((window as any).lastPollingCheck || 0)) {
+                if (
+                  timestamp > fiveMinutesAgo &&
+                  timestamp > ((window as any).lastPollingCheck || 0)
+                ) {
                   recentMessages.push({
                     id: msg.id._serialized || msg.id.id,
                     from: msg.from._serialized || msg.from,
                     body: msg.body || '',
                     timestamp: timestamp,
-                    type: msg.type || 'chat'
+                    type: msg.type || 'chat',
                   });
                 }
               }
@@ -667,7 +756,7 @@ class WhatsAppClient extends EventEmitter {
             console.log('[WA] 🔄 POLLING: Mensagem encontrada!', {
               from: msg.from,
               body: msg.body?.slice(0, 50),
-              timestamp: new Date(msg.timestamp).toISOString()
+              timestamp: new Date(msg.timestamp).toISOString(),
             });
 
             // Disparar handlers manualmente
@@ -683,7 +772,6 @@ class WhatsAppClient extends EventEmitter {
         }
 
         this.lastMessageCheck = Date.now();
-
       } catch (error) {
         console.error('[WA] Erro no polling:', error);
       }
@@ -700,4 +788,3 @@ class WhatsAppClient extends EventEmitter {
 }
 
 export const waClient = new WhatsAppClient();
-

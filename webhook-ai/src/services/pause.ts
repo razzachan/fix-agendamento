@@ -7,4 +7,3 @@ export function isGloballyPaused() {
 export function setGlobalPause(p: boolean) {
   pausedGlobal = !!p;
 }
-

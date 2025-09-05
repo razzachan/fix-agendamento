@@ -1,4 +1,12 @@
-import { buildQuote, getAvailability, createAppointment, cancelAppointment, getOrderStatus, aiScheduleStart, aiScheduleConfirm } from './toolsRuntime.js';
+import {
+  buildQuote,
+  getAvailability,
+  createAppointment,
+  cancelAppointment,
+  getOrderStatus,
+  aiScheduleStart,
+  aiScheduleConfirm,
+} from './toolsRuntime.js';
 
 function normalizePeerToPhone(peer?: string): string | undefined {
   if (!peer) return undefined;
@@ -8,7 +16,7 @@ function normalizePeerToPhone(peer?: string): string | undefined {
   return digits || undefined;
 }
 
-export async function tryExecuteTool(text: string, context?: { channel?: string; peer?: string }){
+export async function tryExecuteTool(text: string, context?: { channel?: string; peer?: string }) {
   // tenta parsear quando o modelo responde com JSON de tool-call
   try {
     const cleaned = String(text || '')
@@ -26,7 +34,9 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
       const idx = cand.indexOf('{"tool"');
       if (idx >= 0) {
         const json = (() => {
-          let depth = 0, inStr = false, esc = false;
+          let depth = 0,
+            inStr = false,
+            esc = false;
           for (let i = idx; i < cand.length; i++) {
             const ch = cand[i];
             if (inStr) {
@@ -36,7 +46,10 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
             } else {
               if (ch === '"') inStr = true;
               else if (ch === '{') depth++;
-              else if (ch === '}') { depth--; if (depth === 0) return cand.slice(idx, i + 1); }
+              else if (ch === '}') {
+                depth--;
+                if (depth === 0) return cand.slice(idx, i + 1);
+              }
             }
           }
           return null;
@@ -75,9 +88,20 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
       if (context?.peer) {
         const s = await getOrCreateSession('whatsapp', context.peer);
         sessionState = s?.state || {};
-        if (!input.segment && sessionState.visual_segment && sessionState.visual_segment !== 'indeterminado') input.segment = sessionState.visual_segment;
-        if (!input.mount && sessionState.visual_type && sessionState.visual_type !== 'indeterminado') input.mount = sessionState.visual_type === 'floor' ? 'piso' : 'cooktop';
-        if (!input.num_burners && sessionState.visual_burners) input.num_burners = String(sessionState.visual_burners);
+        if (
+          !input.segment &&
+          sessionState.visual_segment &&
+          sessionState.visual_segment !== 'indeterminado'
+        )
+          input.segment = sessionState.visual_segment;
+        if (
+          !input.mount &&
+          sessionState.visual_type &&
+          sessionState.visual_type !== 'indeterminado'
+        )
+          input.mount = sessionState.visual_type === 'floor' ? 'piso' : 'cooktop';
+        if (!input.num_burners && sessionState.visual_burners)
+          input.num_burners = String(sessionState.visual_burners);
       }
     } catch {}
 
@@ -92,14 +116,20 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
         const m = desc.match(/(?:\b|^)(4|5|6)\s*bocas?\b/);
         if (m) input.num_burners = m[1];
         else {
-          const map: any = { 'quatro':'4', 'cinco':'5', 'seis':'6' };
-          for (const [w,n] of Object.entries(map)){
-            if (desc.includes(`${w} bocas`) || desc.includes(`${w} boca`)) { input.num_burners = n; break; }
+          const map: any = { quatro: '4', cinco: '5', seis: '6' };
+          for (const [w, n] of Object.entries(map)) {
+            if (desc.includes(`${w} bocas`) || desc.includes(`${w} boca`)) {
+              input.num_burners = n;
+              break;
+            }
           }
         }
       }
 
-      const isFogao = /fog[ãa]o|cooktop/.test(eq) || ['piso','cooktop'].includes(String(input.mount||'').toLowerCase()) || (sessionState?.visual_type && sessionState.visual_type !== 'indeterminado');
+      const isFogao =
+        /fog[ãa]o|cooktop/.test(eq) ||
+        ['piso', 'cooktop'].includes(String(input.mount || '').toLowerCase()) ||
+        (sessionState?.visual_type && sessionState.visual_type !== 'indeterminado');
       const isGasLikely = power.includes('gás') || power.includes('gas') || isFogao; // default para fogão comum
 
       if (isFogao && isGasLikely) {
@@ -115,37 +145,43 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
     }
 
     // Normalizações/validações leves (quando existirem nos inputs)
-    const normalizeCEP = (v?: string)=> v ? v.replace(/\D+/g,'').slice(0,8) : v;
-    const maskCEP = (v?: string)=> v && v.length===8 ? `${v.slice(0,5)}-${v.slice(5)}` : v;
-    const normalizeCPF = (v?: string)=> v ? v.replace(/\D+/g,'').slice(0,11) : v;
-    const maskCPF = (v?: string)=> v && v.length===11 ? `${v.slice(0,3)}.${v.slice(3,6)}.${v.slice(6,9)}-${v.slice(9)}` : v;
-    const isEmail = (v?: string)=> !!(v && /.+@.+\..+/.test(v));
+    const normalizeCEP = (v?: string) => (v ? v.replace(/\D+/g, '').slice(0, 8) : v);
+    const maskCEP = (v?: string) => (v && v.length === 8 ? `${v.slice(0, 5)}-${v.slice(5)}` : v);
+    const normalizeCPF = (v?: string) => (v ? v.replace(/\D+/g, '').slice(0, 11) : v);
+    const maskCPF = (v?: string) =>
+      v && v.length === 11 ? `${v.slice(0, 3)}.${v.slice(3, 6)}.${v.slice(6, 9)}-${v.slice(9)}` : v;
+    const isEmail = (v?: string) => !!(v && /.+@.+\..+/.test(v));
 
     if (obj.tool === 'createAppointment') {
       // tentar extrair cep do address
       if (typeof input.address === 'string') {
         const digits = normalizeCEP(input.address);
-        if (digits && digits.length===8) {
-          input.address = input.address.replace(/\d{5}-?\d{3}/, '')
-            .replace(/\s{2,}/g,' ').trim();
+        if (digits && digits.length === 8) {
+          input.address = input.address
+            .replace(/\d{5}-?\d{3}/, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
           input.zip_code = maskCEP(digits);
         }
       }
       if (typeof input.cpf === 'string') {
         const digits = normalizeCPF(input.cpf);
-        if (digits?.length===11) input.cpf = maskCPF(digits);
+        if (digits?.length === 11) input.cpf = maskCPF(digits);
       }
       if (typeof input.email === 'string' && !isEmail(input.email)) {
         // deixar como veio; validação forte pode ser feita no backend/form
       }
     }
 
-
     switch (obj.tool) {
-      case 'getAvailability': return await getAvailability(input);
-      case 'createAppointment': return await createAppointment(input);
-      case 'cancelAppointment': return await cancelAppointment(input);
-      case 'getOrderStatus': return await getOrderStatus(input?.id || input);
+      case 'getAvailability':
+        return await getAvailability(input);
+      case 'createAppointment':
+        return await createAppointment(input);
+      case 'cancelAppointment':
+        return await cancelAppointment(input);
+      case 'getOrderStatus':
+        return await getOrderStatus(input?.id || input);
       case 'aiScheduleStart': {
         const phone = normalizePeerToPhone(context?.peer) || input.telefone || input.phone;
         const payload = {
@@ -154,7 +190,7 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
           equipamento: input.equipment || input.equipamento || '',
           problema: input.description || input.problema || '',
           telefone: phone,
-          urgente: input.urgente
+          urgente: input.urgente,
         };
         return await aiScheduleStart(payload);
       }
@@ -163,8 +199,10 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
         const opt = String(input.opcao_escolhida || input.choice || '').trim();
         return await aiScheduleConfirm({ telefone: phone!, opcao_escolhida: opt });
       }
-      default: return null;
+      default:
+        return null;
     }
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
-

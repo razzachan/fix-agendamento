@@ -21,9 +21,9 @@ export async function processFAQ(body: any) {
   }
 
   // Padrão caso não haja template
-  const fallback = 'Como posso ajudar? Opções:\n1) Orçamento\n2) Status de Ordem\n3) Garantia\n4) Falar com humano';
+  const fallback =
+    'Como posso ajudar? Opções:\n1) Orçamento\n2) Status de Ordem\n3) Garantia\n4) Falar com humano';
   await sendText(to, fallback);
   await logOutbound(to, fallback);
   return { ok: true, template: 'default' };
 }
-

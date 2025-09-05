@@ -33,32 +33,51 @@ export function extractBlocks(bot: any): KnowledgeBlock[] {
           if (maybe && typeof maybe === 'object') out.data = maybe;
           // Se for string JSON
           if (typeof maybe === 'string') {
-            try { out.data = JSON.parse(maybe); } catch {}
+            try {
+              out.data = JSON.parse(maybe);
+            } catch {}
           }
         }
         return out;
       })
       .filter((b: KnowledgeBlock) => b.key);
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchKnowledgeBlocks(): Promise<KnowledgeBlock[]> {
   try {
-    const { data, error } = await supabase.from('bot_knowledge_blocks').select('*').eq('enabled', true);
+    const { data, error } = await supabase
+      .from('bot_knowledge_blocks')
+      .select('*')
+      .eq('enabled', true);
     if (error || !data) return [];
-    return (data as any[]).map(row => ({ key: row.key, type: row.type || 'knowledge_block', description: row.description || '', data: row.data || undefined }));
-  } catch { return []; }
+    return (data as any[]).map((row) => ({
+      key: row.key,
+      type: row.type || 'knowledge_block',
+      description: row.description || '',
+      data: row.data || undefined,
+    }));
+  } catch {
+    return [];
+  }
 }
 
-export function findRelevantBlocks(blocks: KnowledgeBlock[], message: string, collected?: { equipamento?: string; problema?: string; marca?: string; }): KnowledgeBlock[] {
+export function findRelevantBlocks(
+  blocks: KnowledgeBlock[],
+  message: string,
+  collected?: { equipamento?: string; problema?: string; marca?: string }
+): KnowledgeBlock[] {
   const msg = (message || '').toLowerCase();
   const eq = (collected?.equipamento || '').toLowerCase();
   const prob = (collected?.problema || '').toLowerCase();
   const isRelevant = (b: KnowledgeBlock) => {
     const d = b.data || {};
     if (eq && d.equipamento && String(d.equipamento).toLowerCase() === eq) return true;
-    const sintomas: string[] = Array.isArray(d.sintomas) ? d.sintomas as string[] : [];
-    if (sintomas.some(s => msg.includes(s.toLowerCase()) || prob.includes(s.toLowerCase()))) return true;
+    const sintomas: string[] = Array.isArray(d.sintomas) ? (d.sintomas as string[]) : [];
+    if (sintomas.some((s) => msg.includes(s.toLowerCase()) || prob.includes(s.toLowerCase())))
+      return true;
     // Palavras do key/description
     const kd = `${b.key} ${b.description || ''}`.toLowerCase();
     if (eq && kd.includes(eq)) return true;
@@ -77,11 +96,14 @@ export function renderBlocksForPrompt(blocks: KnowledgeBlock[]): string {
     const d = b.data || {};
     lines.push(`[${b.key}]`);
     if (d.equipamento) lines.push(`- equipamento: ${d.equipamento}`);
-    if (Array.isArray(d.sintomas) && d.sintomas.length) lines.push(`- sintomas: ${d.sintomas.join(', ')}`);
-    if (Array.isArray(d.causas_possiveis) && d.causas_possiveis.length) lines.push(`- causas_possiveis: ${d.causas_possiveis.join('; ')}`);
-    if (Array.isArray(d.servicos_recomendados) && d.servicos_recomendados.length) lines.push(`- servicos_recomendados: ${d.servicos_recomendados.join(', ')}`);
-    if (d.mensagens_base && typeof d.mensagens_base === 'object') lines.push(`- mensagens_base(disponíveis): ${Object.keys(d.mensagens_base).join(', ')}`);
+    if (Array.isArray(d.sintomas) && d.sintomas.length)
+      lines.push(`- sintomas: ${d.sintomas.join(', ')}`);
+    if (Array.isArray(d.causas_possiveis) && d.causas_possiveis.length)
+      lines.push(`- causas_possiveis: ${d.causas_possiveis.join('; ')}`);
+    if (Array.isArray(d.servicos_recomendados) && d.servicos_recomendados.length)
+      lines.push(`- servicos_recomendados: ${d.servicos_recomendados.join(', ')}`);
+    if (d.mensagens_base && typeof d.mensagens_base === 'object')
+      lines.push(`- mensagens_base(disponíveis): ${Object.keys(d.mensagens_base).join(', ')}`);
   }
   return `Blocos de conhecimento relevantes (use como referência, reescrevendo com naturalidade e sem copiar):\n${lines.join('\n')}`;
 }
-

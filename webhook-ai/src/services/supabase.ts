@@ -8,15 +8,26 @@ function makeMock() {
   let idCounter = 1;
 
   function matchRows(rows: any[], query: Record<string, any>) {
-    return rows.filter(r => Object.entries(query).every(([k, v]) => r[k] === v));
+    return rows.filter((r) => Object.entries(query).every(([k, v]) => r[k] === v));
   }
 
   function table(name: string) {
     return {
       select(_cols?: string) {
-        const ctx: any = { _name: name, _rows: name === 'bot_sessions' ? sessions : messages, _query: {}, _limit: undefined };
-        ctx.eq = function (k: string, v: any) { this._query[k] = v; return this; };
-        ctx.limit = function (n: number) { this._limit = n; return this; };
+        const ctx: any = {
+          _name: name,
+          _rows: name === 'bot_sessions' ? sessions : messages,
+          _query: {},
+          _limit: undefined,
+        };
+        ctx.eq = function (k: string, v: any) {
+          this._query[k] = v;
+          return this;
+        };
+        ctx.limit = function (n: number) {
+          this._limit = n;
+          return this;
+        };
         ctx.single = async function () {
           let rows = matchRows(this._rows, this._query);
           if (this._limit) rows = rows.slice(0, this._limit);
@@ -27,7 +38,9 @@ function makeMock() {
       },
       insert(payload: any) {
         return {
-          select() { return this; },
+          select() {
+            return this;
+          },
           async single() {
             if (name === 'bot_sessions') {
               const row = { id: String(idCounter++), ...payload };
@@ -39,7 +52,7 @@ function makeMock() {
               return { data: row } as any;
             }
             return { data: null } as any;
-          }
+          },
         };
       },
       update(payload: any) {
@@ -48,12 +61,15 @@ function makeMock() {
             const rows = name === 'bot_sessions' ? sessions : messages;
             let updated: any[] = [];
             for (const r of rows) {
-              if (r[k] === v) { Object.assign(r, payload); updated.push(r); }
+              if (r[k] === v) {
+                Object.assign(r, payload);
+                updated.push(r);
+              }
             }
             return { data: updated } as any;
-          }
+          },
         };
-      }
+      },
     } as any;
   }
 
@@ -70,4 +86,3 @@ if (useMock) {
 }
 
 export const supabase = supabaseImpl;
-

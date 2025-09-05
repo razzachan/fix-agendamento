@@ -42,4 +42,3 @@ export function normalizePhone(p?: string | null): string | null {
   if (!p) return null;
   return p.replace(/\D/g, '');
 }
-

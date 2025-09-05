@@ -18,7 +18,7 @@ export async function applyCostRules(serviceOrderId: string, input: CostInput) {
     } else if (type === 'coleta_conserto') {
       // final_cost = total, initial_cost = 50%
       if (val && val > 0) {
-        const initial = round2((val * 0.5));
+        const initial = round2(val * 0.5);
         await updateOrder(serviceOrderId, { initial_cost: initial, final_cost: val });
       }
     } else if (type === 'em_domicilio') {
@@ -53,17 +53,25 @@ async function updateOrder(id: string, patch: Record<string, any>) {
 }
 
 async function getInitial(id: string): Promise<number> {
-  const { data } = await supabase.from('service_orders').select('initial_cost').eq('id', id).single();
+  const { data } = await supabase
+    .from('service_orders')
+    .select('initial_cost')
+    .eq('id', id)
+    .single();
   return toNumber(data?.initial_cost) || 0;
 }
 
 function toNumber(n: any): number | null {
   if (n === null || n === undefined) return null;
   if (typeof n === 'number') return n;
-  const s = String(n).replace(/[^0-9.,]/g, '').replace('.', '').replace(',', '.');
+  const s = String(n)
+    .replace(/[^0-9.,]/g, '')
+    .replace('.', '')
+    .replace(',', '.');
   const v = Number(s);
   return isNaN(v) ? null : v;
 }
 
-function round2(n: number) { return Math.round(n * 100) / 100; }
-
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
+}

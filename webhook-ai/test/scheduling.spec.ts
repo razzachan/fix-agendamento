@@ -28,8 +28,23 @@ describe('Fluxo orçamento -> agendamento', () => {
     // Evitar perguntas adicionais no meio do fluxo durante testes determinísticos
     process.env.NODE_ENV = 'test';
     // Prencher contexto mínimo e forçar decisão de gerar orçamento via LLM_FAKE_JSON
-    await setSessionState(session.id, { ...(session.state||{}), dados_coletados: { equipamento: 'fogão a gás', marca: 'Brastemp', problema: 'não funciona 2 bocas' } });
-    process.env.LLM_FAKE_JSON = JSON.stringify({ intent:'orcamento_equipamento', acao_principal:'gerar_orcamento', dados_extrair:{ equipamento: 'fogão a gás', marca: 'Brastemp', problema: 'não funciona 2 bocas' } });
+    await setSessionState(session.id, {
+      ...(session.state || {}),
+      dados_coletados: {
+        equipamento: 'fogão a gás',
+        marca: 'Brastemp',
+        problema: 'não funciona 2 bocas',
+      },
+    });
+    process.env.LLM_FAKE_JSON = JSON.stringify({
+      intent: 'orcamento_equipamento',
+      acao_principal: 'gerar_orcamento',
+      dados_extrair: {
+        equipamento: 'fogão a gás',
+        marca: 'Brastemp',
+        problema: 'não funciona 2 bocas',
+      },
+    });
 
     const out1 = await orchestrateInbound(FROM, 'não funciona 2 bocas', session);
     expect(typeof out1).toBe('string');
@@ -40,9 +55,13 @@ describe('Fluxo orçamento -> agendamento', () => {
     expect(!!st.orcamento_entregue).toBe(true);
 
     // Agora, com orçamento entregue, a fala de agendar deve retornar um texto de follow-up (sem exigir que chame middleware)
-    process.env.LLM_FAKE_JSON = JSON.stringify({ intent:'agendamento_servico', acao_principal:'agendar_servico', dados_extrair:{ equipamento: 'fogão a gás' }, resposta_sugerida: 'Vamos agendar' });
+    process.env.LLM_FAKE_JSON = JSON.stringify({
+      intent: 'agendamento_servico',
+      acao_principal: 'agendar_servico',
+      dados_extrair: { equipamento: 'fogão a gás' },
+      resposta_sugerida: 'Vamos agendar',
+    });
     const out2 = await orchestrateInbound(FROM, 'quero agendar amanhã 9h', session);
     expect(typeof out2).toBe('string');
   });
 });
-
