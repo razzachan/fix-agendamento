@@ -1,0 +1,42 @@
+name: Webhook AI Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'webhook-ai/scripts/smoke-*.mjs'
+      - '.github/workflows/webhook-ai-smoke.yml'
+
+jobs:
+  smoke:
+    name: Smoke (requires API_URL & BOT_TOKEN secrets)
+    runs-on: ubuntu-latest
+    env:
+      API_URL: ${{ secrets.API_URL }}
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+    steps:
+      - name: Check required secrets
+        if: ${{ env.API_URL == '' || env.BOT_TOKEN == '' }}
+        run: |
+          echo "Skipping smoke: missing API_URL or BOT_TOKEN secrets"
+          exit 0
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install root dependencies (for dotenv)
+        run: npm ci
+
+      - name: Smoke orçamento
+        run: node webhook-ai/scripts/smoke-orcamento.mjs
+
+      - name: Smoke agendamento
+        run: node webhook-ai/scripts/smoke-agendamento.mjs
+
