@@ -201,7 +201,12 @@ export async function buildQuote(input: BuildQuoteInput) {
     if (!resp || !resp.ok) throw new Error(`quote failed: ${resp ? resp.status : 'no_response'}`);
   }
   const data = await resp.json();
-  return data?.result;
+  const result = data?.result;
+  try {
+    const { logEvent } = await import('./analytics.js');
+    await logEvent({ type: 'tool:buildQuote', data: { input: payload, result } });
+  } catch {}
+  return result;
 }
 
 export async function getAvailability(params: {
@@ -216,7 +221,12 @@ export async function getAvailability(params: {
   });
   const resp = await fetch(`${API_URL}/api/schedule/availability?${qs.toString()}`);
   if (!resp.ok) throw new Error(`availability failed: ${resp.status}`);
-  return await resp.json();
+  const data = await resp.json();
+  try {
+    const { logEvent } = await import('./analytics.js');
+    await logEvent({ type: 'tool:getAvailability', data: { params, result: data } });
+  } catch {}
+  return data;
 }
 
 export async function createAppointment(input: {
@@ -231,7 +241,12 @@ export async function createAppointment(input: {
     body: JSON.stringify(input),
   });
   if (!resp.ok) throw new Error(`book failed: ${resp.status}`);
-  return await resp.json();
+  const data = await resp.json();
+  try {
+    const { logEvent } = await import('./analytics.js');
+    await logEvent({ type: 'tool:createAppointment', data: { input, result: data } });
+  } catch {}
+  return data;
 }
 
 export async function cancelAppointment(input: { id: string; reason?: string }) {
@@ -241,13 +256,23 @@ export async function cancelAppointment(input: { id: string; reason?: string }) 
     body: JSON.stringify(input),
   });
   if (!resp.ok) throw new Error(`cancel failed: ${resp.status}`);
-  return await resp.json();
+  const data = await resp.json();
+  try {
+    const { logEvent } = await import('./analytics.js');
+    await logEvent({ type: 'tool:cancelAppointment', data: { input, result: data } });
+  } catch {}
+  return data;
 }
 
 export async function getOrderStatus(id: string) {
   const resp = await fetch(`${API_URL}/api/orders/${encodeURIComponent(id)}/status`);
   if (!resp.ok) throw new Error(`order_status failed: ${resp.status}`);
-  return await resp.json();
+  const data = await resp.json();
+  try {
+    const { logEvent } = await import('./analytics.js');
+    await logEvent({ type: 'tool:getOrderStatus', data: { id, result: data } });
+  } catch {}
+  return data;
 }
 
 // Integração com middleware.py (ETAPA 1 e 2) para seguir regras de logística, agenda e conversões
@@ -276,7 +301,12 @@ export async function aiScheduleStart(input: {
     }),
   });
   if (!resp.ok) throw new Error(`aiScheduleStart failed: ${resp.status}`);
-  return await resp.json();
+  const data = await resp.json();
+  try {
+    const { logEvent } = await import('./analytics.js');
+    await logEvent({ type: 'tool:aiScheduleStart', data: { input, result: data } });
+  } catch {}
+  return data;
 }
 
 export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhida: string }) {
@@ -293,5 +323,10 @@ export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhi
     }),
   });
   if (!resp.ok) throw new Error(`aiScheduleConfirm failed: ${resp.status}`);
-  return await resp.json();
+  const data = await resp.json();
+  try {
+    const { logEvent } = await import('./analytics.js');
+    await logEvent({ type: 'tool:aiScheduleConfirm', data: { input, result: data } });
+  } catch {}
+  return data;
 }
