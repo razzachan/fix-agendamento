@@ -338,14 +338,18 @@ export async function setupWAInboundAdapter() {
     try {
       const greeted = !!session?.state?.greeted;
       if (!greeted) {
-        // Se houver template 'greeting' configurado, use-o; caso contrário, use fallback curto
-        let greetingText = 'Olá, farei seu atendimento. Como posso ajudar?';
+        // Se houver template 'greeting' configurado, use-o; caso contrário, use fallback curto via Copy
+        let greetingText = '';
         try {
           const { getTemplates, renderTemplate } = await import('./botConfig.js');
           const templates = await getTemplates();
           const greeting = templates.find((t: any) => t.key === 'greeting');
           if (greeting?.content) greetingText = renderTemplate(greeting.content, {});
         } catch {}
+        if (!greetingText) {
+          const { getCopy } = await import('./copy.js');
+          greetingText = getCopy('greetingFallback');
+        }
         await waClient.sendText(from, greetingText);
         await logMessage(session.id, 'out', greetingText);
         const { setSessionState } = await import('./sessionStore.js');
