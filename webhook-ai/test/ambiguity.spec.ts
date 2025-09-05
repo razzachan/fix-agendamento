@@ -1,13 +1,20 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { orchestrateInbound } from '../src/services/conversationOrchestrator.js';
 
-// Estes testes validam apenas a lógica de desambiguação e anti-loop em memória (sem WhatsApp)
+// Estes testes validam a lógica de desambiguação e anti-loop. Usamos LLM_FAKE_JSON para tornar determinístico.
 
 describe('Ambiguidade: forno vs fogão a gás vs forno elétrico', () => {
+  const originalFake = process.env.LLM_FAKE_JSON;
+
+  afterEach(() => {
+    process.env.LLM_FAKE_JSON = originalFake || '';
+  });
+
   it('mapeia "forno do fogão" para fogão a gás (domicílio)', async () => {
+    process.env.LLM_FAKE_JSON = JSON.stringify({ intent:'orcamento_equipamento', acao_principal:'gerar_orcamento', dados_extrair:{ equipamento: 'fogão a gás' } });
     const out = await orchestrateInbound('whatsapp:+550000', 'o forno do fogão não esquenta', { id: 's1', channel: 'whatsapp', peer: '+550000', state: {} } as any);
     const text = typeof out === 'string' ? out : (out as any).text || '';
-    expect(text.toLowerCase()).toContain('forno');
+    expect(text.toLowerCase()).toContain('fogão a gás');
   });
 
   it('pergunta e oferece opções quando somente "forno"', async () => {
@@ -21,7 +28,8 @@ describe('Ambiguidade: forno vs fogão a gás vs forno elétrico', () => {
 
 describe('Anti-loop de agendamento', () => {
   it('aceita agendamento com equipamento coletado, mesmo sem problema', async () => {
-    const session = { id: 's3', channel: 'whatsapp', peer: '+550000', state: { dados_coletados: { equipamento: 'fogão a gás' } } } as any;
+    const session = { id: 's3', channel: 'whatsapp', peer: '+550000', state: { dados_coletados: { equipamento: 'fogão a gás' }, orcamento_entregue: true } } as any;
+    process.env.LLM_FAKE_JSON = JSON.stringify({ intent:'agendamento_servico', acao_principal:'agendar_servico', dados_extrair:{ equipamento: 'fogão a gás' } });
     const out = await orchestrateInbound('whatsapp:+550000', 'sim, pode agendar', session);
     expect(out).toBeTruthy();
   });

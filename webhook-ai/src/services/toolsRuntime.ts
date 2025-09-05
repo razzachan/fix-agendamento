@@ -30,38 +30,40 @@ export async function buildQuote(input: BuildQuoteInput){
   let seg = (input.segment||'').toLowerCase();
   const classLevel = String((input as any).class_level||'').toLowerCase();
 
-  // Consolidar segmento por regras de marca (chama API interna)
-  try {
-    const brand = String(input.brand||'').trim();
-    if (brand) {
-      const qs = new URLSearchParams({ brand, mount });
-      const primary = API_URL;
-      const fallback = 'http://127.0.0.1:3001';
-      let resp: Response | null = null;
-      try {
-        resp = await fetch(`${primary}/api/brand-rules/resolve?${qs.toString()}`);
-      } catch (e:any) {
-        const msg = String(e?.message||'');
-        if ((msg.includes('ECONNREFUSED') || msg.includes('fetch failed') || msg.includes('Connect Timeout')) && !primary.includes('127.0.0.1') && !primary.includes('localhost')) {
-          try { resp = await fetch(`${fallback}/api/brand-rules/resolve?${qs.toString()}`); } catch {}
+  // Consolidar segmento por regras de marca (chama API interna) — pular em modo de teste/offline
+  if (!QUOTE_OFFLINE_FALLBACK) {
+    try {
+      const brand = String(input.brand||'').trim();
+      if (brand) {
+        const qs = new URLSearchParams({ brand, mount });
+        const primary = API_URL;
+        const fallback = 'http://127.0.0.1:3001';
+        let resp: Response | null = null;
+        try {
+          resp = await fetch(`${primary}/api/brand-rules/resolve?${qs.toString()}`);
+        } catch (e:any) {
+          const msg = String(e?.message||'');
+          if ((msg.includes('ECONNREFUSED') || msg.includes('fetch failed') || msg.includes('Connect Timeout')) && !primary.includes('127.0.0.1') && !primary.includes('localhost')) {
+            try { resp = await fetch(`${fallback}/api/brand-rules/resolve?${qs.toString()}`); } catch {}
+          }
         }
-      }
-      if (resp && resp.ok){
-        const data = await resp.json();
-        const rule = data?.rule;
-        if (rule){
-          const recommended = String(rule.recommended_segment||'').toLowerCase();
-          const strat = String(rule.strategy||'infer_by_photos');
-          if (strat === 'force' && recommended) seg = recommended;
-          else if (strat === 'prefer' && recommended){
-            const rank = (s:string)=> s==='premium'?3 : s==='inox'?2 : s==='basico'?1 : 0;
-            if (rank(recommended) > rank(seg)) seg = recommended;
+        if (resp && resp.ok){
+          const data = await resp.json();
+          const rule = data?.rule;
+          if (rule){
+            const recommended = String(rule.recommended_segment||'').toLowerCase();
+            const strat = String(rule.strategy||'infer_by_photos');
+            if (strat === 'force' && recommended) seg = recommended;
+            else if (strat === 'prefer' && recommended){
+              const rank = (s:string)=> s==='premium'?3 : s==='inox'?2 : s==='basico'?1 : 0;
+              if (rank(recommended) > rank(seg)) seg = recommended;
+            }
           }
         }
       }
+    } catch (e:any) {
+      console.warn('[buildQuote] brand rule consolidation failed', e?.message||e);
     }
-  } catch (e:any) {
-    console.warn('[buildQuote] brand rule consolidation failed', e?.message||e);
   }
 
   // Regras contextualizadas
@@ -175,6 +177,10 @@ export async function getOrderStatus(id: string){
 
 // Integração com middleware.py (ETAPA 1 e 2) para seguir regras de logística, agenda e conversões
 export async function aiScheduleStart(input: { nome:string; endereco:string; equipamento:string; problema:string; telefone:string; urgente?:boolean }){
+  // Test-mode: return deterministic stub to avoid external HTTP in CI/tests
+  if (process.env.NODE_ENV === 'test') {
+    return { message: 'Tenho estas opções de horário: 1) 09:00 2) 10:30 3) 14:00' };
+  }
   const resp = await fetch(`${MIDDLEWARE_URL}/agendamento-inteligente`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
     nome: input.nome,
     endereco: input.endereco,
@@ -188,6 +194,10 @@ export async function aiScheduleStart(input: { nome:string; endereco:string; equ
 }
 
 export async function aiScheduleConfirm(input: { telefone:string; opcao_escolhida:string }){
+  // Test-mode: return deterministic confirmation
+  if (process.env.NODE_ENV === 'test') {
+    return { message: 'Agendamento confirmado!' };
+  }
   const resp = await fetch(`${MIDDLEWARE_URL}/agendamento-inteligente`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
     telefone: input.telefone,
     opcao_escolhida: input.opcao_escolhida

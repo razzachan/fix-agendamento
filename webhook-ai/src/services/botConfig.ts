@@ -1,6 +1,12 @@
 import { supabase } from './supabase.js';
 
+const USE_MOCK = (process.env.MOCK_SUPABASE === 'true');
+
 export async function getActiveBot() {
+  if (USE_MOCK) {
+    // Retorna um bot mínimo para testes, evitando chamadas reais ao Supabase
+    return { id: 'test-bot', blocks: [], updated_at: new Date().toISOString(), created_at: new Date().toISOString() } as any;
+  }
   // Busca a última configuração do bot (mais recente por updated_at/created_at)
   const { data, error } = await supabase
     .from('bot_configs')
@@ -17,6 +23,9 @@ export async function getActiveBot() {
 }
 
 export async function getTemplates() {
+  if (USE_MOCK) {
+    return [];
+  }
   const { data, error } = await supabase.from('bot_templates').select('*').eq('enabled', true);
   if (error) {
     console.error('[webhook-ai] templates load error', error.message);
