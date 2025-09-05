@@ -1,5 +1,8 @@
 # Fix Fogões - Sistema de Gestão de Assistência Técnica
 
+![Webhook AI CI](https://github.com/razzachan/fix-agendamento/actions/workflows/webhook-ai-ci.yml/badge.svg)
+
+
 🚀 **Deploy Automático Ativo** - Sistema configurado e funcionando!
 
 ## 🧪 TESTE DE DEPLOY AUTOMÁTICO
