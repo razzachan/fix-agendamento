@@ -24,6 +24,9 @@ jobs:
         run: npm ci
 
       - name: Run analysis
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node webhook-ai/scripts/analytics-report.mjs
 
       - name: Propose PR with copy tweaks
