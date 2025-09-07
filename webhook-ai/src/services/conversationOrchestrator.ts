@@ -3263,10 +3263,10 @@ async function generateAIQuoteResponse(quote: any, decision: any, dados: any): P
     // Ajuste: quando o equipamento for micro-ondas e houver indicação de bancada na mensagem ou estado,
     // preferir coleta + conserto (política da empresa)
     try {
-      const eq = String((session as any)?.state?.dados_coletados?.equipamento || '').toLowerCase();
-      const lastMsg = String((session as any)?.state?.last_raw_message || '').toLowerCase();
+      const eq = String((dados as any)?.equipamento || '').toLowerCase();
+      const lastMsg = String((dados as any)?.last_raw_message || '').toLowerCase();
       const isMicro = /micro[- ]?ondas|microondas/.test(eq);
-      const mentionsBancada = /bancada/.test(lastMsg) || !!(session as any)?._micro_bancada_hint;
+      const mentionsBancada = /bancada/.test(lastMsg) || !!(dados as any)?._micro_bancada_hint;
       if (isMicro && mentionsBancada) {
         return `${causasText}Coletamos, consertamos em bancada e devolvemos.
 
