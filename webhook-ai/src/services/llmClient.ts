@@ -21,6 +21,10 @@ export async function chatComplete(options: ChatOptions, messages: ChatMessage[]
     const out = process.env.LLM_FAKE_JSON;
     return typeof out === 'string' ? out : JSON.stringify(out);
   }
+  // Em ambiente de teste, evitar chamadas externas e retornar string vazia por padrão
+  if (process.env.NODE_ENV === 'test') {
+    return '';
+  }
   const provider = options.provider || 'openai';
   if (provider === 'anthropic') return anthropicComplete(options, messages);
   return openaiComplete(options, messages);
