@@ -9,6 +9,7 @@
     "start": "node dist/app.js",
     "test": "vitest run",
     "test:ci": "vitest run --coverage --silent",
+    "test:ci:c8": "vitest run --coverage.enabled --coverage.provider=c8 --coverage.reporter=text,json,lcov --silent",
     "lint": "eslint --config eslint.config.mjs \"src/**/*.{ts,js}\" \"test/**/*.ts\" --max-warnings=0",
     "format": "prettier --write \"src/**/*.{ts,js}\" \"test/**/*.ts\""
   },

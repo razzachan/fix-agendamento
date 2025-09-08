@@ -6,6 +6,11 @@ export default defineConfig({
     environment: 'node',
     hookTimeout: 20000,
     testTimeout: 20000,
+    coverage: {
+      provider: 'c8',
+      reporter: ['text', 'json', 'lcov'],
+      reportsDirectory: './coverage',
+    },
   },
 });
 
