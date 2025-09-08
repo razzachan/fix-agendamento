@@ -15,3 +15,8 @@ process.env.USE_AI_ROUTER = process.env.USE_AI_ROUTER || 'true';
 
 // API base for local calls in toolsRuntime
 process.env.API_URL = process.env.API_URL || 'http://127.0.0.1:3001';
+
+
+// Ensure WhatsApp client or any polling is not started in test env
+process.env.WA_HEADLESS = 'true';
+process.env.WA_DATA_PATH = process.env.WA_DATA_PATH || '""';
