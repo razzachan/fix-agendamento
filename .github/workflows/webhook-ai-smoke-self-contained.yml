@@ -1,14 +1,15 @@
 name: Webhook AI Smoke (self-contained)
 
 on:
-  schedule:
-    - cron: '0 6 * * *' # Daily 06:00 UTC
+  # Desativado por padrão para não interferir em PRs. Rode manualmente quando quiser.
   workflow_dispatch:
-  push:
-    branches: [ main, master ]
-    paths:
-      - 'webhook-ai/scripts/smoke-*.mjs'
-      - '.github/workflows/webhook-ai-smoke-self-contained.yml'
+  # schedule:
+  #   - cron: '0 6 * * *' # Daily 06:00 UTC
+  # push:
+  #   branches: [ main, master ]
+  #   paths:
+  #     - 'webhook-ai/scripts/smoke-*.mjs'
+  #     - '.github/workflows/webhook-ai-smoke-self-contained.yml'
 
 jobs:
   smoke:
@@ -69,13 +70,13 @@ jobs:
             sleep 1
           done
 
-      - name: Run smoke: orçamento
+      - name: "Run smoke: orçamento"
         env:
           API_URL: http://127.0.0.1:3100
           BOT_TOKEN: test-token
         run: node webhook-ai/scripts/smoke-orcamento.mjs
 
-      - name: Run smoke: agendamento
+      - name: "Run smoke: agendamento"
         env:
           API_URL: http://127.0.0.1:3100
           BOT_TOKEN: test-token
