@@ -49,7 +49,7 @@ jobs:
         working-directory: webhook-ai
 
       - name: Test (webhook-ai)
-        run: npm run test:ci:c8
+        run: npm run test:ci:v8
         working-directory: webhook-ai
 
       - name: Upload coverage artifact

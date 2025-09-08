@@ -9,7 +9,7 @@
     "start": "node dist/app.js",
     "test": "vitest run",
     "test:ci": "vitest run --coverage --silent",
-    "test:ci:c8": "vitest run --coverage.enabled --coverage.provider=c8 --coverage.reporter=text,json,lcov --silent",
+    "test:ci:v8": "vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=text,json,lcov --silent",
     "lint": "eslint --config eslint.config.mjs \"src/**/*.{ts,js}\" \"test/**/*.ts\" --max-warnings=0",
     "format": "prettier --write \"src/**/*.{ts,js}\" \"test/**/*.ts\""
   },
@@ -31,6 +31,7 @@
     "@types/supertest": "^2.0.16",
     "@typescript-eslint/eslint-plugin": "^8.42.0",
     "@typescript-eslint/parser": "^8.42.0",
+    "@vitest/coverage-v8": "^1.6.1",
     "eslint": "^9.35.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
