@@ -15,5 +15,6 @@ cmd = "node api/index.js"
 
 [variables]
 NPM_CONFIG_PACKAGE_MANAGER = "npm"
+NIXPACKS_NO_BUN = "1"
 
 
