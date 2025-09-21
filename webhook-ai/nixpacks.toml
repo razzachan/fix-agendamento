@@ -2,13 +2,13 @@
 node = "18"
 
 [phases.setup]
-nixPkgs = ["nodejs_18", "chromium", "nss", "freetype", "harfbuzz", "ca-certificates", "ttf-freefont", "fontconfig"]
+nixPkgs = ["nodejs_18", "chromium", "nss", "freetype", "harfbuzz", "ca-certificates", "ttf-freefont", "fontconfig", "glib", "gtk3", "libdrm", "xorg.libxcb", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libXrender", "xorg.libxshmfence", "xorg.libXi", "xorg.libXtst", "gdk-pixbuf", "cairo", "pango", "atk", "at-spi2-atk", "at-spi2-core", "cups", "dbus", "expat", "libxkbcommon", "nspr", "alsa-lib"]
 
 [phases.install]
 cmds = [
   "npm ci",
   "mkdir -p /usr/bin /app/.cache",
-  "echo 'Setting up Chromium for Railway deployment...'",
+  "echo 'Setting up Chromium and dependencies for Railway deployment...'",
   "CHROMIUM_PATH=$(find /nix/store -name chromium -type f -executable 2>/dev/null | head -1)",
   "echo \"Found Chromium at: $CHROMIUM_PATH\"",
   "if [ -n \"$CHROMIUM_PATH\" ]; then",
@@ -22,7 +22,9 @@ cmds = [
   "else",
   "  echo 'ERROR: Chromium not found in Nix store'",
   "  find /nix/store -name '*chrom*' -type f 2>/dev/null | head -10",
-  "fi"
+  "fi",
+  "echo 'Installing additional system libraries for Puppeteer...'",
+  "echo 'Libraries will be available via Nix packages'"
 ]
 
 [phases.build]
