@@ -464,7 +464,7 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 });
 
 app.listen(Number(env.PORT), '0.0.0.0', async () => {
-  console.log(`Webhook AI listening on :${env.PORT} - NOTES CORRECTION APPLIED`);
+  console.log(`Webhook AI listening on :${env.PORT} - CHROMIUM SYSTEM FIX APPLIED`);
 
   // Inicializar admin seed em background (não bloquear o servidor)
   runAdminSeedOnBoot().catch(e => console.warn('[ADMIN] Seed failed:', e));
