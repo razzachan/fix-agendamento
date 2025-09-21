@@ -501,10 +501,6 @@ export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhi
       }
     }
   }
-<<<<<<< HEAD
-=======
-  let data: any;
->>>>>>> origin/main
   try {
     data = await resp.json();
     try { console.log('[toolsRuntime] aiScheduleConfirm: response message=', typeof data?.message === 'string' ? data.message : '(no message)'); } catch {}
