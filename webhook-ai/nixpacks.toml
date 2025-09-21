@@ -2,12 +2,7 @@
 nixPkgs = ["nodejs_18", "chromium", "nss", "freetype", "freetype-dev", "harfbuzz", "ca-certificates", "ttf-freefont"]
 
 [phases.install]
-cmds = [
-  "npm ci",
-  "mkdir -p /usr/bin",
-  "find /nix/store -name chromium -type f -executable | head -1 | xargs -I {} ln -sf {} /usr/bin/chromium || true",
-  "chmod +x /usr/bin/chromium || true"
-]
+cmds = ["npm ci"]
 
 [phases.build]
 cmds = ["npm run build"]
@@ -17,4 +12,4 @@ cmd = "npm start"
 
 [variables]
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
-PUPPETEER_EXECUTABLE_PATH = "/usr/bin/chromium"
+PUPPETEER_EXECUTABLE_PATH = "chromium"
