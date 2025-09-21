@@ -1,13 +1,19 @@
+[providers]
+node = "18"
+
 [phases.setup]
 nixPkgs = ["nodejs_18"]
 
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["npm ci --legacy-peer-deps"]
 
 [phases.build]
 cmds = ["npm run build"]
 
 [start]
 cmd = "node api/index.js"
+
+[variables]
+NPM_CONFIG_PACKAGE_MANAGER = "npm"
 
 
