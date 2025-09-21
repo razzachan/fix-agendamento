@@ -1,0 +1,49 @@
+{
+  "peer": "553299910621@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 8,
+  "inCount": 4,
+  "outCount": 4,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:22:21.966567+00:00",
+      "body": "Olá! Este é o canal oficial da Claro.✅\n\nA sua linha está *temporariamente bloqueada.*\n\nPara reativar, basta fazer uma recarga de qualquer valor. Assim, seu número volta a funcionar normalmente."
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:22:22.895946+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:22:26.558402+00:00",
+      "body": "Desculpe, não entendi 😕\n\n✳ Para escolher um valor de recarga digite o número referente ao valor de recarga escolhido.\n\nO que prefere fazer?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:22:32.228981+00:00",
+      "body": "Olá! Sem problemas, estou aqui para ajudar. Como posso auxiliá-lo com seus equipamentos domésticos? Se você está tendo algum problema com fogões ou eletrodomésticos, por favor, me conte o que está acontecendo!"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:22:42.557597+00:00",
+      "body": "Você está com problemas técnicos em qual serviço?\n\n*1-* Claro Móvel 📱 \n*2-* Claro Tv 📺  \n*3-* Claro Residencial (NET) 🏠\n*4-* Claro Empresas (NET) 🏢\n*5-* Claro Box TV 🎬"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:22:43.467823+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:22:53.549573+00:00",
+      "body": "Recomendo usar o Fale Conosco para assistência:\n\nPara Claro Residencial NET, acesse:\nhttp://claro.com.br/falecomaclaroresidencial\n\nPara Claro TV, acesse:\nhttps://claro.com.br/mca\n\nPara Claro Móvel, acesse:\nhttps://claro.com.br/falecomaclaromovel"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:22:54.08217+00:00",
+      "body": "Desculpe, no momento não atendemos eletroportáteis (ex.: air fryer, cafeteira, liquidificador). Trabalhamos com fogões, fornos/cooktops, micro-ondas, geladeiras, lavadoras/lava e seca/secadoras, lava-louças e coifas. Posso ajudar com algum desses?"
+    }
+  ]
+}

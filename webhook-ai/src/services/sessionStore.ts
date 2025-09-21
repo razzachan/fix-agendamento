@@ -43,3 +43,22 @@ export async function logMessage(
 ) {
   await supabase.from('bot_messages').insert({ session_id, direction, body, meta: meta || null });
 }
+
+
+export async function resetSessionStateByPeer(channel: string, peer_id: string) {
+  // Zera somente o estado; mantém o registro da sessão
+  try {
+    const { data } = await supabase
+      .from('bot_sessions')
+      .select('id')
+      .eq('channel', channel)
+      .eq('peer_id', peer_id)
+      .single();
+    const id = (data as any)?.id;
+    if (id) {
+      await supabase.from('bot_sessions').update({ state: {} }).eq('id', id);
+    }
+  } catch (e) {
+    // ignora
+  }
+}

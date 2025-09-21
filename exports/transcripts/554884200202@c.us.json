@@ -1,0 +1,94 @@
+{
+  "peer": "554884200202@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 17,
+  "inCount": 8,
+  "outCount": 9,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T11:33:34.241588+00:00",
+      "body": ""
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T11:33:34.286272+00:00",
+      "body": "Oi bom dia meu formo estragou. Ele consul facilite"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T11:33:35.221838+00:00",
+      "body": "Perfeito! Pode descrever rapidamente o problema que está acontecendo?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T11:33:37.599681+00:00",
+      "body": "Olá! Como posso ajudar você hoje? Para te ajudar, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T11:34:00.00166+00:00",
+      "body": "Não liga"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T11:34:02.153725+00:00",
+      "body": "Olá! Para te ajudar, me diga qual é o equipamento e qual o problema. Assim, poderei orientá-lo sobre o melhor atendimento."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T11:35:33.328328+00:00",
+      "body": "Não acende luz não funciona nada"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T11:35:38.487022+00:00",
+      "body": "entendi: forno comercial — coletamos, diagnosticamos. Qual é a marca do equipamento?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T11:36:19.82513+00:00",
+      "body": "Consul  facilit"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T11:36:20.523174+00:00",
+      "body": "Pode me descrever o problema específico que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T11:38:00.039205+00:00",
+      "body": "Não liga"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T11:38:08.46228+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca Consul, problema \"não acende\".\n\nIsso pode ser problema de Eletrodo sujo ou desalinhado, que pode impedir a ignição adequada do forno., Termopar defeituoso, que pode não detectar a chama, levando ao bloqueio do fornecimento de gás., Válvula de gás obstruída, que pode restringir o fluxo de gás, impossibilitando a ignição do forno..\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T11:38:23.256437+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T11:38:30.524685+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca Consul, problema \"não acende\".\n\nIsso pode ser problema de Eletrodo sujo ou desalinhado, que pode impedir a faísca necessária para acender o forno., Termopar defeituoso, que pode não estar detectando a chama e, portanto, não permitindo a liberação de gás., Válvula de gás obstruída, que pode bloquear o fluxo de gás e impedir a ignição do forno..\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T11:38:30.96074+00:00",
+      "body": "Recebi a foto! Parece um forno de embutido. Se puder, me diga a marca e um breve descritivo do problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T11:39:45.754624+00:00",
+      "body": "Consul  facelite"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T11:39:46.515451+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, endereço completo com CEP, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    }
+  ]
+}

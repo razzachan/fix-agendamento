@@ -1,0 +1,89 @@
+{
+  "peer": "556399868583@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 16,
+  "inCount": 8,
+  "outCount": 8,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:29:16.642145+00:00",
+      "body": "Bom dia!!"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:29:17.116063+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:32:47.85293+00:00",
+      "body": "Não entendi?\nJá falei com alguém ontem. \nForno fischer infinity!"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:32:48.762145+00:00",
+      "body": "Perfeito! Pode descrever rapidamente o problema que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:33:24.579802+00:00",
+      "body": "Olha conversação de ontem!!"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:33:28.952199+00:00",
+      "body": "entendi: forno — coletamos, diagnosticamos. Pode me descrever o problema específico que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:34:04.935601+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:34:09.337159+00:00",
+      "body": "entendi: forno — coletamos, diagnosticamos. Pode me descrever o problema específico que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:34:57.696674+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:35:01.415882+00:00",
+      "body": "entendi: forno — coletamos, diagnosticamos. Pode me descrever o problema específico que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:26:53.789087+00:00",
+      "body": "O décima está ok\nOs outros dois que estão frouxos!!"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:26:54.021413+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:26:54.611464+00:00",
+      "body": "Perfeito! Pode descrever rapidamente o problema que está acontecendo?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:26:58.311561+00:00",
+      "body": "entendi: forno — coletamos, diagnosticamos. Pode me descrever o problema específico que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:27:28.130398+00:00",
+      "body": "Falar com atendente"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:27:28.928252+00:00",
+      "body": "Certo! Vou te transferir para um de nossos atendentes. Por favor, aguarde... \n\n*Bot pausado - aguardando atendimento humano*"
+    }
+  ]
+}

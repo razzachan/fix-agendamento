@@ -1,0 +1,149 @@
+{
+  "peer": "554891962111@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 28,
+  "inCount": 14,
+  "outCount": 14,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T20:50:42.390619+00:00",
+      "body": "Oi, vc consegue identificar o que esta sendo feito nessa foto?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T20:50:43.728487+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T20:51:26.977904+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T20:51:33.883764+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca consul, problema \"não está com força para lavar\".\n\nIsso pode ser problema de Correia ou motor com desgaste, Pressostato/nível com leitura incorreta, Resistência/condutos de secagem obstruídos.\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T20:51:37.708092+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca consul, problema \"não está com força para lavar\".\n\nIsso pode ser problema de Correia ou motor com desgaste, Pressostato/nível com leitura incorreta, Resistência/condutos de secagem obstruídos.\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T20:51:51.508041+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T20:51:57.580792+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca consul, problema \"não está com força para lavar\".\n\nIsso pode ser problema de Correia ou motor com desgaste, Pressostato/nível com leitura incorreta, Resistência/condutos de secagem obstruídos.\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T20:52:00.087283+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca consul, problema \"não está com força para lavar\".\n\nIsso pode ser problema de Correia ou motor com desgaste, Pressostato/nível com leitura incorreta, Resistência/condutos de secagem obstruídos.\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T01:25:11.183093+00:00",
+      "body": "oi preciso instalar uma lava louças"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T01:25:11.849469+00:00",
+      "body": "Perfeito! Sobre a elétrica: a voltagem é 127V ou 220V? Há tomada próxima (até ~1,5 m)?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T01:25:23.538624+00:00",
+      "body": "sim, a  hidráulica tem que plugar na pia da cozinha"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T01:25:24.155048+00:00",
+      "body": "Perfeito! Sobre a elétrica: a voltagem é 127V ou 220V? Há tomada próxima (até ~1,5 m)?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T05:01:14.350532+00:00",
+      "body": "oi preciso instalar uma lava louças"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T05:01:15.207774+00:00",
+      "body": "Perfeito! Sobre a elétrica: a voltagem é 127V ou 220V? Há tomada próxima (até ~1,5 m)?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T05:01:25.279503+00:00",
+      "body": "sim, a  hidráulica tem que plugar na pia da cozinha"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T05:01:25.968659+00:00",
+      "body": "Perfeito! Sobre a elétrica: a voltagem é 127V ou 220V? Há tomada próxima (até ~1,5 m)?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T06:33:14.518443+00:00",
+      "body": "oi preciso instalar uma lava louças"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T06:33:15.20138+00:00",
+      "body": "Perfeito! Sobre a elétrica: a voltagem é 127V ou 220V? Há tomada próxima (até ~1,5 m)?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T06:33:18.493634+00:00",
+      "body": "sim"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T06:46:01.088894+00:00",
+      "body": "sim"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T06:46:01.857421+00:00",
+      "body": "Perfeito! Sobre a elétrica: a voltagem é 127V ou 220V? Há tomada próxima (até ~1,5 m)?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T06:46:08.614325+00:00",
+      "body": "é sim"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T06:46:09.2342+00:00",
+      "body": "Perfeito! Sobre a elétrica: a voltagem é 127V ou 220V? Há tomada próxima (até ~1,5 m)?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T07:11:58.70922+00:00",
+      "body": "sim"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T07:11:59.4977+00:00",
+      "body": "Perfeito! Sobre a elétrica: a voltagem é 127V ou 220V? Há tomada próxima (até ~1,5 m)?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T07:12:08.268753+00:00",
+      "body": "gostaria de instalar meu fogao"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T07:12:08.915424+00:00",
+      "body": "Perfeito! Sobre a elétrica: a voltagem é 127V ou 220V? Há tomada próxima (até ~1,5 m)?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T07:12:15.986431+00:00",
+      "body": "sim"
+    }
+  ]
+}

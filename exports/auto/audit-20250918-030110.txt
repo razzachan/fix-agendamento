@@ -1,0 +1,179 @@
+AutoAudit @ 2025-09-18T06:01:10.582Z
+SINCE: 2025-09-17T07:00:00-03:00
+THRESHOLD: 8
+
+
+===== findDoubleReplies (code 0) =====
+🔎 Buscando double replies desde 2025-09-17T07:00:00-03:00
+
+===== DOUBLE REPLIES =====
+Peers com ocorrências: 20
+Total de ocorrências: 27
+
+📱 554799400601@c.us — ocorrências: 1
+  • IN 2025-09-17 10:38:55.138 UTC  Bom dia
+    OUT 2025-09-17 10:38:55.660 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 10:38:58.568 UTC  Olá! Como posso te ajudar hoje? Se você tiver um problema com um fogão ou eletrodoméstico, me diga qual é o equipamento e qual o problema. E
+
+📱 554891059577@c.us — ocorrências: 1
+  • IN 2025-09-17 10:44:47.695 UTC  
+    OUT 2025-09-17 10:44:48.213 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 10:44:50.328 UTC  Olá! Como posso te ajudar hoje? Se você tiver um problema com um fogão ou eletrodoméstico, me diga qual é o equipamento e qual o problema.
+
+📱 554884200202@c.us — ocorrências: 2
+  • IN 2025-09-17 11:33:34.286 UTC  Oi bom dia meu formo estragou. Ele consul facilite
+    OUT 2025-09-17 11:33:35.221 UTC  Perfeito! Pode descrever rapidamente o problema que está acontecendo?
+    OUT 2025-09-17 11:33:37.599 UTC  Olá! Como posso ajudar você hoje? Para te ajudar, me diga qual é o equipamento e qual o problema.
+  • IN 2025-09-17 11:38:23.256 UTC  
+    OUT 2025-09-17 11:38:30.524 UTC  Olha, usando os dados que já tenho aqui: marca Consul, problema "não acende".
+
+Isso pode ser problema de Eletrodo sujo ou desalinhado, que p
+    OUT 2025-09-17 11:38:30.960 UTC  Recebi a foto! Parece um forno de embutido. Se puder, me diga a marca e um breve descritivo do problema.
+
+📱 554884024094@c.us — ocorrências: 1
+  • IN 2025-09-17 12:08:09.150 UTC  
+    OUT 2025-09-17 12:08:12.064 UTC  Olá! Como posso ajudar você hoje? Se precisar de assistência técnica para fogões ou eletrodomésticos, por favor, me diga qual é o equipament
+    OUT 2025-09-17 12:08:13.653 UTC  Perfeito! Pode descrever rapidamente o problema que está acontecendo?
+
+📱 554885013670@c.us — ocorrências: 3
+  • IN 2025-09-17 12:40:26.184 UTC  Bom dia. Estou precisando substituir as bocas do fogão Fischer. Quanto custa?
+    OUT 2025-09-17 12:40:26.990 UTC  Perfeito! Pode descrever rapidamente o problema que está acontecendo?
+    OUT 2025-09-17 12:40:27.810 UTC  Olá! Como posso te ajudar hoje? Se você tiver algum problema com um eletrodoméstico, me diga qual é o equipamento e qual o problema. Estou a
+  • IN 2025-09-17 12:40:41.799 UTC  
+    OUT 2025-09-17 12:40:48.340 UTC  Olá! Como você está? Estou aqui para ajudar com seus equipamentos domésticos. Em que posso te ajudar hoje?
+    OUT 2025-09-17 12:40:49.402 UTC  Recebi a foto! Parece um forno de embutido. Se puder, me diga a marca e um breve descritivo do problema.
+  • IN 2025-09-17 12:41:07.585 UTC  
+    OUT 2025-09-17 12:41:12.051 UTC  entendi: fogão — coletamos, diagnosticamos. Pode me descrever o problema específico que está acontecendo?
+    OUT 2025-09-17 12:41:13.338 UTC  Recebi a foto! Parece um fogão de embutido. Se puder, me diga a marca e um breve descritivo do problema.
+
+📱 554896211980@c.us — ocorrências: 1
+  • IN 2025-09-17 13:13:48.080 UTC  
+    OUT 2025-09-17 13:13:48.630 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 13:13:50.564 UTC  Olá! Como posso ajudar você hoje? Para te ajudar, me diga qual é o equipamento e qual o problema.
+
+📱 554888258584@c.us — ocorrências: 1
+  • IN 2025-09-17 13:21:15.108 UTC  Ola
+    OUT 2025-09-17 13:21:15.623 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 13:21:16.941 UTC  Olá! Como posso ajudar você hoje? Para te ajudar, me diga qual é o equipamento e qual o problema.
+
+📱 556399868583@c.us — ocorrências: 1
+  • IN 2025-09-17 14:26:54.021 UTC  
+    OUT 2025-09-17 14:26:54.611 UTC  Perfeito! Pode descrever rapidamente o problema que está acontecendo?
+    OUT 2025-09-17 14:26:58.311 UTC  entendi: forno — coletamos, diagnosticamos. Pode me descrever o problema específico que está acontecendo?
+
+📱 554999055640@c.us — ocorrências: 1
+  • IN 2025-09-17 13:45:23.123 UTC  Bom dia
+    OUT 2025-09-17 13:45:23.636 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 13:45:25.104 UTC  Olá! Como posso te ajudar hoje? Se você tiver um problema com algum eletrodoméstico, me diga qual é o equipamento e qual o problema.
+
+📱 554884313297@c.us — ocorrências: 2
+  • IN 2025-09-17 14:01:12.207 UTC  Ola
+    OUT 2025-09-17 14:01:12.900 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 14:01:14.372 UTC  Olá! Como posso ajudá-lo hoje? Para te ajudar, me diga qual é o equipamento e qual o problema.
+  • IN 2025-09-17 14:01:41.458 UTC  Rua Capitão Euclides de Castro 308
+    OUT 2025-09-17 14:01:41.585 UTC  Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?
+    OUT 2025-09-17 14:01:42.832 UTC  Olá! Como posso ajudar você hoje? Para te ajudar, me diga qual é o equipamento e qual o problema.
+    OUT 2025-09-17 14:01:43.270 UTC  Olá! Como posso te ajudar hoje? Se precisar de assistência técnica, por favor, me diga qual é o equipamento e qual o problema que você está 
+    OUT 2025-09-17 14:01:45.791 UTC  entendi: fogão — coletamos, diagnosticamos. Antes do orçamento: qual é a marca do equipamento e qual é o problema específico?
+    OUT 2025-09-17 14:01:47.013 UTC  Recebi a foto! Parece um fogão de bancada. Se puder, me diga a marca e um breve descritivo do problema.
+    OUT 2025-09-17 14:01:47.370 UTC  Recebi a foto! Parece um fogão de bancada. Se puder, me diga a marca e um breve descritivo do problema.
+
+📱 554796287418@c.us — ocorrências: 1
+  • IN 2025-09-17 14:05:56.960 UTC  Oi bom dia 
+Moro em Itapema 
+Bairro Morretes
+Tenho um fogão que suporte das bocas ( cano que segura ) 
+Precisa de rebite que caiu e fazer um
+    OUT 2025-09-17 14:05:57.801 UTC  Perfeito! Pode descrever rapidamente o problema que está acontecendo?
+    OUT 2025-09-17 14:05:58.987 UTC  Olá! Como posso ajudá-lo hoje? Se você tiver um problema com algum equipamento, me diga qual é e qual o problema para que possamos encontrar
+
+📱 554899815706@c.us — ocorrências: 2
+  • IN 2025-09-17 14:23:59.118 UTC  Bom dia
+    OUT 2025-09-17 14:23:59.665 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 14:24:01.018 UTC  Olá! Como posso ajudá-lo hoje? Se precisar de assistência com um fogão ou eletrodoméstico, por favor, me diga qual é o equipamento e qual o 
+  • IN 2025-09-17 14:25:19.099 UTC  
+    OUT 2025-09-17 14:25:22.171 UTC  Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?
+    OUT 2025-09-17 14:25:22.763 UTC  Certo! Qual é a marca do seu micro-ondas?
+
+📱 554891943031@c.us — ocorrências: 1
+  • IN 2025-09-17 15:19:34.256 UTC  Ola
+    OUT 2025-09-17 15:19:34.770 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 15:19:36.796 UTC  Olá! Como posso ajudá-lo hoje? Para te ajudar, me diga qual é o equipamento e qual o problema.
+
+📱 554896810020@c.us — ocorrências: 1
+  • IN 2025-09-17 15:28:44.288 UTC  Boa tarde
+    OUT 2025-09-17 15:28:45.097 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 15:28:46.564 UTC  Olá! Como posso te ajudar hoje? Se precisar de assistência técnica para algum eletrodoméstico, me diga qual é o equipamento e qual o problem
+
+📱 554791345327@c.us — ocorrências: 2
+  • IN 2025-09-17 16:05:11.637 UTC  Boa tarde 
+Vcs consertam esse tipo de adega ?
+    OUT 2025-09-17 16:05:12.437 UTC  Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?
+    OUT 2025-09-17 16:05:13.209 UTC  Olá! Como posso ajudá-lo hoje? Para te ajudar, me diga qual é o equipamento e qual o problema.
+  • IN 2025-09-17 16:05:31.217 UTC  Está vazando água marrom por trás dela
+    OUT 2025-09-17 16:05:33.245 UTC  Olá! Como posso te ajudar hoje? Se precisar de assistência técnica, me diga qual é o equipamento e qual o problema.
+    OUT 2025-09-17 16:05:35.741 UTC  entendi: geladeira — coletamos, diagnosticamos. Qual é a marca do equipamento?
+    OUT 2025-09-17 16:05:39.077 UTC  Recebi a foto! Parece um adega. Se puder, me diga a marca e um breve descritivo do problema.
+
+📱 554891239622@c.us — ocorrências: 1
+  • IN 2025-09-17 16:23:23.286 UTC  Boa tarde
+    OUT 2025-09-17 16:23:23.738 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 16:23:25.512 UTC  Olá! Como posso te ajudar hoje? Se precisar de assistência técnica, me diga qual é o equipamento e qual o problema que você está enfrentando
+
+📱 554891749304@c.us — ocorrências: 1
+  • IN 2025-09-17 17:10:43.703 UTC  
+    OUT 2025-09-17 17:10:44.420 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 17:10:47.003 UTC  Olá! Como posso ajudar você hoje? Se precisar de assistência técnica, me diga qual é o equipamento e qual o problema que você está enfrentan
+
+📱 554891962111@c.us — ocorrências: 2
+  • IN 2025-09-17 20:51:26.977 UTC  
+    OUT 2025-09-17 20:51:33.883 UTC  Olha, usando os dados que já tenho aqui: marca consul, problema "não está com força para lavar".
+
+Isso pode ser problema de Correia ou motor
+    OUT 2025-09-17 20:51:37.708 UTC  Olha, usando os dados que já tenho aqui: marca consul, problema "não está com força para lavar".
+
+Isso pode ser problema de Correia ou motor
+  • IN 2025-09-17 20:51:51.508 UTC  
+    OUT 2025-09-17 20:51:57.580 UTC  Olha, usando os dados que já tenho aqui: marca consul, problema "não está com força para lavar".
+
+Isso pode ser problema de Correia ou motor
+    OUT 2025-09-17 20:52:00.087 UTC  Olha, usando os dados que já tenho aqui: marca consul, problema "não está com força para lavar".
+
+Isso pode ser problema de Correia ou motor
+
+📱 554898215918@c.us — ocorrências: 1
+  • IN 2025-09-17 20:58:29.182 UTC  Olá
+    OUT 2025-09-17 20:58:29.644 UTC  Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?
+    OUT 2025-09-17 20:58:34.385 UTC  Olá! Como posso ajudá-lo hoje? Se você tiver um problema com um fogão ou eletrodoméstico, por favor, me diga qual é o equipamento e qual o p
+
+📱 554899991916@c.us — ocorrências: 1
+  • IN 2025-09-17 21:30:39.719 UTC  instalação do aparelho
+    OUT 2025-09-17 21:30:40.383 UTC  Obrigado! Agora preciso de: nome completo, endereço completo com CEP, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/ca
+    OUT 2025-09-17 21:30:45.756 UTC  Legal! Para a instalação, preciso de: equipamento, tipo (embutido ou bancada), local exato de instalação, voltagem (127V/220V), distância do
+
+===== auditWhatsAppLogs (code 0) =====
+🔎 Auditando conversas WhatsApp desde 2025-09-17T07:00:00-03:00 (gaps > 8 min)
+
+===== RESUMO =====
+Peers auditados: 35
+Gaps detectados: 3
+Loops detectados: 0
+
+📱 554884139020@c.us — msgs=5 | gaps=1 | loops=0
+  ⚠️ Gap 1007 min  | in=2025-09-17 13:14:25.893 UTC  -> out=—
+     in:  .
+
+📱 5511914174548@c.us — msgs=5 | gaps=1 | loops=0
+  ⚠️ Gap 546 min  | in=2025-09-17 20:54:53.844 UTC  -> out=—
+     in:  eu to orçando a visita somente, por ora, obrigado
+
+📱 554899991916@c.us — msgs=28 | gaps=1 | loops=0
+  ⚠️ Gap 486 min  | in=2025-09-17 21:55:38.586 UTC  -> out=—
+     in:  Show, vou estar por aqui, qualquer coisa é só avisar
+
+===== summarizeWhatsAppLogs (code 0) =====
+📊 Resumindo conversas WhatsApp desde 2025-09-17T07:00:00-03:00
+✅ Summary salvo:
+- CSV: C:\Users\akrom\OneDrive\Área de Trabalho\eletro-fix-hub-pro-main2\exports\whatsapp_summary_2025-09-17T070000-0300.csv
+- JSON: C:\Users\akrom\OneDrive\Área de Trabalho\eletro-fix-hub-pro-main2\exports\whatsapp_summary_2025-09-17T070000-0300.json
+- Transcripts: C:\Users\akrom\OneDrive\Área de Trabalho\eletro-fix-hub-pro-main2\exports\transcripts (35 arquivos)

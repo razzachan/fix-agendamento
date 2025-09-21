@@ -77,12 +77,16 @@ function makeMock() {
 }
 
 let supabaseImpl: any;
-if (useMock) {
+const envUrl = process.env.SUPABASE_URL;
+const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (useMock || !envUrl || !envKey) {
+  if (!useMock) {
+    console.warn('[SUPABASE] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Using mock client.');
+  }
   supabaseImpl = makeMock();
 } else {
-  const url = process.env.SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  supabaseImpl = createClient(url, key, { auth: { persistSession: false } });
+  supabaseImpl = createClient(envUrl, envKey, { auth: { persistSession: false } });
 }
 
 export const supabase = supabaseImpl;

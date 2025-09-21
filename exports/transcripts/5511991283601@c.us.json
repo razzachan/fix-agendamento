@@ -1,0 +1,59 @@
+{
+  "peer": "5511991283601@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 10,
+  "inCount": 5,
+  "outCount": 5,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T12:40:06.610336+00:00",
+      "body": "Ainda estou esperando a NF"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T12:40:10.666133+00:00",
+      "body": "Posso te ajudar com orçamento, agendamento ou status. Qual prefere?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T12:45:44.409379+00:00",
+      "body": "Preciso da nota fiscal de um serviço já realizado"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T12:45:45.296096+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:16:19.342456+00:00",
+      "body": "NF"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:16:21.598193+00:00",
+      "body": "Olá! Como posso ajudar você hoje? Para te ajudar, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T16:52:40.028699+00:00",
+      "body": "NF"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T16:52:43.907327+00:00",
+      "body": "Olá! Como posso te ajudar hoje? Para te ajudar, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T16:53:03.152343+00:00",
+      "body": "NF"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T16:53:03.957368+00:00",
+      "body": "Vejo que talvez eu não esteja conseguindo te ajudar da melhor forma. Gostaria de falar com um de nossos atendentes? Digite \"quero falar com humano\" se preferir. 😊\n\nOu, se for sobre equipamentos domésticos, me diga: qual é o equipamento e qual o problema?"
+    }
+  ]
+}

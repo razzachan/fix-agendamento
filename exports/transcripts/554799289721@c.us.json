@@ -1,0 +1,74 @@
+{
+  "peer": "554799289721@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 13,
+  "inCount": 7,
+  "outCount": 6,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:22:29.077281+00:00",
+      "body": "Ol"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:22:31.523945+00:00",
+      "body": "Ola"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:22:32.001199+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:22:35.631516+00:00",
+      "body": "Algum retorno?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:22:38.213757+00:00",
+      "body": "Estamos verificando seu pedido. Por favor, aguarde um momento enquanto buscamos as informações necessárias."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:38:28.674223+00:00",
+      "body": "Certo"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:38:32.217652+00:00",
+      "body": "Antes de agendarmos, vou te passar o valor e as possíveis causas para alinharmos. Pode me confirmar a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:39:06.122484+00:00",
+      "body": "Troca da bomba, higienização interna e conserto amassado da porta."
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:39:10.263177+00:00",
+      "body": "entendi: lava-louças — coletamos, diagnosticamos. Qual é a marca do equipamento?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:39:30.146963+00:00",
+      "body": "Ok. Assim que estiver pronta me avise."
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:39:33.591092+00:00",
+      "body": "Assim que a lava-louças estiver pronta, entraremos em contato para avisar. Agradecemos pela sua paciência!"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:39:48.1436+00:00",
+      "body": "Gostaria de agendar pra sábado de manhã"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:39:52.169263+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, endereço completo com CEP, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    }
+  ]
+}

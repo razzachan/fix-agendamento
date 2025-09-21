@@ -30,7 +30,8 @@ const SERVICES = {
   },
   'WEB': {
     command: 'npm',
-    args: ['run', 'dev:frontend'],
+    // Força Vite a servir na rede (LAN) e na porta certa
+    args: ['run', 'dev:frontend', '--', '--host', '0.0.0.0', '--port', '8082'],
     cwd: process.cwd(),
     port: 8082,
     color: '\x1b[36m', // Ciano
@@ -38,11 +39,12 @@ const SERVICES = {
   },
   'WA': {
     command: 'npm',
-    args: ['run', 'dev'],
+    // Habilita modo watch para reiniciar automaticamente o Webhook-AI ao editar arquivos
+    args: ['run', 'dev', '--', '--watch'],
     cwd: path.join(process.cwd(), 'webhook-ai'),
     port: 3100,
     color: '\x1b[35m', // Magenta
-    description: 'WhatsApp AI Bot'
+    description: 'WhatsApp AI Bot (watch)'
   },
   'PY': {
     command: 'python',
@@ -64,6 +66,8 @@ const SERVICES = {
 
 const PORTS_TO_KILL = [8082, 3000, 3001, 3100, 8000, 3002];
 const RESET = '\x1b[0m';
+
+let SHUTTING_DOWN = false;
 
 function log(service, message, isError = false) {
   const color = SERVICES[service]?.color || '\x1b[37m';
@@ -156,10 +160,19 @@ function startService(serviceName) {
 
   log(serviceName, `Iniciando ${service.description} na porta ${service.port}...`);
 
+  const envOverrides = {};
+  // Garantir que o Webhook AI aponte para o middleware local na porta 8000
+  if (serviceName === 'WA') {
+    envOverrides.MIDDLEWARE_URL = 'http://127.0.0.1:8000';
+    // Garantir bind na rede para acesso pelo celular (QR/proxy)
+    envOverrides.PORT = String(service.port);
+    envOverrides.HOST = '0.0.0.0';
+  }
   const child = spawn(service.command, service.args, {
     cwd: service.cwd,
     stdio: ['ignore', 'pipe', 'pipe'],
-    shell: os.platform() === 'win32'
+    shell: os.platform() === 'win32',
+    env: { ...process.env, ...envOverrides }
   });
 
   // Capturar stdout
@@ -192,6 +205,16 @@ function startService(serviceName) {
 
 // Função principal
 function main() {
+  // Detectar IP de rede (LAN)
+  const ifaces = os.networkInterfaces();
+  let lanIp = null;
+  for (const name of Object.keys(ifaces)) {
+    for (const ni of ifaces[name] || []) {
+      if (ni.family === 'IPv4' && !ni.internal) { lanIp = ni.address; break; }
+    }
+    if (lanIp) break;
+  }
+
   console.log(`
 🚀 ===============================================
    FIX FOGÕES - DESENVOLVIMENTO COMPLETO
@@ -202,13 +225,20 @@ ${Object.entries(SERVICES).map(([name, service]) =>
   `   ${service.color}${name}${RESET}: ${service.description} (porta ${service.port})`
 ).join('\n')}
 
-🌐 URLS DE ACESSO:
-   Frontend: http://localhost:8082
-   API: http://localhost:3001
-   WhatsApp AI: http://localhost:3100
-   Middleware: http://localhost:8000
-   Thermal Print: http://localhost:3002
-
+🌐 URLS DE ACESSO (LOCAL):
+   Frontend:  http://localhost:8082
+   API:       http://localhost:3001
+   WhatsApp:  http://localhost:3100
+   Middleware:http://localhost:8000
+   Thermal:   http://localhost:3002
+${lanIp ? `
+🌐 URLS DE ACESSO (REDE):
+   Frontend:  http://${lanIp}:8082
+   API:       http://${lanIp}:3001
+   WhatsApp:  http://${lanIp}:3100
+   Middleware:http://${lanIp}:8000
+   Thermal:   http://${lanIp}:3002
+` : ''}
 ===============================================
 `);
 
@@ -236,11 +266,14 @@ ${Object.entries(SERVICES).map(([name, service]) =>
         continue;
       }
       processes[serviceName] = startService(serviceName);
+
+
     }
 
     // 6. Tratar sinais de interrupção
     process.on('SIGINT', () => {
       logSystem('Recebido SIGINT, encerrando todos os serviços...');
+      SHUTTING_DOWN = true;
       Object.entries(processes).forEach(([name, proc]) => {
         if (proc && !proc.killed) {
           log(name, 'Encerrando...');
@@ -256,10 +289,72 @@ ${Object.entries(SERVICES).map(([name, service]) =>
 
     process.on('SIGTERM', () => {
       logSystem('Recebido SIGTERM, encerrando...');
+      SHUTTING_DOWN = true;
       process.exit(0);
     });
 
     logSystem('Todos os serviços iniciados! Pressione Ctrl+C para parar.');
+
+	    // 7. Health-checks de rede aps subir (logs amigveis)
+	    try {
+
+	    // Respawn automático do WhatsApp Bot se o processo sair (ex.: /restart)
+	    function attachRespawn(serviceName) {
+	      if (serviceName !== 'WA') return;
+	      if (!processes[serviceName]) return;
+	      const delayMs = 1200;
+	      processes[serviceName].on('close', async (code) => {
+	        if (SHUTTING_DOWN) return; // não respawn durante shutdown
+	        log(serviceName, `Processo saiu (código ${code}). Respawn em ${delayMs}ms...`);
+	        setTimeout(async () => {
+	          try {
+	            const free = await isPortFree(SERVICES[serviceName].port);
+	            if (!free) {
+	              log(serviceName, `Porta ${SERVICES[serviceName].port} ocupada, abortando respawn.`, true);
+	              return;
+	            }
+	            processes[serviceName] = startService(serviceName);
+	            // reanexar para próximos exits
+	            attachRespawn(serviceName);
+	          } catch (e) {
+	            log(serviceName, `Falha ao respawn: ${e.message || e}`, true);
+	          }
+	        }, delayMs);
+	      });
+	    }
+	    // Habilita respawn para WA (apenas uma vez, fora do laço)
+	    attachRespawn('WA');
+
+	      const http = require('http');
+	      const check = (url) => new Promise((resolve) => {
+	        const t0 = Date.now();
+	        const req = http.get(url, { timeout: 3000 }, (res) => {
+	          res.resume();
+	          const dt = Date.now() - t0;
+	          logSystem(`HEALTH ${url} -> ${res.statusCode} (${dt}ms)`);
+	          resolve();
+	        });
+	        req.on('error', (e) => { logSystem(`HEALTH ${url} -> ERROR ${e.code || e.message}`); resolve(); });
+	        req.on('timeout', () => { req.destroy(); logSystem(`HEALTH ${url} -> TIMEOUT`); resolve(); });
+	      });
+	      setTimeout(async () => {
+	        const urls = [
+	          'http://localhost:3100/health',
+	          'http://localhost:8000/docs',
+	          'http://localhost:3001/health',
+	          'http://localhost:8082',
+	        ];
+	        if (lanIp) {
+	          urls.push(`http://${lanIp}:3100/health`);
+	          urls.push(`http://${lanIp}:3100/`);
+	          urls.push(`http://${lanIp}:3001/health`);
+	          urls.push(`http://${lanIp}:8082/`);
+	          urls.push(`http://${lanIp}:8000/docs`);
+	        }
+	        for (const u of urls) { await check(u); }
+	      }, 4000);
+	    } catch {}
+
 
   }, 2000);
 }

@@ -1,7 +1,7 @@
 import 'dotenv/config'
 
 async function main(){
-  const api = process.env.API_URL || 'http://localhost:3000'
+  const api = process.env.API_URL || 'http://localhost:3001'
   const date = new Date().toISOString().slice(0,10)
   const res = await fetch(`${api}/api/bot/tools/getAvailability`, {
     method: 'POST', headers: {'Content-Type':'application/json', 'x-bot-token': process.env.BOT_TOKEN || ''},

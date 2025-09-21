@@ -113,3 +113,36 @@ export function buildSystemPrompt(
   );
   return parts.join('\n\n');
 }
+
+
+// Transcrição de áudio (Whisper / modelo configurável)
+export async function transcribeAudio(params: { mimeType: string; base64: string; model?: string }): Promise<string> {
+  // Em testes, não chama API externa
+  if (process.env.NODE_ENV === 'test') return '';
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY not set');
+  const model = params.model || process.env.LLM_TRANSCRIBE_MODEL || 'whisper-1';
+
+  const FormDataCtor: any = (global as any).FormData;
+  const BlobCtor: any = (global as any).Blob;
+  if (!FormDataCtor || !BlobCtor) throw new Error('FormData/Blob não disponíveis no runtime');
+
+  const form = new FormDataCtor();
+  const buffer = Buffer.from(params.base64, 'base64');
+  const blob = new BlobCtor([buffer], { type: params.mimeType || 'audio/ogg' });
+  const ext = (params.mimeType?.split('/')?.[1] || 'ogg').split(';')[0];
+  form.append('file', blob, `audio.${ext}`);
+  form.append('model', model);
+
+  const resp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form as any,
+  });
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`OpenAI transcription error ${resp.status}: ${txt}`);
+  }
+  const json: any = await resp.json();
+  return json?.text || '';
+}

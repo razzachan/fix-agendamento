@@ -1,0 +1,19 @@
+{
+  "peer": "554884462566@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 2,
+  "inCount": 1,
+  "outCount": 1,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T21:05:02.349141+00:00",
+      "body": "Já estou em casa"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T21:05:10.181457+00:00",
+      "body": "Olá! Que bom saber que você já está em casa. Como posso ajudar com seus equipamentos domésticos hoje?"
+    }
+  ]
+}

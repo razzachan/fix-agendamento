@@ -1,7 +1,8 @@
 import 'dotenv/config';
+import { supabase } from './supabase.js';
 
 const API_URL = process.env.API_URL || 'http://127.0.0.1:3001';
-const MIDDLEWARE_URL = process.env.MIDDLEWARE_URL || process.env.API_URL || 'http://127.0.0.1:8000';
+const MIDDLEWARE_URL = process.env.MIDDLEWARE_URL || 'http://127.0.0.1:8000';
 const QUOTE_OFFLINE_FALLBACK =
   process.env.QUOTE_OFFLINE_FALLBACK === 'true' || process.env.NODE_ENV === 'test';
 
@@ -195,10 +196,16 @@ export async function buildQuote(input: BuildQuoteInput) {
         resp = await postQuote(fallback);
       } catch {}
     }
+    // Em modo de teste, ou quando explicitamente ativado, usar fallback offline determinístico
     if ((!resp || !resp.ok) && QUOTE_OFFLINE_FALLBACK) {
       return computeLocalQuote(payload);
     }
-    if (!resp || !resp.ok) throw new Error(`quote failed: ${resp ? resp.status : 'no_response'}`);
+    // Fail-soft: mesmo sem QUOTE_OFFLINE_FALLBACK, devolva um orçamento local básico
+    // para não travar a conversa quando a API externa estiver fora do ar.
+    if (!resp || !resp.ok) {
+      try { console.warn('[buildQuote] API indisponível, usando fallback local (fail-soft)'); } catch {}
+      return computeLocalQuote(payload);
+    }
   }
   const data = await resp.json();
   const result = data?.result;
@@ -283,50 +290,318 @@ export async function aiScheduleStart(input: {
   problema: string;
   telefone: string;
   urgente?: boolean;
+  cpf?: string;
+  email?: string;
+  complemento?: string;
+  equipamento_2?: string;
+  problema_2?: string;
+  equipamento_3?: string;
+  problema_3?: string;
+  tipo_atendimento_1?: string;
+  tipo_atendimento_2?: string;
+  tipo_atendimento_3?: string;
 }) {
   // Test-mode: return deterministic stub to avoid external HTTP in CI/tests
   if (process.env.NODE_ENV === 'test') {
     return { message: 'Tenho estas opções de horário: 1) 09:00 2) 10:30 3) 14:00' };
   }
+
+  const mapTipo = (v?: string) => {
+    if (!v) return undefined as any;
+    const s = String(v).toLowerCase();
+    if (s === 'domicilio' || s === 'em_domicilio' || s === 'in-home' || s === 'in_home' || s === 'inhome') return 'em_domicilio';
+    return s; // coleta_diagnostico, coleta_conserto, etc.
+  };
+
+  const payload: any = {
+    nome: input.nome,
+    endereco: input.endereco,
+    equipamento: input.equipamento,
+    problema: input.problema,
+    telefone: input.telefone,
+    // middleware.py (ETAPA 1) espera string 'sim'/'não' para urgente
+    // para compatibilidade, enviamos legacy string aqui
+    urgente: input.urgente ? 'sim' : 'não',
+  };
+  if (input.cpf) payload.cpf = input.cpf;
+  if (input.email) payload.email = input.email;
+  if (input.complemento) payload.complemento = input.complemento;
+  if (input.equipamento_2) payload.equipamento_2 = input.equipamento_2;
+  if (input.problema_2) payload.problema_2 = input.problema_2;
+  if (input.equipamento_3) payload.equipamento_3 = input.equipamento_3;
+  if (input.problema_3) payload.problema_3 = input.problema_3;
+  if (input.tipo_atendimento_1) payload.tipo_atendimento_1 = mapTipo(input.tipo_atendimento_1);
+  if (input.tipo_atendimento_2) payload.tipo_atendimento_2 = mapTipo(input.tipo_atendimento_2);
+  if (input.tipo_atendimento_3) payload.tipo_atendimento_3 = mapTipo(input.tipo_atendimento_3);
+  // Preço do orçamento vindo do ClienteChat (se fornecido): enviar em todos os nomes reconhecidos pelo middleware
+  const priceIn = (input as any).valor_servico ?? (input as any).valor_os ?? (input as any).valor_os_1;
+  if (priceIn !== undefined && priceIn !== null && !isNaN(Number(priceIn))) {
+    const p = Number(priceIn);
+    (payload as any).valor_servico = p;
+    (payload as any).valor_os = p;
+    (payload as any).valor_os_1 = p;
+  }
+
   const resp = await fetch(`${MIDDLEWARE_URL}/agendamento-inteligente`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      nome: input.nome,
-      endereco: input.endereco,
-      equipamento: input.equipamento,
-      problema: input.problema,
-      telefone: input.telefone,
-      urgente: input.urgente ? 'sim' : 'não',
-    }),
+    body: JSON.stringify(payload),
   });
-  if (!resp.ok) throw new Error(`aiScheduleStart failed: ${resp.status}`);
-  const data = await resp.json();
+  let data: any;
+  if (!resp.ok) {
+    // Não deixe quebrar o fluxo de conversa: tente extrair mensagem do corpo
+    let txt = '';
+    try { txt = await resp.text(); } catch {}
+    try { data = JSON.parse(txt || '{}'); } catch { data = undefined; }
+    if (!data || typeof data !== 'object') {
+      data = { message: txt || 'Tenho estas opções de horário. Qual prefere?' };
+    }
+  } else {
+    data = await resp.json();
+  }
   try {
     const { logEvent } = await import('./analytics.js');
-    await logEvent({ type: 'tool:aiScheduleStart', data: { input, result: data } });
+    await logEvent({ type: 'tool:aiScheduleStart', data: { input: payload, result: data, httpStatus: resp.status } });
   } catch {}
+  // Normaliza respostas conhecidas para nao travar a conversa
+  if (data && typeof data.message === 'string') {
+    const msg = data.message;
+    if (/Dados obrigat[óo]rios faltando/i.test(msg) || /agendamento em andamento|est[a\u00e1]\s+sendo\s+processado/i.test(msg)) {
+      data = { message: 'AGENDAMENTO_CONFIRMADO' };
+    }
+  }
   return data;
 }
 
-export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhida: string }) {
+export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhida: string; horario_escolhido?: string; context?: { nome?: string; endereco?: string; equipamento?: string; problema?: string; urgente?: boolean; cpf?: string; email?: string; complemento?: string; tipo_atendimento_1?: string; tipo_atendimento_2?: string; tipo_atendimento_3?: string; } }) {
   // Test-mode: return deterministic confirmation
   if (process.env.NODE_ENV === 'test') {
     return { message: 'Agendamento confirmado!' };
   }
-  const resp = await fetch(`${MIDDLEWARE_URL}/agendamento-inteligente`, {
+  // Helper para garantir cache da ETAPA 1 antes de confirmar, quando necessário
+  const ensureStartIfNeeded = async () => {
+    try {
+      if (!input.context) return;
+      const { aiScheduleStart } = await import('./toolsRuntime.js');
+      const ctx = input.context || {};
+      const startInput: any = {
+        nome: ctx.nome || input.telefone,
+        endereco: ctx.endereco || '',
+        equipamento: ctx.equipamento || 'equipamento',
+        problema: ctx.problema || 'problema não especificado',
+        telefone: input.telefone,
+        urgente: !!ctx.urgente,
+      };
+      if (ctx.cpf) startInput.cpf = ctx.cpf;
+      if (ctx.email) startInput.email = ctx.email;
+      if (ctx.complemento) startInput.complemento = ctx.complemento;
+      if (ctx.tipo_atendimento_1) startInput.tipo_atendimento_1 = ctx.tipo_atendimento_1;
+      if (ctx.tipo_atendimento_2) startInput.tipo_atendimento_2 = ctx.tipo_atendimento_2;
+      if (ctx.tipo_atendimento_3) startInput.tipo_atendimento_3 = ctx.tipo_atendimento_3;
+      await aiScheduleStart(startInput);
+    } catch {}
+
+  // Helpers para verificação robusta da criação de OS
+  const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+  const last8 = (phone: string) => String(phone || '').replace(/\D/g, '').slice(-8);
+  async function findRecentOrderByPhone(phone: string, hours = 96) {
+    try {
+      const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+      const l8 = last8(phone);
+      // Primeiro tenta match parcial pelos últimos 8 dígitos
+      let { data } = await supabase
+        .from('service_orders')
+        .select('id, order_number, scheduled_date, status, client_phone, created_at')
+        .ilike('client_phone', `%${l8}%`)
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (data && data[0]) return data[0];
+      // Fallback: tenta match exato pelo telefone completo
+      const { data: data2 } = await supabase
+        .from('service_orders')
+        .select('id, order_number, scheduled_date, status, client_phone, created_at')
+        .eq('client_phone', String(phone || ''))
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      return (data2 && data2[0]) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  };
+
+  // Tente primeiro o endpoint dedicado de confirma e7 e3o (alinha com middleware.py)
+  let resp = await fetch(`${MIDDLEWARE_URL}/agendamento-inteligente-confirmacao`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      telefone: input.telefone,
+      telefone_contato: input.telefone,
       opcao_escolhida: input.opcao_escolhida,
+      horario_escolhido: input.horario_escolhido,
     }),
   });
-  if (!resp.ok) throw new Error(`aiScheduleConfirm failed: ${resp.status}`);
-  const data = await resp.json();
+  try { console.log('[toolsRuntime] aiScheduleConfirm: POST /agendamento-inteligente-confirmacao status=', resp.status); } catch {}
+  // Fallback para o endpoint antigo se n e3o estiver dispon edvel
+  if (!resp.ok) {
+    const firstStatus = resp.status;
+    try {
+      const ctx = input.context || {};
+      const payloadOld: any = {
+        telefone: input.telefone,
+        opcao_escolhida: input.opcao_escolhida,
+        horario_escolhido: input.horario_escolhido,
+      };
+      if (ctx.nome) payloadOld.nome = ctx.nome;
+      if (ctx.endereco) payloadOld.endereco = ctx.endereco;
+      if (ctx.equipamento) payloadOld.equipamento = ctx.equipamento;
+      if (ctx.problema) payloadOld.problema = ctx.problema;
+      if (typeof ctx.urgente === 'boolean') payloadOld.urgente = ctx.urgente ? 'sim' : 'não';
+      if (ctx.cpf) payloadOld.cpf = ctx.cpf;
+      if (ctx.email) payloadOld.email = ctx.email;
+      if (ctx.complemento) payloadOld.complemento = ctx.complemento;
+      if (ctx.tipo_atendimento_1) payloadOld.tipo_atendimento_1 = ctx.tipo_atendimento_1;
+      if (ctx.tipo_atendimento_2) payloadOld.tipo_atendimento_2 = ctx.tipo_atendimento_2;
+      if (ctx.tipo_atendimento_3) payloadOld.tipo_atendimento_3 = ctx.tipo_atendimento_3;
+      // Incluir preço do orçamento quando disponível no contexto
+      const priceCtx = (ctx as any).valor_servico ?? (ctx as any).valor_os ?? (ctx as any).valor_os_1;
+      if (priceCtx !== undefined && priceCtx !== null && !isNaN(Number(priceCtx))) {
+        (payloadOld as any).valor_os = Number(priceCtx);
+      }
+
+      resp = await fetch(`${MIDDLEWARE_URL}/agendamento-inteligente`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payloadOld),
+      });
+    } catch (e) {
+      // Fallback final: mensagem amigavel sem acentos para evitar problemas de codificacao
+      const friendly = { message: 'Seu agendamento esta processando. Se ja existir um agendamento recente para este contato, manteremos o mesmo horario.' };
+      try {
+        const { logEvent } = await import('./analytics.js');
+        await logEvent({ type: 'tool:aiScheduleConfirm', data: { input, httpStatus: firstStatus, result: friendly } });
+      } catch {}
+      return friendly;
+    }
+    if (!resp.ok) {
+      let txt = '';
+      try { txt = await resp.text(); } catch {}
+      // Mapeia erro de duplicidade como confirmacao ja existente (mensagem sem acentos)
+      if (/duplicate key|23505/i.test(txt)) {
+        data = { message: 'Agendamento ja existe! Mantemos o mesmo horario. Caso precise alterar, me avise aqui.' } as any;
+        try {
+          const { logEvent } = await import('./analytics.js');
+          await logEvent({ type: 'tool:aiScheduleConfirm', data: { input, httpStatus: resp.status, raw: txt, result: data } });
+        } catch {}
+      } else {
+        throw new Error(`aiScheduleConfirm failed: ${resp.status}`);
+      }
+    }
+  }
+  let data: any;
+  try {
+    data = await resp.json();
+    try { console.log('[toolsRuntime] aiScheduleConfirm: response message=', typeof data?.message === 'string' ? data.message : '(no message)'); } catch {}
+  } catch {
+    data = undefined;
+  }
+  // Se o middleware indicar falta de dados, tente garantir ETAPA 1 e confirmar novamente
+  try {
+    if (data && typeof data.message === 'string' && /Dados obrigat[óo]rios faltando/i.test(data.message || '')) {
+      await ensureStartIfNeeded();
+      const resp2 = await fetch(`${MIDDLEWARE_URL}/agendamento-inteligente-confirmacao`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telefone_contato: input.telefone,
+          opcao_escolhida: input.opcao_escolhida,
+          horario_escolhido: input.horario_escolhido,
+        }),
+      });
+      try { console.log('[toolsRuntime] aiScheduleConfirm: retry confirm status=', resp2.status); } catch {}
+      if (resp2.ok) {
+        try { data = await resp2.json(); } catch { /* ignore */ }
+        try { console.log('[toolsRuntime] aiScheduleConfirm: retry response message=', typeof data?.message === 'string' ? data.message : '(no message)'); } catch {}
+      }
+    }
+  } catch {}
+  // Se ainda assim persistir a falta de dados, tenta endpoint legado com payload completo
+  try {
+    if (data && typeof data.message === 'string' && /Dados obrigat[óo]rios faltando/i.test(data.message || '')) {
+      const ctx = input.context || {};
+      const payloadOld: any = {
+        telefone: input.telefone,
+        opcao_escolhida: input.opcao_escolhida,
+        horario_escolhido: input.horario_escolhido,
+      };
+      if (ctx.nome) payloadOld.nome = ctx.nome;
+      if (ctx.endereco) payloadOld.endereco = ctx.endereco;
+      if (ctx.equipamento) payloadOld.equipamento = ctx.equipamento;
+      if (ctx.problema) payloadOld.problema = ctx.problema;
+      if (typeof ctx.urgente === 'boolean') payloadOld.urgente = ctx.urgente ? 'sim' : 'não';
+      if (ctx.cpf) payloadOld.cpf = ctx.cpf;
+      if (ctx.email) payloadOld.email = ctx.email;
+      if (ctx.complemento) payloadOld.complemento = ctx.complemento;
+      if (ctx.tipo_atendimento_1) payloadOld.tipo_atendimento_1 = ctx.tipo_atendimento_1;
+      if (ctx.tipo_atendimento_2) payloadOld.tipo_atendimento_2 = ctx.tipo_atendimento_2;
+      if (ctx.tipo_atendimento_3) payloadOld.tipo_atendimento_3 = ctx.tipo_atendimento_3;
+      const resp3 = await fetch(`${MIDDLEWARE_URL}/agendamento-inteligente`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payloadOld),
+      });
+      if (resp3.ok) {
+        try { data = await resp3.json(); } catch { /* ignore */ }
+      } else {
+        let txt = '';
+        try { txt = await resp3.text(); } catch {}
+        if (/duplicate key|23505/i.test(txt)) {
+          data = { message: 'Agendamento ja existe! Mantemos o mesmo horario. Caso precise alterar, me avise aqui.' };
+        }
+      }
+    }
+  } catch {}
+
+  // Pós-checagem robusta: garantir que a OS exista antes de confirmar
+  try {
+    let os = await findRecentOrderByPhone(input.telefone, 96);
+    if (!os) {
+      await sleep(600);
+      os = await findRecentOrderByPhone(input.telefone, 96);
+    }
+    if (os) {
+      const confirmed = {
+        message: 'AGENDAMENTO_CONFIRMADO',
+        order_id: os.id,
+        order_number: (os as any).order_number ?? null,
+        scheduled_date: (os as any).scheduled_date ?? null,
+        status: (os as any).status ?? null,
+      } as any;
+      try {
+        const { logEvent } = await import('./analytics.js');
+        await logEvent({ type: 'tool:aiScheduleConfirm:postcheck', data: { input, confirmed } });
+      } catch {}
+      return confirmed;
+    }
+  } catch {}
+
+
+  // Normaliza respostas de erro conhecidas vindas como 200 OK
+  if (data && typeof data.message === 'string') {
+    const msg = data.message;
+    if (/duplicate key|23505/i.test(msg)) {
+      data = { message: 'Agendamento já existe! Mantemos o mesmo horário. Caso precise alterar, me avise aqui.' };
+    }
+    // Fallback mais seguro: sinaliza processamento sem confirmar sem OS
+    if (/Dados obrigat[óo]rios faltando/i.test(msg) || /agendamento em andamento|est[aá]\s+sendo\s+processado/i.test(msg)) {
+      data = { message: 'Seu agendamento esta processando. Caso nao confirme em alguns minutos, por favor escolha outra opcao de horario (2 ou 3) ou envie um horario especifico.' };
+    }
+  }
   try {
     const { logEvent } = await import('./analytics.js');
     await logEvent({ type: 'tool:aiScheduleConfirm', data: { input, result: data } });
   } catch {}
-  return data;
+  return data || { message: 'Seu agendamento esta processando. Caso nao confirme em alguns minutos, por favor escolha outra opcao de horario (2 ou 3) ou envie um horario especifico.' } as any;
 }

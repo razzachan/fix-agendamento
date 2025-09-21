@@ -1,0 +1,104 @@
+{
+  "peer": "554791960811@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 19,
+  "inCount": 10,
+  "outCount": 9,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:18:24.043031+00:00",
+      "body": "oi boa noite"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:18:24.983723+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:18:34.672616+00:00",
+      "body": "gostaria de um orçamento para instalação de uma coifa de ilha tubular"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:18:35.535225+00:00",
+      "body": "Certo! Para fechar, qual é a marca do equipamento?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:18:49.199014+00:00",
+      "body": "sugar"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:18:54.084056+00:00",
+      "body": "Antes de agendarmos, vou te passar o valor e as possíveis causas para alinharmos. Pode me confirmar a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:19:10.778422+00:00",
+      "body": "não é defeito, é instalação"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:19:11.545623+00:00",
+      "body": "Certo! Para fechar, qual é a marca do equipamento?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:19:20.463342+00:00",
+      "body": "sugar"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:19:24.442616+00:00",
+      "body": "Antes de agendarmos, vou te passar o valor e as possíveis causas para alinharmos. Pode me confirmar a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:27:05.501159+00:00",
+      "body": "Oi bom dia"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:27:06.382473+00:00",
+      "body": "Certo! Para fechar, qual é a marca do equipamento?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:27:07.314352+00:00",
+      "body": "Depurador"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:27:08.025766+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:27:14.358924+00:00",
+      "body": "Suggar"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:27:19.587238+00:00",
+      "body": "entendi: depurador — coletamos, diagnosticamos. Pode me descrever o problema específico que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:27:25.223395+00:00",
+      "body": "Não tem defeito"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:27:30.916278+00:00",
+      "body": "Olá! Como posso ajudar com seu depurador Suggar? Se precisar de assistência, estou à disposição!"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:27:39.458843+00:00",
+      "body": "É instalação"
+    }
+  ]
+}

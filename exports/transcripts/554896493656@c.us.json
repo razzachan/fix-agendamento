@@ -1,0 +1,29 @@
+{
+  "peer": "554896493656@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 4,
+  "inCount": 2,
+  "outCount": 2,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:25:42.010163+00:00",
+      "body": "Tá no simao"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:25:46.778204+00:00",
+      "body": "entendi: forno comercial — coletamos, diagnosticamos. Antes do orçamento: qual é a marca do equipamento e qual é o problema específico?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:26:04.810012+00:00",
+      "body": "Ele levou segunda feira"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:26:09.980737+00:00",
+      "body": "entendi: forno comercial — coletamos, diagnosticamos. Antes do orçamento: qual é a marca do equipamento e qual é o problema específico?"
+    }
+  ]
+}

@@ -1,17 +1,21 @@
+[providers]
+node = "18"
+
 [phases.setup]
-nixPkgs = ["python311", "pip"]
+nixPkgs = ["nodejs_18", "npm"]
 
 [phases.install]
-cmds = ["pip install --no-cache-dir -r requirements.txt"]
+cmds = ["rm -f bun.lockb", "npm ci --legacy-peer-deps"]
 
 [phases.build]
-cmds = ["echo 'Build completed'", "rm -f main_backup.py || true", "python -m compileall middleware.py"]
+cmds = ["npm run build"]
 
 [start]
-cmd = "python main.py"
+cmd = "node api/index.js"
 
 [variables]
-PYTHONUNBUFFERED = "1"
-PYTHONIOENCODING = "utf-8"
-UVICORN_TIMEOUT_KEEP_ALIVE = "300"
-UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN = "30"
+NPM_CONFIG_PACKAGE_MANAGER = "npm"
+NIXPACKS_NO_BUN = "1"
+NIXPACKS_INSTALL_CMD = "npm ci"
+
+

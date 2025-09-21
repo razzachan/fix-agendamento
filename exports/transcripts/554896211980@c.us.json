@@ -1,0 +1,69 @@
+{
+  "peer": "554896211980@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 12,
+  "inCount": 6,
+  "outCount": 6,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:13:48.071068+00:00",
+      "body": "Bom dia"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:13:48.080253+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:13:48.630183+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:13:50.564421+00:00",
+      "body": "Olá! Como posso ajudar você hoje? Para te ajudar, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:14:10.922501+00:00",
+      "body": "Coifa  Arix"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:14:11.797322+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:14:24.142469+00:00",
+      "body": "Arix"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:14:26.321475+00:00",
+      "body": "Olá! Como posso te ajudar hoje? Para te ajudar, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:14:55.695401+00:00",
+      "body": "Fazer uma limpeza interna e botoes de ligar estao soltos"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:14:59.703042+00:00",
+      "body": "Antes de agendarmos, vou te passar o valor e as possíveis causas para alinharmos. Pode me confirmar a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:15:16.81415+00:00",
+      "body": "Arix"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:15:23.066584+00:00",
+      "body": "Olá, Arix! Como posso ajudá-lo com seus equipamentos domésticos hoje? Se você tiver algum problema ou precisar de um serviço, estou aqui para ajudar!"
+    }
+  ]
+}

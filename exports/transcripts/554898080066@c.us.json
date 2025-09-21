@@ -1,0 +1,49 @@
+{
+  "peer": "554898080066@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 8,
+  "inCount": 4,
+  "outCount": 4,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T11:37:00.147421+00:00",
+      "body": "Bom dia!"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T11:37:00.697692+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T11:37:27.040971+00:00",
+      "body": "Forno elétrico Electrolux, não está esquentando na parte debaixo"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T11:37:27.922008+00:00",
+      "body": "Perfeito! Pode descrever rapidamente o problema que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T11:37:47.232289+00:00",
+      "body": "Não está esquentando na parte debaixo"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T11:37:54.919953+00:00",
+      "body": "Identificamos que seu forno não está esquentando. Vamos gerar um orçamento para o conserto. Por favor, aguarde um momento."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T11:39:30.990285+00:00",
+      "body": "Não entendi… seria 350,00 da completa, mas o serviço?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T11:39:39.920126+00:00",
+      "body": "Entendi sua dúvida! O orçamento para o diagnóstico do forno comercial é de R$ 350,00. Posso agendar o serviço?"
+    }
+  ]
+}

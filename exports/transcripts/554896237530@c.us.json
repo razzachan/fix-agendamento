@@ -1,0 +1,79 @@
+{
+  "peer": "554896237530@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 14,
+  "inCount": 7,
+  "outCount": 7,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T16:40:20.214299+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T16:40:22.627144+00:00",
+      "body": "Olá! Como posso te ajudar hoje? Se você tiver algum problema com um eletrodoméstico, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T16:40:52.561019+00:00",
+      "body": "Vocês dão assistência para lava louça da Philco?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T16:40:54.125872+00:00",
+      "body": "Perfeito! Pode descrever rapidamente o problema que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T16:41:34.74045+00:00",
+      "body": "Não liga mais. Não obedece aos comandos"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T16:41:43.970614+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca philco, problema \"não liga mais\".\n\nIsso pode ser problema de - Sensor de nível: Se o sensor de nível estiver com defeito, a máquina pode não reconhecer que há água suficiente para iniciar o ciclo, impedindo que ligue., - Filtro da bomba entupido: Um filtro entupido pode bloquear o fluxo de água, causando falhas no funcionamento e impedindo que a lava-louças inicie., - Motor da bomba de drenagem: Se o motor da bomba de drenagem estiver queimado ou com problemas, a máquina pode não conseguir drenar a água, resultando na impossibilidade de ligar., Essas causas são as mais prováveis para o problema de uma lava-louças que não liga..\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T16:42:45.345242+00:00",
+      "body": "Onde fica essa empresa."
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T16:42:49.287057+00:00",
+      "body": "Nossa empresa está localizada em [endereço]. Posso ajudar com mais alguma informação sobre seu equipamento?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T16:43:25.755359+00:00",
+      "body": "Pode me passar o endereço?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T16:43:26.772548+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T16:43:53.791093+00:00",
+      "body": "Gostaria de saber o endereço da empresa."
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T16:43:54.991431+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T16:44:12.10696+00:00",
+      "body": "Boa tarde"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T16:44:12.439882+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    }
+  ]
+}

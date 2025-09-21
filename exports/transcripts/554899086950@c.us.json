@@ -1,0 +1,29 @@
+{
+  "peer": "554899086950@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 4,
+  "inCount": 2,
+  "outCount": 2,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T13:14:29.788141+00:00",
+      "body": "Bom dia, tudo bem?\n\nGostaria de saber o valor para instalação de máquina de lavar louça"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T13:14:30.594711+00:00",
+      "body": "Para a instalação, o equipamento é de embutir (embutido) ou de bancada?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T13:16:31.450512+00:00",
+      "body": "Ainda estamos verificando qual dos modelos vamos pegar, se tiver uma ideia do valor da instalação de cada um dos formatos, pode ajudar na decisão hehe"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T13:16:32.022401+00:00",
+      "body": "Para a instalação, o equipamento é de embutir (embutido) ou de bancada?"
+    }
+  ]
+}

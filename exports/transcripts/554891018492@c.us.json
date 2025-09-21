@@ -1,0 +1,89 @@
+{
+  "peer": "554891018492@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 16,
+  "inCount": 7,
+  "outCount": 9,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:16:47.73281+00:00",
+      "body": "Bom dia"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:16:48.266016+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:17:08.249174+00:00",
+      "body": "Vcs são assistência técnica Brastemp"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:17:15.158174+00:00",
+      "body": "Olá! Sim, somos especializados em assistência técnica para eletrodomésticos, incluindo produtos da. Como posso ajudar você hoje? Você está enfrentando algum problema específico com seu equipamento?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:17:55.661131+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:18:19.659791+00:00",
+      "body": "Brastemp"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:18:20.327964+00:00",
+      "body": "Pode me descrever o problema específico que está acontecendo?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:19:01.308502+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca, problema \"parou de funcionar\". Isso pode ser problema de Motor da bomba de drenagem pode estar com defeito, impedindo o funcionamento do aparelho., Filtro da bomba entupido pode causar a interrupção do ciclo, já que a água não é drenada corretamente., Mangueira de saída obstruída pode impedir a água de ser expelida, resultando em falhas no funcionamento., Sensor de nível pode estar com problemas, não detectando a presença de água e interrompendo o ciclo de lavagem.. Coletamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis. O valor da coleta diagnóstico fica em R$ 350 (por equipamento). Depois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço. Aceitamos cartão e dividimos também. O serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:20:11.324353+00:00",
+      "body": "Mas a máquina é nova e tem garantia de 1 ano"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:20:21.037217+00:00",
+      "body": "Claro! Vamos lá:\n\nOlá! 😊 Entendo que você está enfrentando um problema com sua máquina nova e ainda na garantia. Para que eu possa ajudá-lo da melhor forma possível, poderia me informar qual é a marca do equipamento e qual o problema que você está enfrentando? Assim, poderemos agendar um diagnóstico e resolver essa situação rapidamente.\n\nAguardo sua resposta!\n\nEssa abordagem é empática e direta, garantindo que o cliente se sinta ouvido e apoiado."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:20:21.378906+00:00",
+      "body": "Como fazemos"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:20:22.217857+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, endereço completo com CEP, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:22:21.388384+00:00",
+      "body": "Tá na garantia"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:22:22.224717+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, endereço completo com CEP, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:22:49.831127+00:00",
+      "body": "Tem um telefone que eu possa ligar"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:22:54.175957+00:00",
+      "body": "Você pode entrar em contato pelo telefone 0800-123-456. Estamos à disposição para ajudar com sua lava-louças Brastemp!"
+    }
+  ]
+}
