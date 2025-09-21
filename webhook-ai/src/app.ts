@@ -339,10 +339,13 @@ app.post('/test-media', async (req, res) => {
           const { chatComplete } = await import('./services/llmClient.js');
           const imageData = `data:${mimetype};base64,${base64}`;
           const prompt = 'Analise esta imagem de fogão e responda APENAS com um JSON no formato: {"type": "floor|cooktop|indeterminado", "segment": "basico|inox|premium|indeterminado", "burners": "4|5|6|indeterminado"}.';
-          const visionResponse = await chatComplete([
-            { role: 'system', content: 'Você é um assistente de visão especializado em eletrodomésticos.' },
-            { role: 'user', content: [ { type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageData } } ] as any }
-          ]);
+          const visionResponse = await chatComplete(
+            { provider: 'openai', model: process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini' },
+            [
+              { role: 'system', content: 'Você é um assistente de visão especializado em eletrodomésticos.' },
+              { role: 'user', content: [ { type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageData } } ] as any }
+            ]
+          );
           const cleaned = String(visionResponse || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
           const visionData = JSON.parse(cleaned || '{}');
           classificationResult = {
@@ -366,13 +369,16 @@ app.post('/test-media', async (req, res) => {
       try {
         const { chatComplete } = await import('./services/llmClient.js');
         const imageData = `data:${mimetype};base64,${base64}`;
-        const resp = await chatComplete([
-          { role: 'system', content: 'Você é um assistente de visão que identifica rapidamente o equipamento e o tipo de instalação.' },
-          { role: 'user', content: [
-            { type: 'text', text: 'Olhe a imagem e responda APENAS com JSON: {"equipamento":"fogão|cooktop|outro|indeterminado","mount":"piso|embutido|indeterminado"}.' },
-            { type: 'image_url', image_url: { url: imageData } }
-          ] as any }
-        ]);
+        const resp = await chatComplete(
+          { provider: 'openai', model: process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini' },
+          [
+            { role: 'system', content: 'Você é um assistente de visão que identifica rapidamente o equipamento e o tipo de instalação.' },
+            { role: 'user', content: [
+              { type: 'text', text: 'Olhe a imagem e responda APENAS com JSON: {"equipamento":"fogão|cooktop|outro|indeterminado","mount":"piso|embutido|indeterminado"}.' },
+              { type: 'image_url', image_url: { url: imageData } }
+            ] as any }
+          ]
+        );
         const cleaned = String(resp || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
         const parsed: any = JSON.parse(cleaned || '{}');
         const equip = String(parsed?.equipamento || '').toLowerCase();

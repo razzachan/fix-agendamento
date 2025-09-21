@@ -444,6 +444,7 @@ export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhi
     }),
   });
   try { console.log('[toolsRuntime] aiScheduleConfirm: POST /agendamento-inteligente-confirmacao status=', resp.status); } catch {}
+  let data: any;
   // Fallback para o endpoint antigo se n e3o estiver dispon edvel
   if (!resp.ok) {
     const firstStatus = resp.status;
@@ -500,7 +501,6 @@ export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhi
       }
     }
   }
-  let data: any;
   try {
     data = await resp.json();
     try { console.log('[toolsRuntime] aiScheduleConfirm: response message=', typeof data?.message === 'string' ? data.message : '(no message)'); } catch {}
@@ -564,12 +564,44 @@ export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhi
     }
   } catch {}
 
+
+  // Helpers (escopo externo) para pós-checagem
+  const sleepOuter = (ms: number) => new Promise((res) => setTimeout(res, ms));
+  const last8Outer = (phone: string) => String(phone || '').replace(/\D/g, '').slice(-8);
+  async function findRecentOrderByPhoneOuter(phone: string, hours = 96) {
+    try {
+      const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+      const l8 = last8Outer(phone);
+      // Primeiro tenta match parcial pelos últimos 8 dígitos
+      let { data } = await supabase
+        .from('service_orders')
+        .select('id, order_number, scheduled_date, status, client_phone, created_at')
+        .ilike('client_phone', `%${l8}%`)
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (data && data[0]) return data[0] as any;
+      // Fallback: tenta match exato pelo telefone completo
+      const { data: data2 } = await supabase
+        .from('service_orders')
+        .select('id, order_number, scheduled_date, status, client_phone, created_at')
+        .eq('client_phone', String(phone || ''))
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      return (data2 && data2[0]) || null;
+    } catch {
+      return null;
+    }
+  }
+
   // Pós-checagem robusta: garantir que a OS exista antes de confirmar
   try {
-    let os = await findRecentOrderByPhone(input.telefone, 96);
+    let os = await findRecentOrderByPhoneOuter(input.telefone, 96);
     if (!os) {
-      await sleep(600);
-      os = await findRecentOrderByPhone(input.telefone, 96);
+      await sleepOuter(600);
+      os = await findRecentOrderByPhoneOuter(input.telefone, 96);
+
     }
     if (os) {
       const confirmed = {
