@@ -46,10 +46,19 @@ whatsappRouter.post('/logout', async (_req, res) => {
   res.json({ ok: true });
 });
 
+// GET version for easy browser testing
+whatsappRouter.get('/connect', async (req, res) => {
+  const force = String(req.query.force || '').toLowerCase() === 'true';
+  res.status(202).json({ ok: true, force, started: true });
+  // Start connection in background to avoid timeout
+  setTimeout(() => waClient.connect(force).catch(e => console.error('[WA] connect error', e)), 0);
+});
+
 whatsappRouter.post('/connect', async (req, res) => {
   const force = String(req.query.force || '').toLowerCase() === 'true';
-  await waClient.connect(force);
-  res.json({ ok: true, force });
+  res.status(202).json({ ok: true, force, started: true });
+  // Start connection in background to avoid timeout
+  setTimeout(() => waClient.connect(force).catch(e => console.error('[WA] connect error', e)), 0);
 });
 
 // Debug: enviar texto manualmente
