@@ -152,10 +152,20 @@ class WhatsAppClient extends EventEmitter {
       }
     }
 
-    // Se ainda não encontrou Chromium no Railway, tentar forçar um caminho
+    // Se ainda não encontrou Chromium no Railway, tentar forçar uso do sistema
     if (!execPath && isRailway) {
-      console.log('[WA] No Chromium found, will let Puppeteer auto-detect or fail gracefully');
-      // Não definir executablePath - deixar Puppeteer tentar encontrar automaticamente
+      try {
+        console.log('[WA] Tentando forçar uso do Chromium do sistema...');
+        const systemChromium = execSync('which chromium || which chromium-browser || which google-chrome || which google-chrome-stable', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+        if (systemChromium && fs.existsSync(systemChromium)) {
+          execPath = systemChromium;
+          console.log('[WA] FORÇANDO uso do Chromium do sistema:', systemChromium);
+        } else {
+          console.log('[WA] No Chromium found, will let Puppeteer auto-detect or fail gracefully');
+        }
+      } catch (e) {
+        console.log('[WA] Erro ao buscar Chromium do sistema, usando auto-detect:', e);
+      }
     }
 
     // Fallback para Windows desktop
