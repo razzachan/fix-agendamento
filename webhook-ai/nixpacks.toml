@@ -1,20 +1,22 @@
 [phases.setup]
-nixPkgs = ["nodejs_18", "chromium", "nss", "freetype", "freetype-dev", "harfbuzz", "ca-certificates", "ttf-freefont"]
+nixPkgs = ["nodejs_18", "chromium", "nss", "freetype", "harfbuzz", "ca-certificates", "ttf-freefont", "fontconfig"]
 
 [phases.install]
 cmds = [
   "npm ci",
-  "mkdir -p /usr/bin",
-  "ln -sf $(which chromium) /usr/bin/chromium || true",
-  "chmod +x /usr/bin/chromium || true"
+  "mkdir -p /usr/bin /app/.cache",
+  "ln -sf $(which chromium) /usr/bin/chromium",
+  "chmod +x /usr/bin/chromium"
 ]
 
 [phases.build]
 cmds = ["npm run build"]
 
 [start]
-cmd = "npm start"
+cmd = "node dist/app.js"
 
 [variables]
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
 PUPPETEER_EXECUTABLE_PATH = "/usr/bin/chromium"
+PUPPETEER_ARGS = "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu"
+WA_HEADLESS = "true"
