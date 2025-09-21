@@ -444,6 +444,7 @@ export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhi
     }),
   });
   try { console.log('[toolsRuntime] aiScheduleConfirm: POST /agendamento-inteligente-confirmacao status=', resp.status); } catch {}
+  let data: any;
   // Fallback para o endpoint antigo se n e3o estiver dispon edvel
   if (!resp.ok) {
     const firstStatus = resp.status;
@@ -500,7 +501,6 @@ export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhi
       }
     }
   }
-  let data: any;
   try {
     data = await resp.json();
     try { console.log('[toolsRuntime] aiScheduleConfirm: response message=', typeof data?.message === 'string' ? data.message : '(no message)'); } catch {}
