@@ -455,14 +455,30 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 
 app.listen(Number(env.PORT), '0.0.0.0', async () => {
   console.log(`Webhook AI listening on :${env.PORT} - NOTES CORRECTION APPLIED`);
-  try {
-    // Seed/garantia de admin único (fora de testes)
-    await runAdminSeedOnBoot();
 
-    await waClient.start();
-    setupWAInboundAdapter();
-    console.log('[WA] Client initialized');
-  } catch (e) {
-    console.error('[WA] init error', e);
-  }
+  // Inicializar admin seed em background (não bloquear o servidor)
+  runAdminSeedOnBoot().catch(e => console.warn('[ADMIN] Seed failed:', e));
+
+  // Inicializar WhatsApp client em background (não bloquear o servidor)
+  setTimeout(async () => {
+    try {
+      console.log('[WA] Starting WhatsApp client...');
+      await waClient.start();
+      setupWAInboundAdapter();
+      console.log('[WA] Client initialized successfully');
+    } catch (e) {
+      console.error('[WA] init error', e);
+      // Tentar novamente em 30 segundos
+      setTimeout(async () => {
+        try {
+          console.log('[WA] Retrying WhatsApp client initialization...');
+          await waClient.start();
+          setupWAInboundAdapter();
+          console.log('[WA] Client initialized on retry');
+        } catch (retryError) {
+          console.error('[WA] Retry failed:', retryError);
+        }
+      }, 30000);
+    }
+  }, 5000); // Aguardar 5 segundos após o servidor estar rodando
 });
