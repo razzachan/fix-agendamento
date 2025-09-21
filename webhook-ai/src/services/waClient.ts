@@ -292,12 +292,17 @@ class WhatsAppClient extends EventEmitter {
     }
 
     this.client.on('qr', async (qr: string) => {
-      const dataURL = await qrcode.toDataURL(qr);
-      this.status.qr = dataURL;
-      this.status.connected = false;
-      this.status.me = null;
-      console.log('[WA] QR recebido');
-      this.emit('qr', dataURL);
+      console.log('[WA] 🎯 QR EVENT TRIGGERED! QR length:', qr?.length || 0);
+      try {
+        const dataURL = await qrcode.toDataURL(qr);
+        this.status.qr = dataURL;
+        this.status.connected = false;
+        this.status.me = null;
+        console.log('[WA] ✅ QR recebido e convertido para DataURL');
+        this.emit('qr', dataURL);
+      } catch (e) {
+        console.error('[WA] ❌ Erro ao converter QR para DataURL:', e);
+      }
     });
 
     // Debug: Capturar TODAS as mensagens que chegam
@@ -673,8 +678,11 @@ class WhatsAppClient extends EventEmitter {
 
   public async start() {
     if (this.started) return;
+    console.log('[WA] 🚀 Iniciando WhatsApp client...');
     this.started = true;
+    console.log('[WA] 🔧 Chamando client.initialize()...');
     await this.client.initialize();
+    console.log('[WA] ✅ Client.initialize() concluído');
   }
 
   public async connect(force = false) {
