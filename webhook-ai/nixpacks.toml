@@ -8,13 +8,21 @@ nixPkgs = ["nodejs_18", "chromium", "nss", "freetype", "harfbuzz", "ca-certifica
 cmds = [
   "npm ci",
   "mkdir -p /usr/bin /app/.cache",
-  "echo 'Searching for Chromium binary...'",
+  "echo 'Setting up Chromium for Railway deployment...'",
   "CHROMIUM_PATH=$(find /nix/store -name chromium -type f -executable 2>/dev/null | head -1)",
   "echo \"Found Chromium at: $CHROMIUM_PATH\"",
-  "if [ -n \"$CHROMIUM_PATH\" ]; then ln -sf \"$CHROMIUM_PATH\" /usr/bin/chromium && echo 'Symlink created successfully'; else echo 'ERROR: Chromium not found'; fi",
-  "ls -la /usr/bin/chromium || echo 'Symlink verification failed'",
-  "chmod +x /usr/bin/chromium 2>/dev/null || echo 'Could not chmod chromium'",
-  "/usr/bin/chromium --version || echo 'Chromium version check failed'"
+  "if [ -n \"$CHROMIUM_PATH\" ]; then",
+  "  ln -sf \"$CHROMIUM_PATH\" /usr/bin/chromium",
+  "  ln -sf \"$CHROMIUM_PATH\" /usr/bin/chromium-browser",
+  "  ln -sf \"$CHROMIUM_PATH\" /usr/bin/google-chrome",
+  "  echo 'Chromium symlinks created successfully'",
+  "  ls -la /usr/bin/chromium /usr/bin/chromium-browser /usr/bin/google-chrome",
+  "  chmod +x /usr/bin/chromium /usr/bin/chromium-browser /usr/bin/google-chrome 2>/dev/null",
+  "  /usr/bin/chromium --version && echo 'Chromium is working!'",
+  "else",
+  "  echo 'ERROR: Chromium not found in Nix store'",
+  "  find /nix/store -name '*chrom*' -type f 2>/dev/null | head -10",
+  "fi"
 ]
 
 [phases.build]
