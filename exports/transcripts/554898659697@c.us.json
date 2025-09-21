@@ -1,0 +1,44 @@
+{
+  "peer": "554898659697@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 7,
+  "inCount": 3,
+  "outCount": 4,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T09:34:19.898546+00:00",
+      "body": "Ola bom dia! Gostaria de um orçamento para consentro de maquiana de lavar"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T09:34:20.764673+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T09:35:08.085538+00:00",
+      "body": "Problema: tranca da tampa quebrou"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T09:35:08.975775+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T09:35:38.664357+00:00",
+      "body": "Marca Muller"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T09:35:42.052221+00:00",
+      "body": "Olá! Como posso ajudar você hoje? Para te ajudar, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T09:35:59.190088+00:00",
+      "body": "Recebi a foto! Parece um lavadora. Se puder, me diga a marca e um breve descritivo do problema."
+    }
+  ]
+}

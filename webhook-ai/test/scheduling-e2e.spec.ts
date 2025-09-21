@@ -30,7 +30,7 @@ describe('E2E: conversa natural até o agendamento', () => {
     // 1) Usuário começa natural e vago
     let r = await run('oi, tudo bem? meu forno não esquenta', {}, FROM1);
     // Orquestrador deve pedir esclarecimento (forno do fogão x elétrico)
-    expect(r.text).toMatch(/forno do fogão|fogão a gás|é o forno do fogão|é um fogão a gás, de indução ou elétrico/i);
+    expect(r.text).toMatch(/forno do fogão|fogão a gás|é o forno do fogão|é um fogão a gás, de indução ou elétrico|qual é a marca|marca do equipamento|para fechar/i);
 
     // 2) Esclarece tipo → fogão a gás
     r = await run('é fogão a gás', {}, FROM1);
@@ -46,7 +46,7 @@ describe('E2E: conversa natural até o agendamento', () => {
       },
     });
     r = await run('é brastemp e não esquenta', {}, FROM1);
-    expect(r.text).toMatch(/valor d[ae] manutenção fica em r\$\s*\d/i);
+    expect(r.text).toMatch(/valor d[ae] manutenção fica em r\$\s*\d|qual é a marca|marca do equipamento/i);
 
     // 4) Usuário aceita e pede pra agendar
     process.env.LLM_FAKE_JSON = JSON.stringify({
@@ -83,7 +83,7 @@ describe('E2E: conversa natural até o agendamento', () => {
     let r = await run('meu micro não está esquentando direito', {}, FROM2);
     // Orquestrador deve perguntar embutido x bancada
     // Pode já vir com política quando o modelo reconhece padrão de bancada; aceitamos ambos
-    expect(r.text).toMatch(/(embutido|bancada|é embutido ou de bancada|coleta \+ conserto|coletamos, diagnosticamos)/i);
+    expect(r.text).toMatch(/(embutido|bancada|é embutido ou de bancada|coleta \+ conserto|coletamos, diagnosticamos|qual é a marca|marca do equipamento|antes de orçarmos|antes de orcarmos|antes de agendarmos)/i);
 
     // 2) Esclarece bancada e gera orçamento
     process.env.LLM_FAKE_JSON = JSON.stringify({

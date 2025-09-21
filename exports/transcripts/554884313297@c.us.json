@@ -1,0 +1,79 @@
+{
+  "peer": "554884313297@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 14,
+  "inCount": 6,
+  "outCount": 8,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:01:12.193214+00:00",
+      "body": ""
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:01:12.207444+00:00",
+      "body": "Ola"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:01:12.900954+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:01:14.372251+00:00",
+      "body": "Olá! Como posso ajudá-lo hoje? Para te ajudar, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:01:40.71362+00:00",
+      "body": "Meu fogão industrial tá preteando as panelas"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:01:40.832708+00:00",
+      "body": ""
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:01:41.203809+00:00",
+      "body": "Coqueiros"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:01:41.458621+00:00",
+      "body": "Rua Capitão Euclides de Castro 308"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:01:41.585335+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:01:42.832804+00:00",
+      "body": "Olá! Como posso ajudar você hoje? Para te ajudar, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:01:43.270523+00:00",
+      "body": "Olá! Como posso te ajudar hoje? Se precisar de assistência técnica, por favor, me diga qual é o equipamento e qual o problema que você está enfrentando."
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:01:45.791798+00:00",
+      "body": "entendi: fogão — coletamos, diagnosticamos. Antes do orçamento: qual é a marca do equipamento e qual é o problema específico?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:01:47.013935+00:00",
+      "body": "Recebi a foto! Parece um fogão de bancada. Se puder, me diga a marca e um breve descritivo do problema."
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:01:47.370551+00:00",
+      "body": "Recebi a foto! Parece um fogão de bancada. Se puder, me diga a marca e um breve descritivo do problema."
+    }
+  ]
+}

@@ -12,17 +12,18 @@ const ftp = require('basic-ftp');
 const fs = require('fs');
 const path = require('path');
 
-// Configurações FTP
+// Configurações FTP (via variáveis de ambiente)
 const FTP_CONFIG = {
-    host: 'br594.hostgator.com.br',
-    user: 'miragi67',
-    password: 'Shadowspirit!23',
+    host: process.env.FTP_HOST,
+    user: process.env.FTP_USER,
+    password: process.env.FTP_PASSWORD,
     secure: false,
-    port: 21
+    port: Number(process.env.FTP_PORT || 21)
 };
 
-const REMOTE_BASE = '/home2/miragi67/app.fixfogoes.com.br';
-const LOCAL_DIST = './dist';
+// Diretório remoto base (ex.: '/home2/USER/app.fixfogoes.com.br')
+const REMOTE_BASE = process.env.FTP_REMOTE_BASE;
+const LOCAL_DIST = process.env.LOCAL_DIST || './dist';
 
 // Função para log colorido
 const log = {
@@ -35,15 +36,15 @@ const log = {
 // Função para upload recursivo CORRIGIDA
 async function uploadDirectoryFixed(client, localPath, remotePath) {
     const items = fs.readdirSync(localPath);
-    
+
     for (const item of items) {
         const localItemPath = path.join(localPath, item);
         const stat = fs.statSync(localItemPath);
-        
+
         if (stat.isDirectory()) {
             const remoteSubDir = `${remotePath}/${item}`;
             log.info(`📁 Criando diretório: ${remoteSubDir}`);
-            
+
             try {
                 // Garantir que o diretório existe
                 await client.ensureDir(remoteSubDir);
@@ -54,15 +55,15 @@ async function uploadDirectoryFixed(client, localPath, remotePath) {
             }
         } else {
             log.info(`📄 Enviando: ${item}`);
-            
+
             try {
                 // CORREÇÃO: Navegar para o diretório correto primeiro
                 await client.cd(remotePath);
-                
+
                 // Upload apenas com o nome do arquivo (sem caminho)
                 await client.uploadFrom(localItemPath, item);
                 log.success(`✅ Enviado: ${item}`);
-                
+
             } catch (e) {
                 log.error(`❌ Erro ao enviar ${item}: ${e.message}`);
             }
@@ -72,7 +73,7 @@ async function uploadDirectoryFixed(client, localPath, remotePath) {
 
 async function deployFixed() {
     console.log('\n🚀 DEPLOY CORRIGIDO PARA HOSTGATOR\n');
-    
+
     try {
         // 1. Verificar se a pasta dist existe
         if (!fs.existsSync(LOCAL_DIST)) {
@@ -80,38 +81,48 @@ async function deployFixed() {
             return false;
         }
         log.success('📁 Pasta dist encontrada');
-        
+
+        // 1.1 Validar variáveis de ambiente obrigatórias
+        if (!FTP_CONFIG.host || !FTP_CONFIG.user || !FTP_CONFIG.password) {
+            log.error('❌ Variáveis FTP ausentes. Configure FTP_HOST, FTP_USER e FTP_PASSWORD.');
+            return false;
+        }
+        if (!REMOTE_BASE) {
+            log.error('❌ Variável FTP_REMOTE_BASE ausente. Ex.: /home2/USER/app.fixfogoes.com.br');
+            return false;
+        }
+
         // 2. Conectar ao FTP
         log.info('🌐 Conectando ao servidor FTP...');
         log.info(`📡 Servidor: ${FTP_CONFIG.host}`);
         log.info(`👤 Usuário: ${FTP_CONFIG.user}`);
-        
+
         const client = new ftp.Client();
         client.ftp.timeout = 120000; // 2 minutos
         client.ftp.verbose = true;
-        
+
         await client.access(FTP_CONFIG);
         log.success('✅ Conectado ao FTP!');
-        
+
         // 3. Navegar para o diretório base
         log.info(`📂 Navegando para: ${REMOTE_BASE}`);
         await client.ensureDir(REMOTE_BASE);
         await client.cd(REMOTE_BASE);
         log.success('📂 Navegado para diretório base');
-        
+
         // 4. Upload dos arquivos
         log.info('📤 Iniciando upload dos arquivos...');
         await uploadDirectoryFixed(client, LOCAL_DIST, REMOTE_BASE);
-        
+
         // 5. Fechar conexão
         client.close();
-        
+
         console.log('\n🎉 DEPLOY CORRIGIDO CONCLUÍDO COM SUCESSO!');
         console.log('🌐 Site disponível em: https://app.fixfogoes.com.br');
         console.log('⏰ Aguarde alguns minutos para propagação');
-        
+
         return true;
-        
+
     } catch (error) {
         log.error('💥 Erro no deploy: ' + error.message);
         return false;

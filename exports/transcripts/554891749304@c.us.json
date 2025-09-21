@@ -1,0 +1,59 @@
+{
+  "peer": "554891749304@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 10,
+  "inCount": 5,
+  "outCount": 5,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T17:10:43.692997+00:00",
+      "body": "Bom dia"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T17:10:43.703275+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T17:10:44.420357+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T17:10:47.0031+00:00",
+      "body": "Olá! Como posso ajudar você hoje? Se precisar de assistência técnica, me diga qual é o equipamento e qual o problema que você está enfrentando."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T17:11:21.478434+00:00",
+      "body": "Chapa industrial macom"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T17:11:26.061361+00:00",
+      "body": "entendi: fogão industrial — coletamos, diagnosticamos. Antes do orçamento: qual é a marca do equipamento e qual é o problema específico?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T17:12:31.465524+00:00",
+      "body": "Vocês trabalham com chapa também?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T17:12:36.081195+00:00",
+      "body": "entendi: fogão industrial — coletamos, diagnosticamos. Antes do orçamento: qual é a marca do equipamento e qual é o problema específico?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T17:13:37.800539+00:00",
+      "body": "Macom"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T17:13:42.190505+00:00",
+      "body": "entendi: fogão industrial — coletamos, diagnosticamos. Antes do orçamento: qual é a marca do equipamento e qual é o problema específico?"
+    }
+  ]
+}

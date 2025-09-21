@@ -1,0 +1,104 @@
+{
+  "peer": "554888209655@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 19,
+  "inCount": 10,
+  "outCount": 9,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:26:52.437352+00:00",
+      "body": "Acho que tem sim"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:26:56.370823+00:00",
+      "body": "Olá! Como você está? Posso ajudar com serviços para seus equipamentos domésticos. Qual é o problema que você está enfrentando?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:27:19.829598+00:00",
+      "body": "Acredito que amanhã resolvo ela também"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:27:24.162288+00:00",
+      "body": "Entendi! Se precisar de ajuda com algum equipamento, estou à disposição. Qualquer coisa, é só avisar!"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:27:26.383107+00:00",
+      "body": "Preciso comprar as peças"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:27:26.911216+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:27:36.178179+00:00",
+      "body": "Kkkkkkk"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:27:37.22158+00:00",
+      "body": "Olá! Como posso ajudar você hoje? Para te ajudar, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:27:39.455272+00:00",
+      "body": "Tem boi na linha"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:27:43.729254+00:00",
+      "body": "Olá! Tudo bem? Como posso ajudar você com seus equipamentos domésticos hoje?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:27:52.583522+00:00",
+      "body": "Beleza"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:27:54.311993+00:00",
+      "body": "Olá! Como posso te ajudar hoje? Para isso, me diga qual é o equipamento e qual o problema que você está enfrentando."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:27:59.85132+00:00",
+      "body": "Mas amanhã tá na mão final da tá xe"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:28:01.880771+00:00",
+      "body": "Tardw"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:28:02.248259+00:00",
+      "body": "Vejo que talvez eu não esteja conseguindo te ajudar da melhor forma. Gostaria de falar com um de nossos atendentes? Digite \"quero falar com humano\" se preferir. 😊\n\nOu, se for sobre equipamentos domésticos, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:28:14.64795+00:00",
+      "body": "Mas teu pai não vai conseguir buscar né"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:28:17.498251+00:00",
+      "body": "Entendo sua preocupação. Como posso ajudar você com seu equipamento? Por favor, me diga qual é e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T22:28:46.796703+00:00",
+      "body": "Amanhã vou ver se\nDo um ligerao ; preciso de grana lkkkk"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T22:28:47.512146+00:00",
+      "body": "Perfeito! Pode descrever rapidamente o problema que está acontecendo?"
+    }
+  ]
+}

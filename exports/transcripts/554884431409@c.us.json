@@ -1,0 +1,19 @@
+{
+  "peer": "554884431409@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 2,
+  "inCount": 1,
+  "outCount": 1,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T11:51:56.018995+00:00",
+      "body": "Bom dia! Por favor, qual seria a data da devolução?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T11:51:57.148725+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    }
+  ]
+}

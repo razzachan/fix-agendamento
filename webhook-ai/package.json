@@ -10,7 +10,16 @@
     "test": "vitest run",
     "test:ci": "vitest run --reporter=verbose --no-coverage",
     "lint": "eslint --config eslint.config.mjs \"src/**/*.{ts,js}\" \"test/**/*.ts\" --max-warnings=0",
-    "format": "prettier --write \"src/**/*.{ts,js}\" \"test/**/*.ts\""
+    "format": "prettier --write \"src/**/*.{ts,js}\" \"test/**/*.ts\"",
+    "health:admin": "node ./scripts/admin-health-check.mjs",
+    "health:admin:prod": "node ./scripts/admin-health-check-prod.mjs",
+    "smoke:ai-router": "node ./scripts/ai-router-smoke.mjs",
+    "smoke:e2e-gate": "node ./scripts/e2e-gate-orcamento.mjs",
+    "smoke:orcamento": "node ./scripts/smoke-orcamento.mjs",
+    "smoke:agendamento": "node ./scripts/smoke-agendamento.mjs",
+    "smoke:all": "npm run smoke:ai-router && npm run smoke:e2e-gate && npm run smoke:orcamento && npm run smoke:agendamento",
+    "smoke:all:local": "node ./scripts/smoke-all-local.mjs",
+    "smoke:dev-local": "node ./scripts/smoke-dev-local.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.10",

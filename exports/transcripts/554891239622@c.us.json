@@ -1,0 +1,29 @@
+{
+  "peer": "554891239622@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 4,
+  "inCount": 2,
+  "outCount": 2,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T16:23:22.996056+00:00",
+      "body": ""
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T16:23:23.286581+00:00",
+      "body": "Boa tarde"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T16:23:23.738371+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T16:23:25.512142+00:00",
+      "body": "Olá! Como posso te ajudar hoje? Se precisar de assistência técnica, me diga qual é o equipamento e qual o problema que você está enfrentando."
+    }
+  ]
+}

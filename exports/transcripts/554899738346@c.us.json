@@ -1,0 +1,44 @@
+{
+  "peer": "554899738346@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 7,
+  "inCount": 4,
+  "outCount": 3,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:46:30.885978+00:00",
+      "body": "Bom dia"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:46:31.455666+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:46:45.244912+00:00",
+      "body": "Está pronto o microondas?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:46:46.100728+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:22:32.520488+00:00",
+      "body": "Bom dia"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-18T12:22:33.072559+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-18T12:23:01.037937+00:00",
+      "body": "Queria saber se está pronto o microondas"
+    }
+  ]
+}

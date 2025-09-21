@@ -1,0 +1,29 @@
+{
+  "peer": "554796683692@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 4,
+  "inCount": 2,
+  "outCount": 2,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T15:01:17.450806+00:00",
+      "body": "Bom dia!"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T15:01:17.951098+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T15:01:27.308674+00:00",
+      "body": "Quando vão levar a máquina?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T15:01:31.378353+00:00",
+      "body": "Antes de dados pessoais, vou te passar o valor e o escopo do atendimento. Tudo bem?"
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "peer": "554796287418@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 10,
+  "inCount": 5,
+  "outCount": 5,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:05:56.429101+00:00",
+      "body": ""
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:05:56.960079+00:00",
+      "body": "Oi bom dia \nMoro em Itapema \nBairro Morretes\nTenho um fogão que suporte das bocas ( cano que segura ) \nPrecisa de rebite que caiu e fazer uma limpeza \nQueria orçamento. \nFalta um botão também.\nConsul"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:05:57.80159+00:00",
+      "body": "Perfeito! Pode descrever rapidamente o problema que está acontecendo?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:05:58.987246+00:00",
+      "body": "Olá! Como posso ajudá-lo hoje? Se você tiver um problema com algum equipamento, me diga qual é e qual o problema para que possamos encontrar a melhor solução."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:06:14.835715+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:06:21.226431+00:00",
+      "body": "Olá! Como você está? Estou aqui para ajudar com qualquer dúvida ou necessidade relacionada a equipamentos domésticos. Como posso ajudar você hoje?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:07:26.023691+00:00",
+      "body": "Fogão caiu o suporte das bocas e falta um botão"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:07:26.959303+00:00",
+      "body": "Perfeito! Pode descrever rapidamente o problema que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T14:07:44.320261+00:00",
+      "body": "Está escrevi em cima"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T14:07:50.541603+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca consul, problema \"não acende\".\n\nIsso pode ser problema de Eletrodo sujo ou desalinhado, Termopar defeituoso, Válvula de gás obstruída.\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    }
+  ]
+}

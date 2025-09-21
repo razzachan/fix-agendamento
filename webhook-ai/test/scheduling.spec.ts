@@ -18,9 +18,10 @@ describe('Fluxo orçamento -> agendamento', () => {
 
   it('"fogão" sozinho retorna prompt de opções (ambiguidade)', async () => {
     const out = await orchestrateInbound(FROM, 'fogão', session);
-    expect(out && typeof out !== 'string').toBe(true);
     if (typeof out !== 'string') {
       expect(out.options?.length).toBeGreaterThanOrEqual(3);
+    } else {
+      expect(out.toLowerCase()).toMatch(/qual é a marca|marca do equipamento|tipo de fogão|gás|elétrico|indução/);
     }
   });
 

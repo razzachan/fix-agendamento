@@ -1,0 +1,59 @@
+{
+  "peer": "554891059577@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 10,
+  "inCount": 5,
+  "outCount": 5,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:44:47.686819+00:00",
+      "body": "Bom dia"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:44:47.695876+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:44:48.213821+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:44:50.328025+00:00",
+      "body": "Olá! Como posso te ajudar hoje? Se você tiver um problema com um fogão ou eletrodoméstico, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:45:15.165785+00:00",
+      "body": "Lava louças Brastemp nova, erro E6F8"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:45:16.270541+00:00",
+      "body": "Perfeito! Pode descrever rapidamente o problema que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:45:29.591844+00:00",
+      "body": "Lava louças Brastemp nova, erro E6F8"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:45:35.15747+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca brastemp, problema \"erro E6F8\".\n\nIsso pode ser problema de Filtro entupido, Bomba de água, Braços aspersores, Válvula de entrada.\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:46:32.037441+00:00",
+      "body": "Não. Não quero fazer a coleta. Apenas uma visita, pois a máquina está nova. Se não for problema de instalação, aí vou devolver ela"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:46:37.570385+00:00",
+      "body": "Legal! Para a instalação, preciso de: equipamento, tipo (embutido ou bancada), local exato de instalação, voltagem (127V/220V), distância do ponto de gás/energia e se já há fixação/suportes. Pode me passar esses dados?"
+    }
+  ]
+}

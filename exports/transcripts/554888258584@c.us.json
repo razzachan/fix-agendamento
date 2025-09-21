@@ -1,0 +1,119 @@
+{
+  "peer": "554888258584@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 22,
+  "inCount": 11,
+  "outCount": 11,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:21:14.606881+00:00",
+      "body": ""
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:21:15.108606+00:00",
+      "body": "Ola"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:21:15.623666+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:21:16.941222+00:00",
+      "body": "Olá! Como posso ajudar você hoje? Para te ajudar, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:21:31.22012+00:00",
+      "body": "Instalação coisa de ilha"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:21:32.733554+00:00",
+      "body": "Certo! Para fechar, qual é a marca do equipamento?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:21:48.722599+00:00",
+      "body": "Oster"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:21:51.350719+00:00",
+      "body": "Olá! Como posso te ajudar com seu equipamento Oster? Por favor, me diga qual é o problema que você está enfrentando."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:22:12.997603+00:00",
+      "body": "Preciso fazer a instalação da coifa"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:22:13.946923+00:00",
+      "body": "Certo! Para fechar, qual é a marca do equipamento?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:22:25.127232+00:00",
+      "body": "Oster"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:22:30.341934+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, endereço completo com CEP, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:27:40.456297+00:00",
+      "body": "Carla faria brognoli buchele \nAvenida Paulo Roberto vidal 1455\nCep: 88132-599 \nCarlabrog@hotmail.com \n042.004.109-58 \n\nCasa 115"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:27:43.051563+00:00",
+      "body": "✅ *Horários disponíveis para coifa:*\n\n*1.* 🌅 Manhã Quinta-feira, 18/09/2025 📍 Previsão de chegada entre 9 e 10hs\n*2.* 🌅 Manhã Quinta-feira, 18/09/2025 📍 Previsão de chegada entre 10 e 11hs\n*3.* 🌞 Tarde Quinta-feira, 18/09/2025 📍 Previsão de chegada entre 14 e 15hs\n\n💬 *Como escolher seu horário:*\n🔢 Digite *1*, *2* ou *3* para confirmar\n🕐 Ou digite o horário (ex: *10h*, *15h*)\n📅 Ou digite o período (*manhã*, *tarde*)\n\n✨ *Responda com sua opção preferida!*"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:28:22.781278+00:00",
+      "body": "1"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:28:27.302228+00:00",
+      "body": "Agendamento ja existe! Mantemos o mesmo horario. Caso precise alterar, me avise aqui."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:28:57.602389+00:00",
+      "body": "Preciso fazer o orçamento"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:28:58.973748+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:30:33.442527+00:00",
+      "body": "Oster"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:30:39.4754+00:00",
+      "body": "entendi: coifa — coletamos, diagnosticamos. Pode me descrever o problema específico que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:30:45.767844+00:00",
+      "body": "Fazer instalação da coifa"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:30:51.430468+00:00",
+      "body": "Legal! Para a instalação, preciso de: equipamento, tipo (embutido ou bancada), local exato de instalação, voltagem (127V/220V), distância do ponto de gás/energia e se já há fixação/suportes. Pode me passar esses dados?"
+    }
+  ]
+}

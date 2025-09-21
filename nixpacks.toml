@@ -1,17 +1,10 @@
 [phases.setup]
-nixPkgs = ["python311", "pip"]
+nixPkgs = ["nodejs_18"]
 
 [phases.install]
-cmds = ["pip install --no-cache-dir -r requirements.txt"]
-
-[phases.build]
-cmds = ["echo 'Build completed'", "rm -f main_backup.py || true", "python -m compileall middleware.py"]
+cmds = ["npm ci"]
 
 [start]
-cmd = "python main.py"
+cmd = "node api/index.js"
 
-[variables]
-PYTHONUNBUFFERED = "1"
-PYTHONIOENCODING = "utf-8"
-UVICORN_TIMEOUT_KEEP_ALIVE = "300"
-UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN = "30"
+

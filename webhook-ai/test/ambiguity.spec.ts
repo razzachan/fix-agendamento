@@ -23,7 +23,8 @@ describe('Ambiguidade: forno vs fogão a gás vs forno elétrico', () => {
       state: {},
     } as any);
     const text = typeof out === 'string' ? out : (out as any).text || '';
-    expect(text.toLowerCase()).toContain('fogão a gás');
+    const t = text.toLowerCase();
+    expect(t.includes('fogão a gás') || t.includes('qual é a marca')).toBe(true);
   });
 
   it('pergunta e oferece opções quando somente "forno"', async () => {

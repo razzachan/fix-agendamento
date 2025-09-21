@@ -105,11 +105,22 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
       }
     } catch {}
 
-    // Guarda de segurança: só chamar buildQuote quando tivermos dados mínimos para fogão
+    // Guarda de segurança: só chamar buildQuote quando tivermos dados mínimos
     if (obj.tool === 'buildQuote') {
       const eq = String(input.equipment || '').toLowerCase();
       const power = String(input.power_type || '').toLowerCase();
       const desc = String(input.description || '').toLowerCase();
+
+      // Gate universal: exigir MARCA e PROBLEMA antes de orçar
+      const problemText = String(input.problem || input.description || '').trim();
+      if (!input.brand || !problemText) {
+        if (!input.brand && !problemText)
+          return 'Antes do orçamento: qual é a marca do equipamento e qual é o problema específico?';
+        if (!input.brand) return 'Qual é a marca do equipamento?';
+        return 'Pode me descrever o problema específico que está acontecendo?';
+      }
+      // Normalizar para as ferramentas downstream
+      input.problem = input.problem || problemText;
 
       // Inferir num_burners a partir da descrição, se não vier explícito
       if (!input.num_burners && desc) {

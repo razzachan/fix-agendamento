@@ -1,0 +1,119 @@
+{
+  "peer": "554799400601@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 22,
+  "inCount": 11,
+  "outCount": 11,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:38:55.091719+00:00",
+      "body": ""
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:38:55.138796+00:00",
+      "body": "Bom dia"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:38:55.66027+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:38:58.56806+00:00",
+      "body": "Olá! Como posso te ajudar hoje? Se você tiver um problema com um fogão ou eletrodoméstico, me diga qual é o equipamento e qual o problema. Estou aqui para ajudar!"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:39:25.891719+00:00",
+      "body": "Preciso q venha ver o meu cooktop marca Fischer"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:39:26.7428+00:00",
+      "body": "Perfeito! Pode descrever rapidamente o problema que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:39:37.792699+00:00",
+      "body": "Tem uma boca q está dando curto,"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:39:44.31689+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca fischer, problema \"boca que está dando curto\".\n\nIsso pode ser problema de Eletrodo sujo ou desalinhado, Termopar defeituoso, Regulagem de ar incorreta.\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:39:53.623607+00:00",
+      "body": "Já foi arrumado da outra vez mas logo depois já estragou novamente"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:39:54.504172+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, endereço completo com CEP, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:41:13.179368+00:00",
+      "body": "Fabíola Miotto de Siqueira \nRua 624. 62 apto 11302\nItapema ex\nTabuleiro dos oliveiras \n88220000"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:41:14.387913+00:00",
+      "body": "Obrigado! Agora preciso de: e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:42:00.062414+00:00",
+      "body": "fabimaquiagem3@gmail.com"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:42:00.994127+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, endereço completo com CEP, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:42:12.884008+00:00",
+      "body": "Eta aqui"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:42:13.615978+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, endereço completo com CEP, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T10:42:29.731913+00:00",
+      "body": "Apartamento bloco 1"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T10:42:36.579359+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca fischer, problema \"boca que está dando curto\".\n\nIsso pode ser problema de Eletrodo sujo ou desalinhado, Termopar defeituoso, Regulagem de ar incorreta.\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T17:36:28.35869+00:00",
+      "body": "Pode sim"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T17:36:29.077265+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, endereço completo com CEP, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T17:36:43.958405+00:00",
+      "body": "Esse endereço"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T17:36:44.667768+00:00",
+      "body": "Obrigado! Agora preciso de: nome completo, endereço completo com CEP, e-mail, CPF. Se houver, me informe também o complemento (apto/bloco/casa/fundos). Pode me informar?"
+    }
+  ]
+}

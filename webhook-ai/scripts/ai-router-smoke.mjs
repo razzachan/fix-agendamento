@@ -11,8 +11,6 @@ const more = [
   {name:'eletroportatil: air fryer', body:'Vocês consertam air fryer?'},
   {name:'eletroportatil: cafeteira', body:'Minha cafeteira Nespresso quebrou, vocês arrumam?'},
 ];
-  {name:'eletroportatil: air fryer', body:'Vocês consertam air fryer?'},
-  {name:'eletroportatil: cafeteira', body:'Minha cafeteira Nespresso quebrou, vocês arrumam?'},
 
 
 
@@ -40,7 +38,12 @@ async function run(){
     try{
       const res = await fetch(`${base}/test-message`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({from:'5599999999999', body:c.body}) });
       const json = await res.json();
-      results.push({ name:c.name, ok:res.ok, reply: (json.reply||'').slice(0, 180) });
+      const r = json && json.reply;
+      let replyStr = '';
+      if (typeof r === 'string') replyStr = r;
+      else if (r && typeof r.text === 'string') replyStr = r.text;
+      else replyStr = JSON.stringify(r ?? '');
+      results.push({ name:c.name, ok:res.ok, reply: replyStr.slice(0, 180) });
     }catch(e){ results.push({ name:c.name, ok:false, error:String(e)}); }
   }
   console.table(results);

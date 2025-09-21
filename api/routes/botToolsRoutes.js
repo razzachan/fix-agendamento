@@ -121,14 +121,21 @@ router.post('/createAppointment', async (req, res) => {
       ({ data, error } = await supabase.from('calendar_events').insert(insert).select().single());
       if (error) throw error;
     } catch (e) {
-      // Fallback: se coluna service_attendance_type não existir no schema, tenta sem ela
-      const msg = (e?.message||'') + ' ' + (e?.hint||'') + ' ' + (e?.details||'');
-      const missingSAT = msg.toLowerCase().includes('service_attendance_type');
-      if (missingSAT) {
-        const { service_attendance_type, ...safeInsert } = insert;
+      // Fallback: remover colunas ausentes conhecidas (compat com schemas antigos)
+      const msg = ((e?.message||'') + ' ' + (e?.hint||'') + ' ' + (e?.details||''))?.toLowerCase();
+      const missingSAT = msg.includes('service_attendance_type');
+      const missingCPF = msg.includes('client_cpf_cnpj');
+      const missingEmail = msg.includes('client_email');
+      if (missingSAT || missingCPF || missingEmail) {
+        const { service_attendance_type, client_cpf_cnpj, client_email, ...safeInsert } = insert;
         ({ data, error } = await supabase.from('calendar_events').insert(safeInsert).select().single());
         if (error) throw error;
-        if (data && !data.service_attendance_type) data.service_attendance_type = service_attendance_type;
+        // reidratar no payload de resposta para quem consome a API
+        if (data) {
+          if (missingSAT && !data.service_attendance_type) data.service_attendance_type = service_attendance_type;
+          if (missingCPF && !data.client_cpf_cnpj) data.client_cpf_cnpj = client_cpf_cnpj || null;
+          if (missingEmail && !data.client_email) data.client_email = client_email || null;
+        }
       } else {
         throw e;
       }

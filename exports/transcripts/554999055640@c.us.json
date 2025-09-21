@@ -1,0 +1,114 @@
+{
+  "peer": "554999055640@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 21,
+  "inCount": 11,
+  "outCount": 10,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:45:22.388926+00:00",
+      "body": ""
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:45:23.123055+00:00",
+      "body": "Bom dia"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:45:23.636717+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:45:25.104563+00:00",
+      "body": "Olá! Como posso te ajudar hoje? Se você tiver um problema com algum eletrodoméstico, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:45:40.110978+00:00",
+      "body": "Olá"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:45:40.625227+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:45:43.861685+00:00",
+      "body": "Fogão"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:45:44.716468+00:00",
+      "body": "Antes de orçarmos ou agendarmos, preciso de duas informações: qual é a marca e um breve descritivo do defeito?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:46:09.357983+00:00",
+      "body": ""
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:46:14.593182+00:00",
+      "body": "Olá! Como você está? Estou aqui para ajudar com qualquer questão relacionada a fogões e eletrodomésticos. Como posso te ajudar hoje?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:46:29.876264+00:00",
+      "body": "Fogão não liga"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:46:30.79054+00:00",
+      "body": "Certo! Para fechar, qual é a marca do equipamento?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:46:39.054549+00:00",
+      "body": "Electrolux"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:46:39.710889+00:00",
+      "body": "Pode me descrever o problema específico que está acontecendo?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:46:58.5861+00:00",
+      "body": "Giro os 3 botões mas ele N liga"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:47:25.707429+00:00",
+      "body": "O produto não é novo"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:47:32.682027+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca Electrolux, problema \"nao liga\".\n\nIsso pode ser problema de Eletrodo sujo ou desalinhado, o que pode impedir a faísca necessária para acender o gás., Termopar defeituoso, que pode não detectar a chama e, por isso, não permitir a liberação de gás., Válvula de gás obstruída, que pode bloquear o fluxo de gás, impedindo o funcionamento do fogão..\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:48:34.372123+00:00",
+      "body": "Não"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:48:42.587164+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca Electrolux, problema \"nao liga\".\n\nIsso pode ser problema de Eletrodo sujo ou desalinhado, que pode impedir a faísca necessária para acender o gás., Termopar defeituoso, que pode não permitir a passagem de gás se não detectar a chama., Válvula de gás obstruída, que pode bloquear o fornecimento de gás ao queimador..\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T13:48:55.009927+00:00",
+      "body": "Não"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T13:49:02.173884+00:00",
+      "body": "Olha, usando os dados que já tenho aqui: marca Electrolux, problema \"nao liga\".\n\nIsso pode ser problema de Eletrodo sujo ou desalinhado, que pode impedir a faísca necessária para acender o gás., Termopar defeituoso, que pode não estar detectando a chama e, por isso, interrompe o fornecimento de gás., Válvula de gás obstruída, que pode bloquear a passagem do gás, impossibilitando a ignição..\n\nColetamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ 350 (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ 350) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?"
+    }
+  ]
+}

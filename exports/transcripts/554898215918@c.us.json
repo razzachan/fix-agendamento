@@ -1,0 +1,69 @@
+{
+  "peer": "554898215918@c.us",
+  "since": "2025-09-17T07:00:00-03:00",
+  "total": 12,
+  "inCount": 6,
+  "outCount": 6,
+  "messages": [
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T20:58:29.165493+00:00",
+      "body": ""
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T20:58:29.182591+00:00",
+      "body": "Olá"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T20:58:29.644242+00:00",
+      "body": "Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T20:58:34.385793+00:00",
+      "body": "Olá! Como posso ajudá-lo hoje? Se você tiver um problema com um fogão ou eletrodoméstico, por favor, me diga qual é o equipamento e qual o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T20:58:45.070987+00:00",
+      "body": "Vocês só consertam fogões?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T20:58:50.626563+00:00",
+      "body": "Olá! Tudo bem? Nós consertamos não apenas fogões, mas também uma variedade de eletrodomésticos. Como posso ajudar você hoje? Tem algum equipamento específico que precisa de assistência?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T20:58:56.652839+00:00",
+      "body": "Air fryer não?"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T20:58:57.088984+00:00",
+      "body": "Desculpe, no momento não atendemos eletroportáteis (ex.: air fryer, cafeteira, liquidificador). Trabalhamos com fogões, fornos/cooktops, micro-ondas, geladeiras, lavadoras/lava e seca/secadoras, lava-louças e coifas. Posso ajudar com algum desses?"
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T20:59:09.078926+00:00",
+      "body": "Não"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T20:59:11.23141+00:00",
+      "body": "Olá! Como posso te ajudar hoje? Se tiver alguma dúvida ou precisar de assistência, fique à vontade para me informar sobre o equipamento e o problema."
+    },
+    {
+      "direction": "in",
+      "created_at": "2025-09-17T20:59:11.784856+00:00",
+      "body": "Obrigada"
+    },
+    {
+      "direction": "out",
+      "created_at": "2025-09-17T20:59:12.220765+00:00",
+      "body": "Perfeito, sem problema! Fico à disposição. Quando quiser retomar, é só mandar mensagem por aqui. Abraço!"
+    }
+  ]
+}

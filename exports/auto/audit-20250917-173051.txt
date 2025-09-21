@@ -1,0 +1,26 @@
+AutoAudit @ 2025-09-17T20:30:51.575Z
+SINCE: 2025-09-17T17:20:51-03:00
+THRESHOLD: 8
+
+
+===== findDoubleReplies (code 0) =====
+🔎 Buscando double replies desde 2025-09-17T17:20:51-03:00
+
+===== DOUBLE REPLIES =====
+Peers com ocorrências: 0
+Total de ocorrências: 0
+
+===== auditWhatsAppLogs (code 0) =====
+🔎 Auditando conversas WhatsApp desde 2025-09-17T17:20:51-03:00 (gaps > 8 min)
+
+===== RESUMO =====
+Peers auditados: 0
+Gaps detectados: 0
+Loops detectados: 0
+
+===== summarizeWhatsAppLogs (code 0) =====
+📊 Resumindo conversas WhatsApp desde 2025-09-17T17:20:51-03:00
+✅ Summary salvo:
+- CSV: C:\Users\akrom\OneDrive\Área de Trabalho\eletro-fix-hub-pro-main2\exports\whatsapp_summary_2025-09-17T172051-0300.csv
+- JSON: C:\Users\akrom\OneDrive\Área de Trabalho\eletro-fix-hub-pro-main2\exports\whatsapp_summary_2025-09-17T172051-0300.json
+- Transcripts: C:\Users\akrom\OneDrive\Área de Trabalho\eletro-fix-hub-pro-main2\exports\transcripts (0 arquivos)
