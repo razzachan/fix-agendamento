@@ -5,7 +5,7 @@ nixPkgs = ["nodejs_18", "chromium", "nss", "freetype", "freetype-dev", "harfbuzz
 cmds = [
   "npm ci",
   "mkdir -p /usr/bin",
-  "ln -sf $(which chromium) /usr/bin/chromium || true",
+  "find /nix/store -name chromium -type f -executable | head -1 | xargs -I {} ln -sf {} /usr/bin/chromium || true",
   "chmod +x /usr/bin/chromium || true"
 ]
 
