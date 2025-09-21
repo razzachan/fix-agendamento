@@ -5,9 +5,7 @@ import { z } from 'zod';
 import { whatsappRouter } from './routes/whatsapp.js';
 import { aiPreviewRouter } from './routes/aiPreview.js';
 import { pauseRouter } from './routes/pause.js';
-import { waClient } from './services/waClient.js';
 import { runAdminSeedOnBoot } from './services/adminSeed.js';
-import { setupWAInboundAdapter } from './services/waAdapter.js';
 import { getOrCreateSession } from './services/sessionStore.js';
 
 const Env = z.object({
@@ -67,7 +65,12 @@ app.get('/', (_req, res) => {
 
 app.get('/health', async (_req, res) => {
   try {
-    const st = waClient.getStatus();
+    let st: any = { connected: false, me: null, qr: null };
+    try {
+      const { waClient } = await import('./services/waClient.js');
+      st = waClient.getStatus();
+    } catch {}
+
     // ping leve ao supabase (sem depender do schema)
     let supa = 'unknown';
     let admin_ok: boolean | 'unknown' = 'unknown';
@@ -215,6 +218,7 @@ app.post('/sessions/reset', async (req, res) => {
 // Limpar sessão do WhatsApp e forçar novo QR
 app.post('/whatsapp/logout', async (_req, res) => {
   try {
+    const { waClient } = await import('./services/waClient.js');
     await waClient.logout();
     await waClient.connect(true);
     res.json({ ok: true, message: 'Sessão do WhatsApp limpa. Leia o QR novamente.' });
@@ -463,6 +467,8 @@ app.listen(Number(env.PORT), '0.0.0.0', async () => {
   setTimeout(async () => {
     try {
       console.log('[WA] Starting WhatsApp client...');
+      const { waClient } = await import('./services/waClient.js');
+      const { setupWAInboundAdapter } = await import('./services/waAdapter.js');
       await waClient.start();
       setupWAInboundAdapter();
       console.log('[WA] Client initialized successfully');
@@ -472,6 +478,8 @@ app.listen(Number(env.PORT), '0.0.0.0', async () => {
       setTimeout(async () => {
         try {
           console.log('[WA] Retrying WhatsApp client initialization...');
+          const { waClient } = await import('./services/waClient.js');
+          const { setupWAInboundAdapter } = await import('./services/waAdapter.js');
           await waClient.start();
           setupWAInboundAdapter();
           console.log('[WA] Client initialized on retry');
