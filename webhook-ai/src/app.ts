@@ -12,8 +12,8 @@ import { getOrCreateSession } from './services/sessionStore.js';
 
 const Env = z.object({
   PORT: z.string().default(process.env.PORT || '3100'),
-  SUPABASE_URL: z.string(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string(),
+  SUPABASE_URL: z.string().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   // Removido: variáveis WABA
   OPENAI_API_KEY: z.string().optional(),
 });
