@@ -8,8 +8,9 @@ nixPkgs = ["nodejs_18", "chromium", "nss", "freetype", "harfbuzz", "ca-certifica
 cmds = [
   "npm ci",
   "mkdir -p /usr/bin /app/.cache",
-  "ln -sf $(which chromium) /usr/bin/chromium",
-  "chmod +x /usr/bin/chromium"
+  "find /nix/store -name chromium -type f -executable 2>/dev/null | head -1 | xargs -I {} ln -sf {} /usr/bin/chromium || echo 'Chromium not found in /nix/store'",
+  "ls -la /usr/bin/chromium || echo 'Symlink not created'",
+  "chmod +x /usr/bin/chromium 2>/dev/null || echo 'Could not chmod chromium'"
 ]
 
 [phases.build]
