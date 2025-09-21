@@ -477,7 +477,7 @@ app.listen(Number(env.PORT), '0.0.0.0', async () => {
       const { setupWAInboundAdapter } = await import('./services/waAdapter.js');
       await waClient.start();
       setupWAInboundAdapter();
-      console.log('[WA] Client initialized successfully');
+      console.log('[WA] Client initialized successfully (force redeploy)');
     } catch (e) {
       console.error('[WA] init error', e);
       // Tentar novamente em 30 segundos
