@@ -11,7 +11,7 @@ import { setupWAInboundAdapter } from './services/waAdapter.js';
 import { getOrCreateSession } from './services/sessionStore.js';
 
 const Env = z.object({
-  PORT: z.string().default('3100'),
+  PORT: z.string().default(process.env.PORT || '3100'),
   SUPABASE_URL: z.string(),
   SUPABASE_SERVICE_ROLE_KEY: z.string(),
   // Removido: variáveis WABA
