@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { supabase } from './supabase.js';
 
-const API_URL = process.env.API_URL || 'http://127.0.0.1:3001';
+const API_URL = process.env.API_BASE_URL || process.env.API_URL || 'http://127.0.0.1:3001';
 const MIDDLEWARE_URL = process.env.MIDDLEWARE_URL || 'http://127.0.0.1:8000';
 const QUOTE_OFFLINE_FALLBACK =
   process.env.QUOTE_OFFLINE_FALLBACK === 'true' || process.env.NODE_ENV === 'test';
