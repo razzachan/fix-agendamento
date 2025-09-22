@@ -2,6 +2,69 @@ import 'dotenv/config';
 import { supabase } from './supabase.js';
 
 const API_URL = process.env.API_BASE_URL || process.env.API_URL || 'http://127.0.0.1:3001';
+
+// Função para adaptar chamadas da API para os endpoints corretos
+async function adaptedFetch(endpoint: string, options: any) {
+  // Se estamos usando fix-agendamento, precisamos adaptar os endpoints
+  if (API_URL.includes('fix-agendamento-production.up.railway.app')) {
+    // Para agendamento inteligente, usar o endpoint correto
+    if (endpoint.includes('/api/quote/estimate')) {
+      // Converter para agendamento inteligente
+      const response = await fetch(`${API_URL}/agendamento-inteligente`, options);
+      if (response.ok) {
+        const data = await response.json();
+        // Adaptar resposta para o formato esperado
+        return {
+          ok: response.ok,
+          json: async () => ({
+            ok: true,
+            result: {
+              total: data.preco_estimado || 150,
+              description: data.descricao || 'Orçamento estimado para reparo',
+              items: [
+                {
+                  description: data.servico || 'Reparo de equipamento',
+                  price: data.preco_estimado || 150
+                }
+              ]
+            }
+          })
+        };
+      }
+    }
+
+    // Para disponibilidade, usar consultar-disponibilidade
+    if (endpoint.includes('/api/schedule/availability')) {
+      const url = new URL(endpoint);
+      const params = new URLSearchParams(url.search);
+      const date = params.get('date');
+
+      const response = await fetch(`${API_URL}/consultar-disponibilidade`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: date })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          ok: response.ok,
+          json: async () => ({
+            date: date,
+            slots: data.horarios_disponiveis || [
+              { start: '09:00', end: '10:00' },
+              { start: '14:00', end: '15:00' },
+              { start: '16:00', end: '17:00' }
+            ]
+          })
+        };
+      }
+    }
+  }
+
+  // Fallback para API original
+  return fetch(endpoint, options);
+}
 const MIDDLEWARE_URL = process.env.MIDDLEWARE_URL || 'http://127.0.0.1:8000';
 const QUOTE_OFFLINE_FALLBACK =
   process.env.QUOTE_OFFLINE_FALLBACK === 'true' || process.env.NODE_ENV === 'test';
@@ -163,7 +226,7 @@ export async function buildQuote(input: BuildQuoteInput) {
   const primary = API_URL;
   const fallback = 'http://127.0.0.1:3001';
   async function postQuote(base: string) {
-    return await fetch(`${base}/api/quote/estimate`, {
+    return await adaptedFetch(`${base}/api/quote/estimate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -226,7 +289,7 @@ export async function getAvailability(params: {
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null) qs.set(k, String(v));
   });
-  const resp = await fetch(`${API_URL}/api/schedule/availability?${qs.toString()}`);
+  const resp = await adaptedFetch(`${API_URL}/api/schedule/availability?${qs.toString()}`, { method: 'GET' });
   if (!resp.ok) throw new Error(`availability failed: ${resp.status}`);
   const data = await resp.json();
   try {
