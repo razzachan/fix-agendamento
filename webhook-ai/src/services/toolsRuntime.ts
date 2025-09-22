@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { supabase } from './supabase.js';
 
-const API_URL = process.env.API_BASE_URL || process.env.API_URL || 'http://127.0.0.1:3001';
+const API_URL = process.env.API_BASE_URL || process.env.API_URL || 'https://fix-agendamento-production.up.railway.app';
 
 // Função para adaptar chamadas da API para os endpoints corretos
 async function adaptedFetch(endpoint: string, options: any) {
