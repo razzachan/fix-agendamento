@@ -94,7 +94,7 @@ async function adaptedFetch(endpoint: string, options: any) {
 }
 const MIDDLEWARE_URL = process.env.MIDDLEWARE_URL || 'http://127.0.0.1:8000';
 const QUOTE_OFFLINE_FALLBACK =
-  process.env.QUOTE_OFFLINE_FALLBACK === 'true' || process.env.NODE_ENV === 'test';
+  process.env.QUOTE_OFFLINE_FALLBACK === 'true' || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'production';
 
 function computeLocalQuote(payload: any) {
   // Fallback determinístico simplificado para testes offline
