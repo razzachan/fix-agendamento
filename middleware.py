@@ -1,52 +1,123 @@
-# -*- coding: utf-8 -*-
-import os
-import json
-import logging
-import math
-import asyncio
-import httpx
-from typing import Dict, Any, List, Optional, Tuple
+#!/usr/bin/env python3
+"""
+API simples para agendamento inteligente - Fix Fogões
+Versão simplificada que funciona corretamente
+"""
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from typing import Optional, Dict, Any, List, Tuple
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import pytz
 from contextlib import asynccontextmanager
+import json
+import logging
+import os
+import math
+import asyncio
+import httpx
 
-# Cache global para otimização
-_supabase_client = None
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def obter_valor_servico(tipo_atendimento: str, valor_clientechat: float = None) -> float:
-    """
-    Obtém o valor do serviço baseado no valor do ClienteChat
+app = FastAPI(
+    title="Fix Fogões API - Agendamento Inteligente",
+    description="API para agendamento inteligente e orçamentos",
+    version="2.0.0"
+)
 
-    LÓGICA CORRETA (FLEXÍVEL):
-    - TODOS os tipos usam valor do ClienteChat (mais flexível)
-    - em_domicilio: Valor do ClienteChat
-    - coleta_conserto: Valor do ClienteChat
-    - coleta_diagnostico: Valor do ClienteChat (bot sempre passa o mesmo valor)
-    """
-    logger.info(f"💰 Obtendo valor para: tipo={tipo_atendimento}, valor_clientechat={valor_clientechat}")
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    # TODOS os tipos usam valor do ClienteChat (mais flexível)
-    if valor_clientechat and valor_clientechat > 0:
-        valor_final = valor_clientechat
-        logger.info(f"📱 VALOR DO CLIENTECHAT: R$ {valor_final} para {tipo_atendimento}")
+# Modelos Pydantic
+class AgendamentoRequest(BaseModel):
+    equipamento: str
+    marca: Optional[str] = None
+    problema: Optional[str] = None
+    urgencia: Optional[str] = "normal"
+    regiao: Optional[str] = None
+
+class QuoteRequest(BaseModel):
+    equipment: str
+    brand: Optional[str] = None
+    problem: Optional[str] = None
+    urgency: Optional[str] = "normal"
+    region: Optional[str] = None
+
+# Função para gerar orçamento determinístico
+def generate_quote(equipment: str, brand: str = None, problem: str = None, urgency: str = "normal"):
+    """Gera um orçamento determinístico baseado nos parâmetros"""
+
+    # Valores base por equipamento
+    base_values = {
+        "fogao": {"visita": 80, "servico": 150, "total": 230},
+        "microondas": {"visita": 70, "servico": 120, "total": 190},
+        "geladeira": {"visita": 90, "servico": 180, "total": 270},
+        "lava_louças": {"visita": 85, "servico": 160, "total": 245},
+        "cooktop": {"visita": 75, "servico": 140, "total": 215},
+        "forno": {"visita": 80, "servico": 150, "total": 230},
+    }
+
+    # Normalizar equipamento
+    eq = equipment.lower().replace("ã", "a").replace("ç", "c")
+    if "micro" in eq or "ondas" in eq:
+        eq = "microondas"
+    elif "fogao" in eq or "fogão" in eq:
+        eq = "fogao"
+    elif "geladeira" in eq or "refrigerador" in eq:
+        eq = "geladeira"
+    elif "lava" in eq and "louça" in eq:
+        eq = "lava_louças"
+    elif "cooktop" in eq:
+        eq = "cooktop"
+    elif "forno" in eq:
+        eq = "forno"
     else:
-        # Fallback se não vier valor do ClienteChat
-        valores_fallback = {
-            "em_domicilio": 150.00,
-            "coleta_conserto": 120.00,
-            "coleta_diagnostico": 350.00  # Fallback para coleta diagnóstico
-        }
-        valor_final = valores_fallback.get(tipo_atendimento, 150.00)
-        logger.warning(f"⚠️ FALLBACK: Usando valor padrão R$ {valor_final} para {tipo_atendimento}")
+        eq = "fogao"  # default
 
-    logger.info(f"✅ Valor final definido: R$ {valor_final}")
-    return valor_final
+    values = base_values.get(eq, base_values["fogao"])
+
+    # Ajustar por urgência
+    if urgency == "urgente":
+        multiplier = 1.3
+    elif urgency == "emergencia":
+        multiplier = 1.5
+    else:
+        multiplier = 1.0
+
+    # Ajustar por marca (premium)
+    premium_brands = ["brastemp", "consul", "electrolux", "bosch", "fischer"]
+    if brand and brand.lower() in premium_brands:
+        multiplier *= 1.1
+
+    # Calcular valores finais
+    final_values = {
+        "visita": round(values["visita"] * multiplier),
+        "servico": round(values["servico"] * multiplier),
+        "total": round(values["total"] * multiplier)
+    }
+
+    return {
+        "success": True,
+        "equipamento": equipment,
+        "marca": brand or "Genérica",
+        "problema": problem or "Não especificado",
+        "valores": final_values,
+        "prazo_visita": "24-48h" if urgency == "urgente" else "48-72h",
+        "garantia": "90 dias",
+        "observacoes": f"Orçamento para {equipment} - {brand or 'marca genérica'}"
+    }
 
 def obter_valor_inicial(tipo_atendimento: str, valor_clientechat: float = None) -> float:
     """
@@ -3453,7 +3524,31 @@ async def agendamento_inteligente(request: Request):
         # 🕐 SEMPRE VERIFICAR HORÁRIO REAL ANTES DE QUALQUER OPERAÇÃO
         info_horario = verificar_horario_real_sistema()
 
-        data = await request.json()
+        # 🔧 PARSING SEGURO DO JSON COM TRATAMENTO DE ERRO
+        try:
+            data = await request.json()
+        except json.JSONDecodeError as json_error:
+            logger.error(f"❌ Erro de parsing JSON: {json_error}")
+            logger.error(f"❌ Body da requisição: {await request.body()}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "JSON inválido",
+                    "message": f"Erro ao processar JSON: {str(json_error)}"
+                }
+            )
+        except Exception as parse_error:
+            logger.error(f"❌ Erro ao processar requisição: {parse_error}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "Erro de requisição",
+                    "message": f"Erro ao processar dados: {str(parse_error)}"
+                }
+            )
+
         logger.info(f"🚀 NEURAL CHAIN 1: Executando consulta de disponibilidade")
         logger.info(f"Agendamento inteligente - dados recebidos: {data}")
 
@@ -3656,7 +3751,31 @@ async def agendamento_inteligente_confirmacao(request: Request):
     Recebe apenas: opcao_escolhida + telefone_contato
     """
     try:
-        data = await request.json()
+        # 🔧 PARSING SEGURO DO JSON COM TRATAMENTO DE ERRO
+        try:
+            data = await request.json()
+        except json.JSONDecodeError as json_error:
+            logger.error(f"❌ Erro de parsing JSON: {json_error}")
+            logger.error(f"❌ Body da requisição: {await request.body()}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "JSON inválido",
+                    "message": f"Erro ao processar JSON: {str(json_error)}"
+                }
+            )
+        except Exception as parse_error:
+            logger.error(f"❌ Erro ao processar requisição: {parse_error}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "Erro de requisição",
+                    "message": f"Erro ao processar dados: {str(parse_error)}"
+                }
+            )
+
         logger.info(f"🚀 ETAPA 2: Confirmação recebida - dados: {data}")
 
         # Extrair dados essenciais
@@ -4176,6 +4295,95 @@ async def health_check():
             "error": str(e)
         }
 
+# Endpoint compatível com webhook-ai para orçamentos
+@app.post("/api/quote/estimate")
+async def quote_estimate(request: Request):
+    """
+    Endpoint compatível com webhook-ai para geração de orçamentos
+    Formato compatível com toolsRuntime.ts
+    """
+    try:
+        # 🔧 PARSING SEGURO DO JSON COM TRATAMENTO DE ERRO
+        try:
+            data = await request.json()
+        except json.JSONDecodeError as json_error:
+            logger.error(f"❌ Erro de parsing JSON: {json_error}")
+            return {"ok": False, "error": f"JSON inválido: {str(json_error)}"}
+        except Exception as parse_error:
+            logger.error(f"❌ Erro ao processar requisição: {parse_error}")
+            return {"ok": False, "error": f"Erro de requisição: {str(parse_error)}"}
+
+        logger.info(f"📋 Quote estimate - dados recebidos: {data}")
+
+        # Extrair dados (formato do webhook-ai)
+        equipment = data.get("equipment", "")
+        brand = data.get("brand", "")
+        problem = data.get("problem", "")
+        urgency = data.get("urgency", "normal")
+
+        # Calcular valores baseados no equipamento e urgência
+        multiplier = 1.0
+        if urgency == "urgente":
+            multiplier = 1.3
+        elif urgency == "emergencia":
+            multiplier = 1.5
+
+        # Valores base por equipamento
+        base_values = {
+            "fogao": {"visita": 80, "servico": 150},
+            "microondas": {"visita": 70, "servico": 120},
+            "geladeira": {"visita": 90, "servico": 180},
+            "cooktop": {"visita": 75, "servico": 140},
+            "forno": {"visita": 80, "servico": 150},
+        }
+
+        # Normalizar equipamento
+        eq = equipment.lower().replace("ã", "a").replace("ç", "c")
+        if "micro" in eq or "ondas" in eq:
+            eq = "microondas"
+        elif "fogao" in eq or "fogão" in eq:
+            eq = "fogao"
+        elif "geladeira" in eq or "refrigerador" in eq:
+            eq = "geladeira"
+        elif "cooktop" in eq:
+            eq = "cooktop"
+        elif "forno" in eq:
+            eq = "forno"
+        else:
+            eq = "fogao"  # default
+
+        values = base_values.get(eq, base_values["fogao"])
+
+        # Calcular valores finais
+        visita_valor = round(values["visita"] * multiplier)
+        servico_valor = round(values["servico"] * multiplier)
+        total_valor = visita_valor + servico_valor
+
+        # Formato de resposta compatível com webhook-ai
+        result = {
+            "ok": True,
+            "result": {
+                "equipment": equipment,
+                "brand": brand or "Genérica",
+                "problem": problem or "Não especificado",
+                "values": {
+                    "visita": visita_valor,
+                    "servico": servico_valor,
+                    "total": total_valor
+                },
+                "visit_time": "24-48h" if urgency == "urgente" else "48-72h",
+                "warranty": "90 dias",
+                "notes": f"Orçamento para {equipment} - {brand or 'marca genérica'}"
+            }
+        }
+
+        logger.info(f"✅ Quote estimate gerado: {result}")
+        return result
+
+    except Exception as e:
+        logger.error(f"❌ Erro na estimativa de orçamento: {str(e)}")
+        return {"ok": False, "error": str(e)}
+
 @app.get("/test-avaliacao")
 async def test_avaliacao():
     """Endpoint de teste para avaliação"""
@@ -4418,7 +4626,31 @@ async def listar_agendamentos():
 @app.post("/consultar-disponibilidade")
 async def consultar_disponibilidade(request: Request):
     try:
-        data = await request.json()
+        # 🔧 PARSING SEGURO DO JSON COM TRATAMENTO DE ERRO
+        try:
+            data = await request.json()
+        except json.JSONDecodeError as json_error:
+            logger.error(f"❌ Erro de parsing JSON: {json_error}")
+            logger.error(f"❌ Body da requisição: {await request.body()}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "JSON inválido",
+                    "message": f"Erro ao processar JSON: {str(json_error)}"
+                }
+            )
+        except Exception as parse_error:
+            logger.error(f"❌ Erro ao processar requisição: {parse_error}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "Erro de requisição",
+                    "message": f"Erro ao processar dados: {str(parse_error)}"
+                }
+            )
+
         logger.info(f"Consultando disponibilidade: {data}")
 
         # Extrair e validar dados básicos
@@ -4592,7 +4824,31 @@ async def consultar_disponibilidade(request: Request):
 @app.post("/agendamento-inteligente-completo")
 async def agendamento_inteligente_completo(request: Request):
     try:
-        data = await request.json()
+        # 🔧 PARSING SEGURO DO JSON COM TRATAMENTO DE ERRO
+        try:
+            data = await request.json()
+        except json.JSONDecodeError as json_error:
+            logger.error(f"❌ Erro de parsing JSON: {json_error}")
+            logger.error(f"❌ Body da requisição: {await request.body()}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "JSON inválido",
+                    "message": f"Erro ao processar JSON: {str(json_error)}"
+                }
+            )
+        except Exception as parse_error:
+            logger.error(f"❌ Erro ao processar requisição: {parse_error}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "Erro de requisição",
+                    "message": f"Erro ao processar dados: {str(parse_error)}"
+                }
+            )
+
         logger.info(f"Agendamento inteligente - dados recebidos: {data}")
 
         # 🔧 NOVA LÓGICA: DETECTAR ETAPA POR PARÂMETRO opcao_escolhida
