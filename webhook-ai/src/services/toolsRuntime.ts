@@ -5,65 +5,92 @@ const API_URL = process.env.API_BASE_URL || process.env.API_URL || 'http://127.0
 
 // Função para adaptar chamadas da API para os endpoints corretos
 async function adaptedFetch(endpoint: string, options: any) {
-  // Se estamos usando fix-agendamento, precisamos adaptar os endpoints
-  if (API_URL.includes('fix-agendamento-production.up.railway.app')) {
-    // Para agendamento inteligente, usar o endpoint correto
-    if (endpoint.includes('/api/quote/estimate')) {
-      // Converter para agendamento inteligente
-      const response = await fetch(`${API_URL}/agendamento-inteligente`, options);
-      if (response.ok) {
-        const data = await response.json();
-        // Adaptar resposta para o formato esperado
-        return {
-          ok: response.ok,
-          json: async () => ({
-            ok: true,
-            result: {
-              total: data.preco_estimado || 150,
-              description: data.descricao || 'Orçamento estimado para reparo',
-              items: [
-                {
-                  description: data.servico || 'Reparo de equipamento',
-                  price: data.preco_estimado || 150
+  try {
+    // Primeiro, tentar a API original
+    const response = await fetch(endpoint, options);
+    if (response.ok) {
+      return response;
+    }
+
+    // Se falhou, tentar adaptações para fix-agendamento
+    if (API_URL.includes('fix-agendamento-production.up.railway.app')) {
+      console.log('[adaptedFetch] Tentando adaptação para fix-agendamento');
+
+      // Para agendamento inteligente, usar o endpoint correto
+      if (endpoint.includes('/api/quote/estimate')) {
+        try {
+          const adaptedResponse = await fetch(`${API_URL}/agendamento-inteligente`, options);
+          if (adaptedResponse.ok) {
+            const data = await adaptedResponse.json();
+            // Criar uma resposta mock que simula o formato esperado
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                ok: true,
+                result: {
+                  total: data.preco_estimado || 150,
+                  description: data.descricao || 'Orçamento estimado para reparo',
+                  items: [
+                    {
+                      description: data.servico || 'Reparo de equipamento',
+                      price: data.preco_estimado || 150
+                    }
+                  ]
                 }
-              ]
-            }
-          })
-        };
+              })
+            } as Response;
+          }
+        } catch (e) {
+          console.warn('[adaptedFetch] Erro na adaptação de quote:', e);
+        }
+      }
+
+      // Para disponibilidade, usar consultar-disponibilidade
+      if (endpoint.includes('/api/schedule/availability')) {
+        try {
+          const url = new URL(endpoint);
+          const params = new URLSearchParams(url.search);
+          const date = params.get('date');
+
+          const adaptedResponse = await fetch(`${API_URL}/consultar-disponibilidade`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: date })
+          });
+
+          if (adaptedResponse.ok) {
+            const data = await adaptedResponse.json();
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                date: date,
+                slots: data.horarios_disponiveis || [
+                  { start: '09:00', end: '10:00' },
+                  { start: '14:00', end: '15:00' },
+                  { start: '16:00', end: '17:00' }
+                ]
+              })
+            } as Response;
+          }
+        } catch (e) {
+          console.warn('[adaptedFetch] Erro na adaptação de availability:', e);
+        }
       }
     }
 
-    // Para disponibilidade, usar consultar-disponibilidade
-    if (endpoint.includes('/api/schedule/availability')) {
-      const url = new URL(endpoint);
-      const params = new URLSearchParams(url.search);
-      const date = params.get('date');
-
-      const response = await fetch(`${API_URL}/consultar-disponibilidade`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: date })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return {
-          ok: response.ok,
-          json: async () => ({
-            date: date,
-            slots: data.horarios_disponiveis || [
-              { start: '09:00', end: '10:00' },
-              { start: '14:00', end: '15:00' },
-              { start: '16:00', end: '17:00' }
-            ]
-          })
-        };
-      }
-    }
+    // Se todas as adaptações falharam, retornar a resposta original (que pode ser um erro)
+    return response;
+  } catch (error) {
+    console.warn('[adaptedFetch] Erro geral:', error);
+    // Em caso de erro de rede, retornar uma resposta de erro
+    return {
+      ok: false,
+      status: 500,
+      json: async () => ({ error: 'network_error' })
+    } as Response;
   }
-
-  // Fallback para API original
-  return fetch(endpoint, options);
 }
 const MIDDLEWARE_URL = process.env.MIDDLEWARE_URL || 'http://127.0.0.1:8000';
 const QUOTE_OFFLINE_FALLBACK =
