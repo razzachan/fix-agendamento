@@ -38,6 +38,19 @@ export function BotWizard({ onSwitchToAdvanced }: Props) {
     if (config?.llm?.model) setModel(config.llm.model);
   },[config?.id]);
 
+  // Auto-refresh QR code quando estiver no passo 3
+  useEffect(() => {
+    if (step === 3) {
+      loadWA(); // Carregar status inicial
+      const interval = setInterval(() => {
+        if (!status?.connected) {
+          loadWA(); // Atualizar QR code a cada 10 segundos se não conectado
+        }
+      }, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [step, status?.connected]);
+
   const saveStep1 = async () => {
     await botService.upsertConfig({ id: config?.id, name, personality: { ...(config?.personality||{}), systemPrompt: prompt, tone } } as any);
     await reload();
@@ -51,8 +64,19 @@ export function BotWizard({ onSwitchToAdvanced }: Props) {
   };
 
   const loadWA = async ()=>{
-    try{ const s = await fetch(`${webhookAIBase()}/whatsapp/status`).then(r=>r.json()); setStatus(s as WAStatus); }catch{/* ignore */}
-    try{ const r = await fetch(`${webhookAIBase()}/whatsapp/qr`); if (r.status===204) setQr(null); else setQr((await r.json()).qr); }catch{/* ignore */}
+    try{
+      const s = await fetch(`${webhookAIBase()}/whatsapp/status`).then(r=>r.json());
+      setStatus(s as WAStatus);
+    }catch{/* ignore */}
+    try{
+      const r = await fetch(`${webhookAIBase()}/whatsapp/qr-image`);
+      if (r.status===204) {
+        setQr(null);
+      } else {
+        const qrData = await r.text();
+        setQr(qrData);
+      }
+    }catch{/* ignore */}
   };
   useEffect(()=>{ if (step===3){ loadWA(); const i=setInterval(loadWA, 3000); return ()=> clearInterval(i); } },[step]);
 
@@ -158,9 +182,33 @@ export function BotWizard({ onSwitchToAdvanced }: Props) {
                   <input type="checkbox" checked={remindLater} onChange={e=>setRemindLater(e.target.checked)} />
                   Lembrar-me de conectar mais tarde
                 </label>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Escaneie o QR abaixo:</div>
-                  {qr ? <img src={qr} className="w-64 border rounded" /> : <div className="text-xs text-muted-foreground">Gerando QR...</div>}
+                <div className="space-y-3">
+                  <div className="text-sm font-medium">📱 QR Code para Conexão:</div>
+                  {qr ? (
+                    <div className="p-4 bg-gradient-to-br from-green-50 to-blue-50 rounded-lg border-2 border-green-200 text-center">
+                      <img src={qr} alt="QR Code WhatsApp" className="mx-auto max-w-[200px] rounded-lg shadow-md" />
+                      <div className="mt-3 space-y-2">
+                        <div className="text-xs font-medium text-green-700">Como conectar:</div>
+                        <ol className="text-xs text-gray-600 space-y-1 text-left max-w-xs mx-auto">
+                          <li>1. Abra o WhatsApp no celular</li>
+                          <li>2. Menu (3 pontos) → "Dispositivos conectados"</li>
+                          <li>3. "Conectar um dispositivo"</li>
+                          <li>4. Escaneie o QR code acima</li>
+                        </ol>
+                        <div className="text-xs text-blue-600 mt-2">
+                          ⏱️ QR expira em alguns minutos. Use "Atualizar" se necessário.
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 text-center">
+                      <div className="text-2xl mb-2">📱</div>
+                      <div className="text-sm text-gray-600">Gerando QR Code...</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Clique em "Conectar / Gerar QR" se não aparecer
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
