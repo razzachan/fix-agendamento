@@ -34,13 +34,15 @@ COPY package*.json ./
 # Install dependencies (skip Chromium download)
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source code
 COPY . .
 
 # Build TypeScript
 RUN npm run build
+# Remove devDependencies for smaller production image
+RUN npm prune --omit=dev
 
 # Set environment variables
 ENV NODE_ENV=production
