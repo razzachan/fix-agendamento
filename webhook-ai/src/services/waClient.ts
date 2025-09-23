@@ -866,6 +866,14 @@ class WhatsAppClient extends EventEmitter {
     this.started = true;
   }
 
+  public async destroy() {
+    try {
+      await this.client.destroy();
+    } catch {}
+    this.status = { connected: false, me: null, qr: null };
+    this.started = false;
+  }
+
   public async logout() {
     try {
       // Sair da sessão e fechar o cliente
