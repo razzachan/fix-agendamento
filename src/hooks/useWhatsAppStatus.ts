@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { webhookAIBase } from '@/lib/urls';
 
 export function useWhatsAppStatus(pollMs: number = 4000) {
   const [connected, setConnected] = useState<boolean>(false);
@@ -8,7 +9,7 @@ export function useWhatsAppStatus(pollMs: number = 4000) {
     let cancelled = false;
     const fetchStatus = async () => {
       try {
-        const base = (window as any).__API_URL__ || ''; const res = await fetch(`${base}/api/whatsapp/status`);
+        const res = await fetch(`${webhookAIBase()}/whatsapp/status`, { cache: 'no-store' });
         const data = await res.json();
         if (!cancelled) {
           setConnected(!!data?.connected);
