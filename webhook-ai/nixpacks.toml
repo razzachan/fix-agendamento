@@ -2,7 +2,7 @@
 node = "18"
 
 [phases.setup]
-nixPkgs = ["nodejs_18", "chromium", "nss", "freetype", "harfbuzz", "ca-certificates", "ttf-freefont", "fontconfig", "glib", "gtk3", "libdrm", "xorg.libxcb", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libXrender", "xorg.libxshmfence", "xorg.libXi", "xorg.libXtst", "gdk-pixbuf", "cairo", "pango", "atk", "at-spi2-atk", "at-spi2-core", "cups", "dbus", "expat", "libxkbcommon", "nspr", "alsa-lib"]
+nixPkgs = ["nodejs_18", "chromium", "nss", "freetype", "harfbuzz", "ca-certificates", "ttf-freefont", "fontconfig", "glib", "gobject-introspection", "gtk3", "libdrm", "xorg.libxcb", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libXrender", "xorg.libxshmfence", "xorg.libXi", "xorg.libXtst", "gdk-pixbuf", "cairo", "pango", "atk", "at-spi2-atk", "at-spi2-core", "cups", "dbus", "expat", "libxkbcommon", "nspr", "alsa-lib", "libffi", "pcre", "util-linux", "systemd"]
 
 [phases.install]
 cmds = [
@@ -21,6 +21,8 @@ cmds = [
   "  chmod +x \"$CHROMIUM_PATH\" /usr/bin/chromium /usr/bin/chromium-browser /usr/bin/google-chrome",
   "  echo 'Testing Chromium...'",
   "  \"$CHROMIUM_PATH\" --version && echo 'Chromium is working!'",
+  "echo 'Checking shared libraries...'",
+  "ldd \"$CHROMIUM_PATH\" | grep 'not found' || echo 'All libraries found!'",
   "else",
   "  echo 'Trying system Chromium as fallback...'",
   "  SYSTEM_CHROMIUM=$(find /nix/store -name chromium -type f -executable 2>/dev/null | head -1)",
@@ -43,3 +45,5 @@ cmd = "npm start"
 PUPPETEER_EXECUTABLE_PATH = "/usr/bin/chromium"
 PUPPETEER_ARGS = "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu"
 WA_HEADLESS = "true"
+LD_LIBRARY_PATH = "/nix/store/*/lib:/usr/lib:/lib"
+PKG_CONFIG_PATH = "/nix/store/*/lib/pkgconfig:/usr/lib/pkgconfig"
