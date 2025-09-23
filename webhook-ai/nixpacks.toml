@@ -8,30 +8,23 @@ nixPkgs = ["nodejs_18", "chromium", "nss", "freetype", "harfbuzz", "ca-certifica
 cmds = [
   "npm ci",
   "mkdir -p /usr/bin /app/.cache /app/.local-chromium",
-  "echo 'Setting up Chromium for Railway deployment...'",
-  "echo 'Downloading Puppeteer Chromium manually...'",
-  "cd /app && npx puppeteer browsers install chrome",
-  "echo 'Finding downloaded Chromium...'",
-  "CHROMIUM_PATH=$(find /app -name chrome -type f -executable 2>/dev/null | head -1)",
-  "if [ -n \"$CHROMIUM_PATH\" ]; then",
-  "  echo \"Found Puppeteer Chromium at: $CHROMIUM_PATH\"",
-  "  ln -sf \"$CHROMIUM_PATH\" /usr/bin/chromium",
-  "  ln -sf \"$CHROMIUM_PATH\" /usr/bin/chromium-browser",
-  "  ln -sf \"$CHROMIUM_PATH\" /usr/bin/google-chrome",
-  "  chmod +x \"$CHROMIUM_PATH\" /usr/bin/chromium /usr/bin/chromium-browser /usr/bin/google-chrome",
-  "  echo 'Testing Chromium...'",
-  "  \"$CHROMIUM_PATH\" --version && echo 'Chromium is working!'",
-  "echo 'Checking shared libraries...'",
-  "ldd \"$CHROMIUM_PATH\" | grep 'not found' || echo 'All libraries found!'",
-  "else",
-  "  echo 'Trying system Chromium as fallback...'",
-  "  SYSTEM_CHROMIUM=$(find /nix/store -name chromium -type f -executable 2>/dev/null | head -1)",
-  "  if [ -n \"$SYSTEM_CHROMIUM\" ]; then",
+  "echo 'Setting up system Chromium for Railway deployment...'",
+  "echo 'Finding system Chromium...'",
+  "SYSTEM_CHROMIUM=$(find /nix/store -name chromium -type f -executable 2>/dev/null | head -1)",
+  "if [ -n \"$SYSTEM_CHROMIUM\" ]; then",
+  "    echo \"Found system Chromium at: $SYSTEM_CHROMIUM\"",
   "    ln -sf \"$SYSTEM_CHROMIUM\" /usr/bin/chromium",
-  "    echo \"Using system Chromium: $SYSTEM_CHROMIUM\"",
-  "  else",
-  "    echo 'ERROR: No Chromium found'",
-  "  fi",
+  "    ln -sf \"$SYSTEM_CHROMIUM\" /usr/bin/chromium-browser",
+  "    ln -sf \"$SYSTEM_CHROMIUM\" /usr/bin/google-chrome",
+  "    chmod +x \"$SYSTEM_CHROMIUM\" /usr/bin/chromium /usr/bin/chromium-browser /usr/bin/google-chrome",
+  "    echo 'Testing system Chromium...'",
+  "    \"$SYSTEM_CHROMIUM\" --version && echo 'System Chromium is working!'",
+  "    echo 'Checking shared libraries...'",
+  "    ldd \"$SYSTEM_CHROMIUM\" | grep 'not found' || echo 'All libraries found!'",
+  "else",
+  "    echo 'ERROR: No system Chromium found in Nix store'",
+  "    echo 'Available Chromium-related files:'",
+  "    find /nix/store -name '*chromium*' -type f 2>/dev/null | head -10",
   "fi"
 ]
 
@@ -42,6 +35,7 @@ cmds = ["npm run build"]
 cmd = "npm start"
 
 [variables]
+PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
 PUPPETEER_EXECUTABLE_PATH = "/usr/bin/chromium"
 PUPPETEER_ARGS = "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu"
 WA_HEADLESS = "true"
