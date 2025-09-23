@@ -17,6 +17,8 @@ cmds = [
   "    ln -sf \"$SYSTEM_CHROMIUM\" /usr/bin/chromium-browser",
   "    ln -sf \"$SYSTEM_CHROMIUM\" /usr/bin/google-chrome",
   "    chmod +x \"$SYSTEM_CHROMIUM\" /usr/bin/chromium /usr/bin/chromium-browser /usr/bin/google-chrome",
+  "    echo \"Setting RAILWAY_CHROMIUM_PATH to: $SYSTEM_CHROMIUM\"",
+  "    export RAILWAY_CHROMIUM_PATH=\"$SYSTEM_CHROMIUM\"",
   "    echo 'Testing system Chromium...'",
   "    \"$SYSTEM_CHROMIUM\" --version && echo 'System Chromium is working!'",
   "    echo 'Checking shared libraries...'",
@@ -37,6 +39,7 @@ cmd = "npm start"
 [variables]
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
 PUPPETEER_EXECUTABLE_PATH = "/usr/bin/chromium"
+RAILWAY_CHROMIUM_PATH = "/nix/store/*/bin/chromium"
 PUPPETEER_ARGS = "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu"
 WA_HEADLESS = "true"
 LD_LIBRARY_PATH = "/nix/store/*/lib:/usr/lib:/lib"

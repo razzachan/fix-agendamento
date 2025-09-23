@@ -152,6 +152,18 @@ class WhatsAppClient extends EventEmitter {
       }
     }
 
+    // Railway: Forçar uso de path específico se definido
+    if (isRailway && process.env.RAILWAY_CHROMIUM_PATH) {
+      const railwayPath = process.env.RAILWAY_CHROMIUM_PATH;
+      console.log('[WA] Using Railway-specific Chromium path:', railwayPath);
+      if (fs.existsSync(railwayPath)) {
+        execPath = railwayPath;
+        console.log('[WA] Railway Chromium path confirmed:', execPath);
+      } else {
+        console.log('[WA] Railway Chromium path does not exist:', railwayPath);
+      }
+    }
+
     // Se ainda não encontrou Chromium no Railway, tentar forçar uso do sistema
     if (!execPath && isRailway) {
       try {
