@@ -1,0 +1,14 @@
+# Ignore heavy/unnecessary files for upload
+node_modules
+**/node_modules
+.git
+**/.git
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+dist
+**/dist
+.DS_Store
+.env*
+# also ignore nixpacks to force Dockerfile use
+nixpacks.toml

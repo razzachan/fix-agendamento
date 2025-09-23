@@ -152,6 +152,36 @@ class WhatsAppClient extends EventEmitter {
       }
     }
 
+    // Railway: FORÇA uso do Chromium do sistema (EMERGÊNCIA)
+    if (isRailway) {
+      console.log('[WA] EMERGENCY: Forcing system Chromium on Railway...');
+      const emergencyPaths = [
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable'
+      ];
+
+      for (const path of emergencyPaths) {
+        if (fs.existsSync(path)) {
+          execPath = path;
+          console.log('[WA] EMERGENCY: Found system Chromium at:', execPath);
+          break;
+        }
+      }
+
+      if (!execPath) {
+        console.log('[WA] EMERGENCY: No system Chromium found, trying to find any...');
+        try {
+          const found = execSync('find /usr -name "*chromium*" -type f -executable 2>/dev/null | head -1', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+          if (found && fs.existsSync(found)) {
+            execPath = found;
+            console.log('[WA] EMERGENCY: Found Chromium via find:', execPath);
+          }
+        } catch {}
+      }
+    }
+
     // Se ainda não encontrou Chromium no Railway, tentar forçar uso do sistema
     if (!execPath && isRailway) {
       try {
@@ -852,6 +882,14 @@ class WhatsAppClient extends EventEmitter {
     this.initClient();
     await this.client.initialize();
     this.started = true;
+  }
+
+  public async destroy() {
+    try {
+      await this.client.destroy();
+    } catch {}
+    this.status = { connected: false, me: null, qr: null };
+    this.started = false;
   }
 
   public async logout() {

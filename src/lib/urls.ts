@@ -9,11 +9,19 @@ export function backendBase() {
 export function webhookAIBase() {
   if (typeof window !== 'undefined') {
     const win = window as any;
+
+    // 1. Primeiro, verifica overrides manuais
     const override = win.__WA_URL__ || (typeof localStorage !== 'undefined' && localStorage.getItem('WA_URL')) || (import.meta as any).env?.VITE_WA_URL;
     if (override) return override;
+
+    // 2. Verifica se há configuração específica do webhook-ai
+    const webhookAIBase = (import.meta as any).env?.VITE_WEBHOOK_AI_BASE;
+    if (webhookAIBase) return webhookAIBase;
+
+    // 3. Fallback: usa mesmo protocolo do front
     const host = window.location.hostname || 'localhost';
     const proto = window.location.protocol === 'https:' ? 'https' : 'http';
-    // Fallback: usa mesmo protocolo do front. Em http, assume porta 3100 local.
+    // Em http, assume porta 3100 local.
     if (proto === 'http') return `http://${host}:3100`;
     return `${proto}://${host}`;
   }
