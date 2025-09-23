@@ -152,15 +152,33 @@ class WhatsAppClient extends EventEmitter {
       }
     }
 
-    // Railway: Forçar uso de path específico se definido
-    if (isRailway && process.env.RAILWAY_CHROMIUM_PATH) {
-      const railwayPath = process.env.RAILWAY_CHROMIUM_PATH;
-      console.log('[WA] Using Railway-specific Chromium path:', railwayPath);
-      if (fs.existsSync(railwayPath)) {
-        execPath = railwayPath;
-        console.log('[WA] Railway Chromium path confirmed:', execPath);
-      } else {
-        console.log('[WA] Railway Chromium path does not exist:', railwayPath);
+    // Railway: FORÇA uso do Chromium do sistema (EMERGÊNCIA)
+    if (isRailway) {
+      console.log('[WA] EMERGENCY: Forcing system Chromium on Railway...');
+      const emergencyPaths = [
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable'
+      ];
+
+      for (const path of emergencyPaths) {
+        if (fs.existsSync(path)) {
+          execPath = path;
+          console.log('[WA] EMERGENCY: Found system Chromium at:', execPath);
+          break;
+        }
+      }
+
+      if (!execPath) {
+        console.log('[WA] EMERGENCY: No system Chromium found, trying to find any...');
+        try {
+          const found = execSync('find /usr -name "*chromium*" -type f -executable 2>/dev/null | head -1', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+          if (found && fs.existsSync(found)) {
+            execPath = found;
+            console.log('[WA] EMERGENCY: Found Chromium via find:', execPath);
+          }
+        } catch {}
       }
     }
 
