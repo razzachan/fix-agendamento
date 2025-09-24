@@ -4,14 +4,19 @@ export type SessionRecord = { id: string; channel: string; peer_id: string; stat
 
 export async function getOrCreateSession(channel: string, peer_id: string): Promise<SessionRecord> {
   // try find existing
-  const { data: existing } = await supabase
-    .from('bot_sessions')
-    .select('*')
-    .eq('channel', channel)
-    .eq('peer_id', peer_id)
-    .limit(1)
-    .single();
-  if (existing) return existing as SessionRecord;
+  try {
+    const { data: existing } = await supabase
+      .from('bot_sessions')
+      .select('*')
+      .eq('channel', channel)
+      .eq('peer_id', peer_id)
+      .limit(1)
+      .single();
+    if (existing) return existing as SessionRecord;
+  } catch (e) {
+    // .single() throws when no records found, which is expected
+  }
+
   // create
   const payload = { channel, peer_id, state: {} } as any;
   const { data } = await supabase.from('bot_sessions').insert(payload).select().single();
