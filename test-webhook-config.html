@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Configuração Webhook-AI</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste de Configuração Webhook-AI</h1>
+    
+    <div>
+        <h3>Configurações Detectadas:</h3>
+        <div id="config-info"></div>
+    </div>
+    
+    <div>
+        <h3>Testes de Conectividade:</h3>
+        <button onclick="testWebhookConnection()">🔍 Testar Conexão Webhook-AI</button>
+        <button onclick="testHealthEndpoint()">❤️ Testar Health Check</button>
+        <button onclick="testWhatsAppStatus()">📱 Testar Status WhatsApp</button>
+        <div id="test-results"></div>
+    </div>
+
+    <script>
+        // Simular as variáveis de ambiente do Vite
+        const VITE_WEBHOOK_AI_BASE = 'https://enchanting-light-production.up.railway.app';
+        
+        function showConfigInfo() {
+            const configDiv = document.getElementById('config-info');
+            const hostname = window.location.hostname;
+            const protocol = window.location.protocol;
+            
+            configDiv.innerHTML = `
+                <div class="result info">
+                    <strong>Hostname atual:</strong> ${hostname}<br>
+                    <strong>Protocolo:</strong> ${protocol}<br>
+                    <strong>VITE_WEBHOOK_AI_BASE:</strong> ${VITE_WEBHOOK_AI_BASE}<br>
+                    <strong>URL que será usada:</strong> ${getWebhookAIBase()}
+                </div>
+            `;
+        }
+        
+        function getWebhookAIBase() {
+            // Simular a lógica do webhookBase.ts
+            if (VITE_WEBHOOK_AI_BASE) return VITE_WEBHOOK_AI_BASE;
+            
+            const host = window.location.hostname;
+            if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3100';
+            
+            const proto = window.location.protocol === 'https:' ? 'https' : 'http';
+            if (proto === 'http') return `http://${host}:3100`;
+            
+            return `${proto}://${host}`;
+        }
+        
+        async function testWebhookConnection() {
+            const resultsDiv = document.getElementById('test-results');
+            const webhookBase = getWebhookAIBase();
+            
+            resultsDiv.innerHTML += `<div class="result info">🔍 Testando conexão com: ${webhookBase}</div>`;
+            
+            try {
+                const response = await fetch(`${webhookBase}/health`, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                
+                if (response.ok) {
+                    const data = await response.text();
+                    resultsDiv.innerHTML += `<div class="result success">✅ Conexão bem-sucedida! Status: ${response.status}<br>Resposta: ${data}</div>`;
+                } else {
+                    resultsDiv.innerHTML += `<div class="result error">❌ Erro na conexão. Status: ${response.status}</div>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="result error">❌ Erro de rede: ${error.message}</div>`;
+            }
+        }
+        
+        async function testHealthEndpoint() {
+            const resultsDiv = document.getElementById('test-results');
+            const webhookBase = getWebhookAIBase();
+            
+            try {
+                const response = await fetch(`${webhookBase}/health`);
+                const data = await response.text();
+                
+                if (response.ok) {
+                    resultsDiv.innerHTML += `<div class="result success">❤️ Health check OK: ${data}</div>`;
+                } else {
+                    resultsDiv.innerHTML += `<div class="result error">❌ Health check falhou: ${response.status}</div>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="result error">❌ Erro no health check: ${error.message}</div>`;
+            }
+        }
+        
+        async function testWhatsAppStatus() {
+            const resultsDiv = document.getElementById('test-results');
+            const webhookBase = getWebhookAIBase();
+            
+            try {
+                const response = await fetch(`${webhookBase}/whatsapp/status`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultsDiv.innerHTML += `<div class="result success">📱 Status WhatsApp: ${JSON.stringify(data, null, 2)}</div>`;
+                } else {
+                    resultsDiv.innerHTML += `<div class="result error">❌ Erro ao obter status WhatsApp: ${response.status}</div>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="result error">❌ Erro no status WhatsApp: ${error.message}</div>`;
+            }
+        }
+        
+        // Mostrar configurações ao carregar a página
+        showConfigInfo();
+    </script>
+</body>
+</html>

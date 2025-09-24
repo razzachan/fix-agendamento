@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Final de Autenticação - Fix Fogões</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #E5B034;
+        }
+        .header h1 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .header p {
+            color: #7f8c8d;
+            margin: 10px 0 0 0;
+            font-size: 1.1em;
+        }
+        .test-section {
+            margin: 25px 0;
+            padding: 20px;
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        .test-section h3 {
+            color: #2c3e50;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn {
+            background: #E5B034;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #d4a017;
+            transform: translateY(-2px);
+        }
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .result.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .status-card {
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #ecf0f1;
+        }
+        .status-card.pass {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .status-card.fail {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .status-card.pending {
+            background: #fff3cd;
+            border-color: #ffeaa7;
+        }
+        .icon {
+            font-size: 1.5em;
+            margin-right: 8px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #E5B034;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Teste Final de Autenticação</h1>
+            <p>Verificação completa do sistema Fix Fogões</p>
+        </div>
+
+        <div class="test-section">
+            <h3><span class="icon">🚀</span>Teste Completo do Sistema</h3>
+            <p>Execute o teste final completo para verificar toda a autenticação:</p>
+            <button class="btn" onclick="runCompleteTest()">
+                <span id="complete-loading" style="display: none;" class="loading"></span>
+                Executar Teste Completo
+            </button>
+            <div id="complete-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3><span class="icon">⚡</span>Verificação Rápida</h3>
+            <p>Verificação rápida do status da autenticação:</p>
+            <button class="btn" onclick="runQuickCheck()">
+                <span id="quick-loading" style="display: none;" class="loading"></span>
+                Verificação Rápida
+            </button>
+            <div id="quick-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3><span class="icon">🔧</span>Conta Administrativa</h3>
+            <p>Verificar e criar conta admin se necessário:</p>
+            <button class="btn" onclick="ensureAdminAccount()">
+                <span id="admin-loading" style="display: none;" class="loading"></span>
+                Verificar Conta Admin
+            </button>
+            <div id="admin-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3><span class="icon">🧹</span>Limpeza de Cache</h3>
+            <p>Limpar cache e dados temporários:</p>
+            <button class="btn" onclick="clearCache()">
+                <span id="cache-loading" style="display: none;" class="loading"></span>
+                Limpar Cache
+            </button>
+            <div id="cache-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="status-grid" id="status-grid" style="display: none;">
+            <div class="status-card pending" id="status-supabase">
+                <h4>🔗 Conexão Supabase</h4>
+                <p>Verificando...</p>
+            </div>
+            <div class="status-card pending" id="status-admin">
+                <h4>👤 Conta Admin</h4>
+                <p>Verificando...</p>
+            </div>
+            <div class="status-card pending" id="status-demo">
+                <h4>🚫 Dados Demo</h4>
+                <p>Verificando...</p>
+            </div>
+            <div class="status-card pending" id="status-auth">
+                <h4>🔐 Sistema Auth</h4>
+                <p>Verificando...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Verificar se as funções estão disponíveis
+        function checkAvailability() {
+            if (typeof window.finalAuthTest === 'undefined') {
+                console.warn('⚠️ finalAuthTest não está disponível. Carregando página principal...');
+                window.location.href = '/';
+                return false;
+            }
+            return true;
+        }
+
+        async function runCompleteTest() {
+            if (!checkAvailability()) return;
+            
+            const btn = event.target;
+            const loading = document.getElementById('complete-loading');
+            const result = document.getElementById('complete-result');
+            
+            btn.disabled = true;
+            loading.style.display = 'inline-block';
+            result.style.display = 'block';
+            result.className = 'result info';
+            result.textContent = 'Executando teste completo...\n';
+            
+            document.getElementById('status-grid').style.display = 'grid';
+            
+            try {
+                // Capturar logs do console
+                const originalLog = console.log;
+                let logs = '';
+                console.log = (...args) => {
+                    logs += args.join(' ') + '\n';
+                    originalLog(...args);
+                };
+                
+                await window.finalAuthTest.runFinalTest();
+                
+                // Restaurar console.log
+                console.log = originalLog;
+                
+                result.className = 'result success';
+                result.textContent = logs;
+                
+                updateStatusCards(true);
+                
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `Erro durante o teste:\n${error.toString()}`;
+                updateStatusCards(false);
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        async function runQuickCheck() {
+            if (!checkAvailability()) return;
+            
+            const btn = event.target;
+            const loading = document.getElementById('quick-loading');
+            const result = document.getElementById('quick-result');
+            
+            btn.disabled = true;
+            loading.style.display = 'inline-block';
+            result.style.display = 'block';
+            result.className = 'result info';
+            result.textContent = 'Executando verificação rápida...';
+            
+            try {
+                const isHealthy = await window.runAuthAudit.quickCheck();
+                
+                result.className = isHealthy ? 'result success' : 'result error';
+                result.textContent = isHealthy 
+                    ? '✅ Sistema de autenticação está saudável!'
+                    : '❌ Problemas encontrados no sistema de autenticação.';
+                    
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `Erro na verificação: ${error.toString()}`;
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        async function ensureAdminAccount() {
+            if (!checkAvailability()) return;
+            
+            const btn = event.target;
+            const loading = document.getElementById('admin-loading');
+            const result = document.getElementById('admin-result');
+            
+            btn.disabled = true;
+            loading.style.display = 'inline-block';
+            result.style.display = 'block';
+            result.className = 'result info';
+            result.textContent = 'Verificando conta administrativa...';
+            
+            try {
+                const success = await window.fixFogoes.ensureAdminAccount();
+                
+                result.className = 'result success';
+                result.textContent = success 
+                    ? '✅ Conta admin verificada/criada com sucesso!\n📧 Email: admin@fixfogoes.com.br\n🔑 Senha: 123456'
+                    : '⚠️ Problemas ao verificar/criar conta admin.';
+                    
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `Erro: ${error.toString()}`;
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        async function clearCache() {
+            const btn = event.target;
+            const loading = document.getElementById('cache-loading');
+            const result = document.getElementById('cache-result');
+            
+            btn.disabled = true;
+            loading.style.display = 'inline-block';
+            result.style.display = 'block';
+            result.className = 'result info';
+            result.textContent = 'Limpando cache...';
+            
+            try {
+                if (typeof window.fixFogoes !== 'undefined') {
+                    await window.fixFogoes.clearCache();
+                    result.className = 'result success';
+                    result.textContent = '✅ Cache limpo com sucesso!\n🔄 Recarregue a página para aplicar as mudanças.';
+                } else {
+                    // Limpeza manual básica
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    result.className = 'result success';
+                    result.textContent = '✅ Cache básico limpo!\n🔄 Recarregue a página.';
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `Erro ao limpar cache: ${error.toString()}`;
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        function updateStatusCards(success) {
+            const cards = ['status-supabase', 'status-admin', 'status-demo', 'status-auth'];
+            cards.forEach(cardId => {
+                const card = document.getElementById(cardId);
+                if (success) {
+                    card.className = 'status-card pass';
+                    card.querySelector('p').textContent = '✅ OK';
+                } else {
+                    card.className = 'status-card fail';
+                    card.querySelector('p').textContent = '❌ Erro';
+                }
+            });
+        }
+
+        // Verificar disponibilidade ao carregar
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (!checkAvailability()) {
+                    document.body.innerHTML = `
+                        <div class="container">
+                            <div class="header">
+                                <h1>⚠️ Ferramentas Não Disponíveis</h1>
+                                <p>As ferramentas de teste não estão carregadas.</p>
+                            </div>
+                            <div class="test-section">
+                                <p>Para usar esta página de teste:</p>
+                                <ol>
+                                    <li>Acesse a página principal do Fix Fogões</li>
+                                    <li>Abra o console do navegador (F12)</li>
+                                    <li>Execute: <code>await finalAuthTest.runFinalTest()</code></li>
+                                </ol>
+                                <button class="btn" onclick="window.location.href='/'">
+                                    Ir para Página Principal
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -17,8 +17,8 @@ function defaultBase() {
   const host = window.location.hostname;
   if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3100';
 
-  // 2.1. Host conhecido em produção (HostGator) → usa Railway
-  if (host === 'app.fixfogoes.com.br') return 'https://enchanting-light-production.up.railway.app';
+  // 2.1. Host conhecido em produção (HostGator) → usa Railway Docker
+  if (host === 'app.fixfogoes.com.br') return 'https://webhook-ai-docker-production.up.railway.app';
 
   // 3. Para produção, não assumir porta 3100 no mesmo host
   const proto = window.location.protocol === 'https:' ? 'https' : 'http';
@@ -78,7 +78,7 @@ export async function ensureWebhookBase(): Promise<string> {
   // 3. Fallbacks locais e host específico
   const host = window.location.hostname;
   if (host === 'app.fixfogoes.com.br') {
-    candidates.push('https://enchanting-light-production.up.railway.app');
+    candidates.push('https://webhook-ai-docker-production.up.railway.app');
   }
   candidates.push(`http://${host}:3100`);
   candidates.push('http://localhost:3100');

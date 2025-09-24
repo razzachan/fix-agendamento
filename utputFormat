@@ -1,0 +1,15 @@
+HTTP/1.1 400 Bad Request
+Date: Sun, 21 Sep 2025 20:14:21 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 130
+Connection: keep-alive
+CF-RAY: 982c3a791a4f01be-GRU
+vary: Origin
+access-control-allow-origin: https://railway.com
+access-control-allow-credentials: true
+via: 1.1 google
+alt-svc: h3=":443"; ma=86400
+cf-cache-status: DYNAMIC
+Server: cloudflare
+
+{"message":"Expected property name or '}' in JSON at position 1 (line 1 column 2)","reqId":"c3da7fb0-6205-401d-a6d9-1a3df3264077"}

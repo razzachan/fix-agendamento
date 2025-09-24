@@ -460,7 +460,6 @@ export async function setupWAInboundAdapter() {
       .from('bot_configs')
       .select('status')
       .order('updated_at', { ascending: false })
-      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
