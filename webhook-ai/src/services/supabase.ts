@@ -80,12 +80,22 @@ let supabaseImpl: any;
 const envUrl = process.env.SUPABASE_URL;
 const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+console.log('[SUPABASE] Environment check:', {
+  useMock,
+  hasUrl: !!envUrl,
+  hasKey: !!envKey,
+  urlPrefix: envUrl?.slice(0, 20),
+  keyPrefix: envKey?.slice(0, 20)
+});
+
 if (useMock || !envUrl || !envKey) {
   if (!useMock) {
     console.warn('[SUPABASE] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Using mock client.');
   }
+  console.log('[SUPABASE] Using mock client');
   supabaseImpl = makeMock();
 } else {
+  console.log('[SUPABASE] Using real Supabase client');
   supabaseImpl = createClient(envUrl, envKey, { auth: { persistSession: false } });
 }
 
