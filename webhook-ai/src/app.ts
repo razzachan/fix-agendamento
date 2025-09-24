@@ -231,6 +231,23 @@ app.post('/whatsapp/logout', async (_req, res) => {
 // Endpoints de conexão via QR Code
 app.use('/whatsapp', whatsappRouter);
 
+// Endpoint de teste simples para verificar sessão
+app.post('/test-session', async (req, res) => {
+  try {
+    const { from } = req.body || {};
+    if (!from) return res.status(400).json({ error: 'Missing from' });
+
+    console.log('[TEST-SESSION] Testando sessão para', from);
+    const session = await getOrCreateSession('whatsapp', String(from));
+    console.log('[TEST-SESSION] Sessão criada/recuperada:', session.id);
+
+    res.json({ ok: true, from, session_id: session.id, state: session.state });
+  } catch (e: any) {
+    console.error('[TEST-SESSION] Erro:', e);
+    res.status(500).json({ error: true, message: e?.message || String(e) });
+  }
+});
+
 // Endpoint de teste para simular mensagem recebida
 app.post('/test-message', async (req, res) => {
   try {
