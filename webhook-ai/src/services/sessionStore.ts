@@ -5,29 +5,34 @@ export type SessionRecord = { id: string; channel: string; peer_id: string; stat
 export async function getOrCreateSession(channel: string, peer_id: string): Promise<SessionRecord> {
   console.log('[SESSION] getOrCreateSession called with:', { channel, peer_id });
 
-  // try find existing
   try {
-    console.log('[SESSION] Searching for existing session...');
-    const { data: existing } = await supabase
-      .from('bot_sessions')
-      .select('*')
-      .eq('channel', channel)
-      .eq('peer_id', peer_id)
-      .limit(1)
-      .single();
-    console.log('[SESSION] Found existing session:', existing?.id);
-    if (existing) return existing as SessionRecord;
-  } catch (e) {
-    console.log('[SESSION] No existing session found, will create new one');
-    // .single() throws when no records found, which is expected
-  }
+    // try find existing
+    try {
+      console.log('[SESSION] Searching for existing session...');
+      const { data: existing } = await supabase
+        .from('bot_sessions')
+        .select('*')
+        .eq('channel', channel)
+        .eq('peer_id', peer_id)
+        .limit(1)
+        .single();
+      console.log('[SESSION] Found existing session:', existing?.id);
+      if (existing) return existing as SessionRecord;
+    } catch (e) {
+      console.log('[SESSION] No existing session found, will create new one');
+      // .single() throws when no records found, which is expected
+    }
 
-  // create
-  console.log('[SESSION] Creating new session...');
-  const payload = { channel, peer_id, state: {} } as any;
-  const { data } = await supabase.from('bot_sessions').insert(payload).select().single();
-  console.log('[SESSION] Created new session:', data?.id);
-  return data as SessionRecord;
+    // create
+    console.log('[SESSION] Creating new session...');
+    const payload = { channel, peer_id, state: {} } as any;
+    const { data } = await supabase.from('bot_sessions').insert(payload).select().single();
+    console.log('[SESSION] Created new session:', data?.id);
+    return data as SessionRecord;
+  } catch (error) {
+    console.error('[SESSION] Critical error in getOrCreateSession:', error);
+    throw error;
+  }
 }
 
 export async function setSessionState(session_id: string, state: any) {
