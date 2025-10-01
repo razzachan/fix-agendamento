@@ -1,4 +1,4 @@
-# Use Node.js 18 with system packages - Force rebuild
+# Use Node.js 18 with system packages - Force rebuild v2
 FROM node:18-bullseye
 
 # Install Chromium and dependencies
