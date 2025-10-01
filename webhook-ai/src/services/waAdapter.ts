@@ -210,6 +210,12 @@ export async function setupWAInboundAdapter() {
 
       // Áudio: transcrever e passar pelo orquestrador
       if (media.mimetype.startsWith('audio/')) {
+        // Ignorar áudios de grupos do WhatsApp (@g.us)
+        if (msg.from.endsWith('@g.us')) {
+          console.log('[Adapter] Ignorando áudio de grupo:', msg.from);
+          return;
+        }
+
         try {
           const { transcribeAudio } = await import('./llmClient.js');
           const transcript = await transcribeAudio({ mimeType: media.mimetype, base64: media.data });
@@ -239,6 +245,12 @@ export async function setupWAInboundAdapter() {
       // Ignorar imagens de status@broadcast (stories do WhatsApp)
       if (msg.from === 'status@broadcast') {
         console.log('[Adapter] Ignorando imagem de status@broadcast');
+        return;
+      }
+
+      // Ignorar imagens de grupos do WhatsApp (@g.us)
+      if (msg.from.endsWith('@g.us')) {
+        console.log('[Adapter] Ignorando imagem de grupo:', msg.from);
         return;
       }
 
@@ -427,6 +439,12 @@ export async function setupWAInboundAdapter() {
     // Ignorar mensagens de status@broadcast (stories do WhatsApp)
     if (from === 'status@broadcast') {
       console.log('[Adapter] Ignorando mensagem de status@broadcast');
+      return;
+    }
+
+    // Ignorar mensagens de grupos do WhatsApp (@g.us)
+    if (from.endsWith('@g.us')) {
+      console.log('[Adapter] Ignorando mensagem de grupo:', from);
       return;
     }
 
