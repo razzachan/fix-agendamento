@@ -254,7 +254,7 @@ export async function setupWAInboundAdapter() {
         return;
       }
 
-      // Ignorar imagens do próprio bot (evitar auto-loop)
+      // Ignorar imagens do próprio bot (evitar auto-loop) - FIXED
       if (msg.fromMe) {
         console.log('[Adapter] Ignorando imagem do próprio bot (fromMe=true):', msg.from);
         return;
