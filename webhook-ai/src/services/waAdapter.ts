@@ -255,8 +255,8 @@ export async function setupWAInboundAdapter() {
       }
 
       // Ignorar imagens do próprio bot (evitar auto-loop)
-      if (msg.from.includes('554888332664')) {
-        console.log('[Adapter] Ignorando imagem do próprio bot:', msg.from);
+      if (msg.fromMe) {
+        console.log('[Adapter] Ignorando imagem do próprio bot (fromMe=true):', msg.from);
         return;
       }
 
@@ -448,11 +448,7 @@ export async function setupWAInboundAdapter() {
       return;
     }
 
-    // Ignorar mensagens do próprio bot (evitar auto-loop)
-    if (from.includes('554888332664')) {
-      console.log('[Adapter] Ignorando mensagem do próprio bot:', from);
-      return;
-    }
+    // Nota: Não precisamos verificar fromMe aqui pois o onMessage só recebe mensagens de outros usuários
 
     // Comandos rápidos de pausa por conversa
     if (text === "'") {
