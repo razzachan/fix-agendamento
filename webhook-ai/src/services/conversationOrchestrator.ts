@@ -1693,7 +1693,18 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
       return 'Legal! Para a instalação, preciso de: equipamento, tipo (embutido ou bancada), local exato de instalação, distância do ponto de água/gás quando aplicável e se já há fixação/suportes. Pode me passar esses dados?';
     }
     // Caso contrário, a queda é para conserto/diagnóstico
-    return 'Entendi que é lava-louças. Para orçar certinho: qual é a marca e qual é o problema específico?';
+    // VERIFICAR se já temos marca e problema antes de pedir novamente
+    const dadosColetados = (st.dados_coletados || {}) as any;
+    const temMarca = !!dadosColetados.marca;
+    const temProblema = !!(dadosColetados.problema || dadosColetados.descricao_problema);
+
+    // Se já temos marca E problema, não retornar essa mensagem - deixar o LLM processar
+    if (temMarca && temProblema) {
+      // Não fazer nada aqui - deixar o fluxo continuar para o LLM
+    } else {
+      // Se falta marca ou problema, pedir
+      return 'Entendi que é lava-louças. Para orçar certinho: qual é a marca e qual é o problema específico?';
+    }
   }
 
   // Atualiza estado do funil com heurística leve
