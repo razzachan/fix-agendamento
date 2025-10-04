@@ -5479,7 +5479,16 @@ async function legacyRouting(
   if (lowered.includes('lava') && lowered.includes('louça')) {
     // Em fallback legado, exigir marca + problema antes de orçar
     // Adiciona dica de política para bater com expectativas dos testes
-    return 'Entendi que você tem um problema com lava-louças — coleta diagnóstico (coletamos, diagnosticamos). Para orçar certinho: qual é a marca e qual é o problema específico?';
+    // VERIFICAR se já temos marca e problema antes de pedir novamente
+    const st = (((session as any)?.state) || {}) as any;
+    const dadosColetados = (st.dados_coletados || {}) as any;
+    const temMarca = !!dadosColetados.marca;
+    const temProblema = !!(dadosColetados.problema || dadosColetados.descricao_problema);
+
+    // Se já temos marca E problema, não retornar essa mensagem - deixar o fluxo continuar
+    if (!temMarca || !temProblema) {
+      return 'Entendi que você tem um problema com lava-louças — coleta diagnóstico (coletamos, diagnosticamos). Para orçar certinho: qual é a marca e qual é o problema específico?';
+    }
   }
 
   try {
