@@ -97,13 +97,28 @@ const QUOTE_OFFLINE_FALLBACK =
   process.env.QUOTE_OFFLINE_FALLBACK === 'true' || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'production';
 
 function computeLocalQuote(payload: any) {
-  // Fallback determinístico simplificado para testes offline
+  // Fallback determinístico com valores corretos por tipo de serviço e equipamento
   const eq = String(payload?.equipment || '').toLowerCase();
-  const st = String(payload?.service_type || 'domicilio');
-  let base = 120;
-  if (eq.includes('fog')) base = 150;
-  if (eq.includes('forno') && st.includes('coleta')) base = 180;
-  if (eq.includes('micro')) base = 130;
+  const st = String(payload?.service_type || 'domicilio').toLowerCase();
+
+  let base = 150; // Valor padrão para domicílio
+
+  // COLETA DIAGNÓSTICO (R$ 350)
+  if (st.includes('coleta') && st.includes('diagnostico')) {
+    base = 350;
+  }
+  // COLETA CONSERTO (R$ 350 para micro-ondas/forno bancada)
+  else if (st.includes('coleta') && st.includes('conserto')) {
+    base = 350;
+  }
+  // DOMICÍLIO - valores específicos por equipamento
+  else if (st.includes('domicilio')) {
+    if (eq.includes('fog')) base = 320; // Fogão domicílio
+    else if (eq.includes('cooktop')) base = 400;
+    else if (eq.includes('coifa')) base = 490;
+    else base = 320; // Padrão domicílio
+  }
+
   const value = base;
   return {
     found: true,
