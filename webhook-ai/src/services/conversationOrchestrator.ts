@@ -5479,8 +5479,16 @@ async function legacyRouting(
     else if (isFogao) equipment = 'fogão industrial';
     else if (isGeladeira) equipment = 'geladeira comercial';
 
-    // Em legado, não vamos orçar sem marca + problema: aplicar gate
-    return 'Para equipamento comercial/industrial, me informe a marca e descreva o problema específico para calcular o orçamento.';
+    // Verificar se já temos marca e problema na sessão
+    const st = (((session as any)?.state) || {}) as any;
+    const dadosColetados = (st.dados_coletados || {}) as any;
+    const temMarca = !!dadosColetados.marca;
+    const temProblema = !!(dadosColetados.problema || dadosColetados.descricao_problema);
+
+    // Se já temos marca E problema, não retornar essa mensagem - deixar o fluxo continuar
+    if (!temMarca || !temProblema) {
+      return 'Para equipamento comercial/industrial, me informe a marca e descreva o problema específico para calcular o orçamento.';
+    }
   }
 
   if (lowered.includes('oi') || lowered.includes('olá')) {
