@@ -47,5 +47,5 @@ android/.gradle/
 local-wa-session/
 
 # Other services not needed for API deploy
-webhook-ai/
+# webhook-ai/  (não ignore: usado no deploy e deve ser incluído no upload do Railway CLI)
 thermal-print-service/
