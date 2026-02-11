@@ -250,7 +250,10 @@ class WhatsAppClient extends EventEmitter {
 
     const args = isRailway ? [...baseArgs, ...railwayArgs] : baseArgs;
     // Forçar um dataPath estável para o cache de sessão (evita reconnect infinito)
-    const defaultData = path.join(os.homedir(), '.wwebjs_auth', 'fixbot-v2');
+    // Railway: se houver Volume montado em /data, esse default permite persistir auth entre deploys.
+    const defaultData = isRailway
+      ? '/data/wwebjs_auth/fixbot-v2'
+      : path.join(os.homedir(), '.wwebjs_auth', 'fixbot-v2');
     const chromeUserData = path.join(os.homedir(), '.wwebjs_chrome');
     const dataPath = process.env.WA_DATA_PATH || defaultData;
     try {
