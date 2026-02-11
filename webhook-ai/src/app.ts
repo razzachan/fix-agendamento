@@ -216,33 +216,41 @@ app.get('/admin/messages', async (req, res) => {
     // Resolve session_id via channel+peer (se fornecidos)
     let effectiveSessionId = session_id || '';
     if (!effectiveSessionId && (channel || peer)) {
-      const buildSessQ = () => {
-        let q = sb.from('bot_sessions').select('id, channel, peer_id');
+      // Em produção, bot_sessions pode não ter created_at/updated_at.
+      // Então NÃO usamos order em bot_sessions. Se houver múltiplas sessões,
+      // derivamos a sessão mais recente via bot_messages.created_at.
+      let sessRows: any[] = [];
+      {
+        let q = sb.from('bot_sessions').select('id');
         if (channel) q = q.eq('channel', channel);
         if (peer) q = q.eq('peer_id', peer);
-        return q;
-      };
-
-      // Em produção, bot_sessions pode não ter created_at/updated_at.
-      // Tentamos ordenar por created_at e, se falhar, fazemos fallback sem order.
-      let sess: any[] | null = null;
-      let sessErr: any = null;
-      {
-        const r = await buildSessQ().order('created_at', { ascending: false }).limit(1);
-        sess = (r as any).data;
-        sessErr = (r as any).error;
-      }
-      if (sessErr && /created_at/i.test(String(sessErr.message || sessErr))) {
-        const r2 = await buildSessQ().limit(1);
-        sess = (r2 as any).data;
-        sessErr = (r2 as any).error;
-      }
-      if (sessErr) {
-        return res.status(500).json({ ok: false, error: sessErr.message || String(sessErr) });
+        const { data, error } = await q.limit(50);
+        if (error) {
+          return res.status(500).json({ ok: false, error: error.message || String(error) });
+        }
+        sessRows = Array.isArray(data) ? (data as any[]) : [];
       }
 
-      const s0: any = Array.isArray(sess) ? sess[0] : null;
-      if (s0?.id) effectiveSessionId = String(s0.id);
+      if (sessRows.length === 1 && sessRows[0]?.id) {
+        effectiveSessionId = String(sessRows[0].id);
+      } else if (sessRows.length > 1) {
+        const ids = sessRows
+          .map((r) => String(r?.id || ''))
+          .filter(Boolean)
+          .slice(0, 50);
+        if (ids.length > 0) {
+          const { data: lastMsg, error: lastErr } = await sb
+            .from('bot_messages')
+            .select('session_id, created_at')
+            .in('session_id', ids)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          if (!lastErr) {
+            const m0: any = Array.isArray(lastMsg) ? lastMsg[0] : null;
+            if (m0?.session_id) effectiveSessionId = String(m0.session_id);
+          }
+        }
+      }
     }
 
     let q = sb
