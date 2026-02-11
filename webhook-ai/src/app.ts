@@ -216,13 +216,31 @@ app.get('/admin/messages', async (req, res) => {
     // Resolve session_id via channel+peer (se fornecidos)
     let effectiveSessionId = session_id || '';
     if (!effectiveSessionId && (channel || peer)) {
-      let sessQ = sb.from('bot_sessions').select('id, channel, peer_id');
-      if (channel) sessQ = sessQ.eq('channel', channel);
-      if (peer) sessQ = sessQ.eq('peer_id', peer);
-      const { data: sess, error: sessErr } = await sessQ.order('created_at', { ascending: false }).limit(1);
+      const buildSessQ = () => {
+        let q = sb.from('bot_sessions').select('id, channel, peer_id');
+        if (channel) q = q.eq('channel', channel);
+        if (peer) q = q.eq('peer_id', peer);
+        return q;
+      };
+
+      // Em produção, bot_sessions pode não ter created_at/updated_at.
+      // Tentamos ordenar por created_at e, se falhar, fazemos fallback sem order.
+      let sess: any[] | null = null;
+      let sessErr: any = null;
+      {
+        const r = await buildSessQ().order('created_at', { ascending: false }).limit(1);
+        sess = (r as any).data;
+        sessErr = (r as any).error;
+      }
+      if (sessErr && /created_at/i.test(String(sessErr.message || sessErr))) {
+        const r2 = await buildSessQ().limit(1);
+        sess = (r2 as any).data;
+        sessErr = (r2 as any).error;
+      }
       if (sessErr) {
         return res.status(500).json({ ok: false, error: sessErr.message || String(sessErr) });
       }
+
       const s0: any = Array.isArray(sess) ? sess[0] : null;
       if (s0?.id) effectiveSessionId = String(s0.id);
     }
