@@ -1,7 +1,9 @@
 import express from 'express';
 import { supabase } from '../config/supabase.js';
+import { botAuth } from '../middleware/botAuth.js';
 
 const router = express.Router();
+const authenticateBot = botAuth;
 
 // Endpoint para Claude enviar leads estruturados
 router.post('/from-claude', async (req, res) => {
@@ -112,6 +114,79 @@ router.post('/from-claude', async (req, res) => {
       message: 'Erro interno ao processar lead do Claude',
       details: error.message,
     });
+  }
+});
+
+// GET /api/leads/pending
+router.get('/pending', authenticateBot, async (req, res) => {
+  try {
+    const nowIso = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from('pre_schedules')
+      .select(
+        `
+        *,
+        clients:client_id (id, name, phone, address)
+      `,
+      )
+      .lte('crm_next_followup', nowIso)
+      .in('crm_status', ['aguardando_resposta', 'interessado'])
+      .order('crm_score', { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+    return res.json({ success: true, count: (data || []).length, leads: data || [] });
+  } catch (error) {
+    console.error('[LEAD] Error fetching pending:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/leads/:id/status
+router.put('/:id/status', authenticateBot, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { crm_status, notes } = req.body || {};
+
+    if (!crm_status) {
+      return res.status(400).json({ error: 'crm_status is required' });
+    }
+
+    const updates = {
+      crm_status,
+      crm_last_interaction: new Date().toISOString(),
+    };
+
+    if (notes) {
+      const { data: current } = await supabase
+        .from('pre_schedules')
+        .select('crm_notes')
+        .eq('id', id)
+        .single();
+
+      const existingNotes = current?.crm_notes || [];
+      updates.crm_notes = [...existingNotes, notes];
+    }
+
+    const { data, error } = await supabase
+      .from('pre_schedules')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    const { error: scoreError } = await supabase.rpc('recalculate_lead_score', { lead_id: id });
+    if (scoreError) {
+      console.warn('[LEAD] recalculate_lead_score failed (non-blocking):', scoreError);
+    }
+
+    return res.json({ success: true, lead: data });
+  } catch (error) {
+    console.error('[LEAD] Error updating status:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
