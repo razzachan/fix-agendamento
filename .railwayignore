@@ -1,0 +1,17 @@
+.git/
+node_modules/
+api/node_modules/
+
+# Pastas auxiliares que não precisam ir pro deploy
+# webhook-ai/  (não ignorar: service webhook-ai-docker usa rootDirectory=webhook-ai)
+
+# Artefatos e binários grandes
+**/*.exe
+**/*.msi
+**/*.zip
+**/*.7z
+**/*.rar
+
+# Logs e caches
+**/*.log
+.cache/

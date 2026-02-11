@@ -34,6 +34,25 @@ async function logAIRoute(event: string, payload: any) {
   } catch {}
 }
 
+function getRoutingLLMConfig() {
+  const envForce = String(process.env.LLM_FORCE_PROVIDER || '').toLowerCase();
+  const provider =
+    envForce === 'openai' || envForce === 'anthropic'
+      ? (envForce as 'openai' | 'anthropic')
+      : ((process.env.LLM_ROUTING_PROVIDER || process.env.LLM_PROVIDER || 'openai') as
+          | 'openai'
+          | 'anthropic');
+
+  const modelFromEnv =
+    process.env.LLM_ROUTING_MODEL ||
+    (provider === 'anthropic' ? process.env.LLM_ANTHROPIC_MODEL : process.env.LLM_OPENAI_MODEL);
+
+  const model =
+    modelFromEnv || (provider === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'gpt-4o-mini');
+
+  return { provider, model };
+}
+
 function detectPriorityIntent(text: string): string | null {
   const normalize = (s: string) =>
     s
@@ -3211,8 +3230,9 @@ Retorne apenas as causas mais relevantes para este problema específico, adaptad
 
 Formato: uma causa por linha, sem numeração.`;
 
+    const llm = getRoutingLLMConfig();
     const response = await chatComplete(
-      { provider: 'openai', model: 'gpt-4o-mini', temperature: 0.7 },
+      { provider: llm.provider, model: llm.model, temperature: 0.7 },
       [
         {
           role: 'system',
@@ -3316,8 +3336,9 @@ Retorne:
   console.log('[AI-ROUTER] 🔍 Enviando prompt para IA...');
   console.log('[AI-ROUTER] 📝 Prompt (primeiros 500 chars):', prompt.slice(0, 500));
 
+  const llm = getRoutingLLMConfig();
   const response = await chatComplete(
-    { provider: 'openai', model: 'gpt-4o-mini', temperature: 0.2 },
+    { provider: llm.provider, model: llm.model, temperature: 0.2 },
     [
       {
         role: 'system',

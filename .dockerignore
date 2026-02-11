@@ -3,6 +3,14 @@ main_backup.py
 middleware_updated.py
 middleware_supabase_integrado.zip
 
+# Git and dependencies
+.git/
+node_modules/
+api/node_modules/
+
+# Large auxiliary folders
+webhook-ai/
+
 # Ignore cache and temporary files
 __pycache__/
 *.pyc
@@ -14,6 +22,13 @@ __pycache__/
 
 # Ignore logs
 *.log
+
+# Large binaries/archives
+**/*.exe
+**/*.msi
+**/*.zip
+**/*.7z
+**/*.rar
 
 # Ignore IDE files
 .vscode/

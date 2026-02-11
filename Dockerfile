@@ -1,34 +1,23 @@
-# Use Python 3.9 slim image
-FROM python:3.9-slim
+# Runtime for the API service (Node/Express)
+FROM node:18-slim
 
-# Set environment variables for UTF-8
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONIOENCODING=utf-8
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
-
-# Set working directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Install API dependencies first (better layer caching)
+COPY api/package*.json ./api/
+RUN cd api && npm ci --omit=dev --legacy-peer-deps
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy API source
+COPY api ./api
 
-# Copy only the necessary files (excluding main_backup.py)
-COPY main.py .
-COPY middleware.py .
-COPY supabase_client.py .
-COPY check_env.py .
-COPY start.py .
-COPY .env .
+ENV NODE_ENV=production
 
-# Remove any potential problematic files
-RUN rm -f main_backup.py || true
+# Se o Railway estiver configurado com Start Command legado (ex: `python main.py`),
+# garantimos que o executável `python` exista e inicie a API Node.
+RUN printf '%s\n' '#!/bin/sh' 'exec node /app/api/index.js' > /usr/local/bin/python \
+	&& chmod +x /usr/local/bin/python
 
-# Expose port
-EXPOSE 8000
+# Railway will set PORT; the API listens on process.env.PORT
+EXPOSE 8080
 
-# Start the application
-CMD ["python", "main.py"]
+CMD ["npm", "--prefix", "api", "start"]

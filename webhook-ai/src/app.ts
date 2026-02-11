@@ -14,6 +14,7 @@ const Env = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   // Removido: variáveis WABA
   OPENAI_API_KEY: z.string().optional(),
+  WHATSAPP_ENABLED: z.string().optional(),
 });
 
 const env = Env.parse(process.env);
@@ -179,6 +180,97 @@ app.get('/admin/health', async (req, res) => {
       handoff_selected_by: selectedBy,
       seed_disabled: process.env.ADMIN_SEED_DISABLE === 'true',
     });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) });
+  }
+});
+
+// Admin: últimas mensagens registradas (WhatsApp etc) via Supabase
+// GET /admin/messages?limit=50&channel=whatsapp&peer=5548...&direction=in|out&session_id=...
+app.get('/admin/messages', async (req, res) => {
+  try {
+    const adminKey = process.env.ADMIN_API_KEY;
+    const provided = String(req.headers['x-admin-key'] || '');
+    if (!adminKey || provided !== adminKey) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+      return res.status(500).json({ ok: false, error: 'missing_supabase_env' });
+    }
+
+    const limitRaw = Number(req.query.limit ?? 50);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, Math.trunc(limitRaw))) : 50;
+
+    const channel = String(req.query.channel || '').trim();
+    const peer = String(req.query.peer || '').trim();
+    const session_id = String(req.query.session_id || '').trim();
+    const direction = String(req.query.direction || '').trim();
+    const dir = direction === 'in' || direction === 'out' ? (direction as 'in' | 'out') : null;
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const sb = createClient(url, key, { auth: { persistSession: false } });
+
+    // Resolve session_id via channel+peer (se fornecidos)
+    let effectiveSessionId = session_id || '';
+    if (!effectiveSessionId && (channel || peer)) {
+      let sessQ = sb.from('bot_sessions').select('id, channel, peer_id');
+      if (channel) sessQ = sessQ.eq('channel', channel);
+      if (peer) sessQ = sessQ.eq('peer_id', peer);
+      const { data: sess, error: sessErr } = await sessQ.order('created_at', { ascending: false }).limit(1);
+      if (sessErr) {
+        return res.status(500).json({ ok: false, error: sessErr.message || String(sessErr) });
+      }
+      const s0: any = Array.isArray(sess) ? sess[0] : null;
+      if (s0?.id) effectiveSessionId = String(s0.id);
+    }
+
+    let q = sb
+      .from('bot_messages')
+      .select('id, session_id, direction, body, meta, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (effectiveSessionId) q = q.eq('session_id', effectiveSessionId);
+    if (dir) q = q.eq('direction', dir);
+
+    const { data: msgs, error: msgErr } = await q;
+    if (msgErr) {
+      return res.status(500).json({ ok: false, error: msgErr.message || String(msgErr) });
+    }
+
+    const rows: any[] = Array.isArray(msgs) ? msgs : [];
+    const sessionIds = Array.from(new Set(rows.map((r) => String(r.session_id)).filter(Boolean)));
+    let sessionsById = new Map<string, { channel: string; peer_id: string }>();
+    if (sessionIds.length > 0) {
+      const { data: sessRows, error: sErr } = await sb
+        .from('bot_sessions')
+        .select('id, channel, peer_id')
+        .in('id', sessionIds);
+      if (!sErr && Array.isArray(sessRows)) {
+        for (const s of sessRows as any[]) {
+          sessionsById.set(String(s.id), { channel: String(s.channel), peer_id: String(s.peer_id) });
+        }
+      }
+    }
+
+    const enriched = rows.map((m) => {
+      const s = sessionsById.get(String(m.session_id));
+      return {
+        id: m.id,
+        created_at: m.created_at,
+        direction: m.direction,
+        body: m.body,
+        session_id: m.session_id,
+        channel: s?.channel || null,
+        peer_id: s?.peer_id || null,
+        meta: m.meta ?? null,
+      };
+    });
+
+    res.json({ ok: true, limit, filters: { channel: channel || null, peer: peer || null, session_id: effectiveSessionId || null, direction: dir }, messages: enriched });
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e?.message || String(e) });
   }
@@ -483,10 +575,16 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 app.listen(Number(env.PORT), '0.0.0.0', async () => {
   console.log(`Webhook AI listening on :${env.PORT} - CHROMIUM SYSTEM FIX APPLIED`);
 
+  const whatsappEnabled = String(process.env.WHATSAPP_ENABLED ?? 'true').toLowerCase() !== 'false';
+
   // Inicializar admin seed em background (não bloquear o servidor)
   runAdminSeedOnBoot().catch(e => console.warn('[ADMIN] Seed failed:', e));
 
   // Inicializar WhatsApp client em background (não bloquear o servidor)
+  if (!whatsappEnabled) {
+    console.log('[WA] Disabled by WHATSAPP_ENABLED=false; skipping WhatsApp initialization');
+    return;
+  }
   setTimeout(async () => {
     try {
       console.log('[WA] Starting WhatsApp client...');

@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import { supabase } from './config/supabase.js';
+import { supabase, supabaseConfigured, supabaseUsingServiceRole } from './config/supabase.js';
 // Importar rotas
 import serviceOrderRoutes from './routes/serviceOrderRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
@@ -31,10 +31,22 @@ import brandRulesRoutes from './routes/brandRulesRoutes.js';
 import leadsRoutes from './routes/leadsRoutes.js';
 import { botAuth } from './middleware/botAuth.js';
 
-// Configuração
-dotenv.config();
+// Configuração: em produção, use vars do ambiente (Railway) e evite ler .env do repo
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 const app = express();
-const PORT = process.env.PORT || 3001;
+const DEFAULT_PORT = process.env.NODE_ENV === 'production' ? 8080 : 3001;
+const PORT = process.env.PORT || DEFAULT_PORT;
+
+if (process.env.DEBUG_BOOT === '1') {
+  console.log('[boot]', {
+    NODE_ENV: process.env.NODE_ENV,
+    PORT_env: process.env.PORT,
+    DEFAULT_PORT,
+    PORT,
+  });
+}
 
 // Middleware
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s=>s.trim()).filter(Boolean);
@@ -95,14 +107,19 @@ app.use('/api/leads', leadsRoutes);
 
 // Health-check para storage
 app.get('/api/_health/storage', (req, res) => {
-  const enabled = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
-  return res.json({ ok: true, supabaseConfigured: enabled, bucket: process.env.SUPABASE_BUCKET || 'training-images' });
+  return res.json({
+    ok: true,
+    supabaseConfigured,
+    supabaseUsingServiceRole,
+    bucket: process.env.SUPABASE_BUCKET || 'training-images',
+  });
 });
 
 // Rota de status da API
 app.get('/api/status', async (req, res) => {
   let supa = 'unknown';
   try {
+    if (!supabase) throw new Error('supabase_not_configured');
     const { error } = await supabase.from('service_orders').select('id').limit(1);
     supa = error ? 'error' : 'ok';
   } catch { supa = 'error'; }
@@ -117,6 +134,8 @@ app.get('/api/status', async (req, res) => {
       lunchEnd: process.env.CALENDAR_LUNCH_END || '13:00',
     },
     supabase: supa,
+    supabaseConfigured,
+    supabaseUsingServiceRole,
   });
 });
 

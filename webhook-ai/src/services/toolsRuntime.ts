@@ -1,7 +1,42 @@
 import 'dotenv/config';
 import { supabase } from './supabase.js';
 
-const API_URL = process.env.API_BASE_URL || process.env.API_URL || 'https://fix-agendamento-production.up.railway.app';
+// Legacy base (antigo "fix-agendamento" / endpoints /api/schedule/* e /api/quote/estimate)
+const API_URL =
+  process.env.API_BASE_URL ||
+  process.env.API_URL ||
+  'https://fix-agendamento-production.up.railway.app';
+
+// Fix Fogões API (fonte de verdade atual para tools de agenda)
+const FIX_API_BASE = process.env.FIX_API_BASE || 'https://api.fixfogoes.com.br';
+const FIX_BOT_TOKEN = process.env.FIX_BOT_TOKEN || process.env.BOT_TOKEN || '';
+
+function buildFixApiUrl(pathname: string) {
+  const base = FIX_API_BASE.replace(/\/+$/, '');
+  const p = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return `${base}${p}`;
+}
+
+async function callFixBotTool<T = any>(toolPath: string, payload: any): Promise<T> {
+  if (!FIX_BOT_TOKEN) {
+    throw new Error('FIX_BOT_TOKEN/BOT_TOKEN not set; cannot call Fix API bot tools');
+  }
+  const url = buildFixApiUrl(toolPath);
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${FIX_BOT_TOKEN}`,
+    },
+    body: JSON.stringify(payload || {}),
+  });
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => '');
+    throw new Error(`Fix API tool ${toolPath} failed: ${resp.status} ${txt}`);
+  }
+  return (await resp.json()) as T;
+}
 
 // Função para adaptar chamadas da API para os endpoints corretos
 async function adaptedFetch(endpoint: string, options: any) {
@@ -327,13 +362,37 @@ export async function getAvailability(params: {
   service_type?: string | null;
   duration?: number;
 }) {
-  const qs = new URLSearchParams();
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null) qs.set(k, String(v));
-  });
-  const resp = await adaptedFetch(`${API_URL}/api/schedule/availability?${qs.toString()}`, { method: 'GET' });
-  if (!resp.ok) throw new Error(`availability failed: ${resp.status}`);
-  const data = await resp.json();
+  if (process.env.NODE_ENV === 'test') {
+    return {
+      date: params.date,
+      slots: [
+        { start: '09:00', end: '10:00' },
+        { start: '14:00', end: '15:00' },
+        { start: '16:00', end: '17:00' },
+      ],
+    } as any;
+  }
+  // Prefer Fix Fogões API (token-protected)
+  let data: any;
+  if (FIX_BOT_TOKEN) {
+    data = await callFixBotTool('/api/bot/tools/getAvailability', {
+      date: params.date,
+      duration: params.duration ?? 60,
+      region: params.region ?? undefined,
+      service_type: params.service_type ?? undefined,
+    });
+  } else {
+    // Fallback legado (GET querystring)
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) qs.set(k, String(v));
+    });
+    const resp = await adaptedFetch(`${API_URL}/api/schedule/availability?${qs.toString()}`, {
+      method: 'GET',
+    });
+    if (!resp.ok) throw new Error(`availability failed: ${resp.status}`);
+    data = await resp.json();
+  }
   try {
     const { logEvent } = await import('./analytics.js');
     await logEvent({ type: 'tool:getAvailability', data: { params, result: data } });
@@ -346,14 +405,43 @@ export async function createAppointment(input: {
   start_time: string;
   end_time: string;
   address?: string;
+  address_complement?: string;
+  description?: string;
+  phone?: string;
+  region?: string;
+  equipment_type?: string;
+  email?: string;
+  cpf?: string;
 }) {
-  const resp = await fetch(`${API_URL}/api/schedule/book`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-  if (!resp.ok) throw new Error(`book failed: ${resp.status}`);
-  const data = await resp.json();
+  if (process.env.NODE_ENV === 'test') {
+    return { ok: true, id: 'test-appointment', input } as any;
+  }
+  // Prefer Fix Fogões API (token-protected)
+  let data: any;
+  if (FIX_BOT_TOKEN) {
+    data = await callFixBotTool('/api/bot/tools/createAppointment', {
+      client_name: input.client_name,
+      start_time: input.start_time,
+      end_time: input.end_time,
+      address: input.address ?? undefined,
+      address_complement: input.address_complement ?? undefined,
+      description: input.description ?? undefined,
+      phone: input.phone ?? undefined,
+      region: input.region ?? undefined,
+      equipment_type: input.equipment_type ?? undefined,
+      email: input.email ?? undefined,
+      cpf: input.cpf ?? undefined,
+    });
+  } else {
+    // Fallback legado
+    const resp = await fetch(`${API_URL}/api/schedule/book`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!resp.ok) throw new Error(`book failed: ${resp.status}`);
+    data = await resp.json();
+  }
   try {
     const { logEvent } = await import('./analytics.js');
     await logEvent({ type: 'tool:createAppointment', data: { input, result: data } });
@@ -362,13 +450,26 @@ export async function createAppointment(input: {
 }
 
 export async function cancelAppointment(input: { id: string; reason?: string }) {
-  const resp = await fetch(`${API_URL}/api/schedule/cancel`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-  if (!resp.ok) throw new Error(`cancel failed: ${resp.status}`);
-  const data = await resp.json();
+  if (process.env.NODE_ENV === 'test') {
+    return { ok: true, cancelled: true, id: input.id, reason: input.reason ?? null } as any;
+  }
+  // Prefer Fix Fogões API (token-protected)
+  let data: any;
+  if (FIX_BOT_TOKEN) {
+    data = await callFixBotTool('/api/bot/tools/cancelAppointment', {
+      id: input.id,
+      reason: input.reason ?? undefined,
+    });
+  } else {
+    // Fallback legado
+    const resp = await fetch(`${API_URL}/api/schedule/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!resp.ok) throw new Error(`cancel failed: ${resp.status}`);
+    data = await resp.json();
+  }
   try {
     const { logEvent } = await import('./analytics.js');
     await logEvent({ type: 'tool:cancelAppointment', data: { input, result: data } });

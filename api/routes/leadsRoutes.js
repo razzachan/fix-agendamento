@@ -8,6 +8,14 @@ const authenticateBot = botAuth;
 // Endpoint para Claude enviar leads estruturados
 router.post('/from-claude', async (req, res) => {
   try {
+    if (!supabase) {
+      return res.status(500).json({
+        error: true,
+        message: 'Supabase não configurado na API',
+        details: 'missing_supabase_env',
+      });
+    }
+
     const body = req.body || {};
     const {
       phone,
@@ -20,6 +28,7 @@ router.post('/from-claude', async (req, res) => {
       problem,
       urgency,
       customer_name: customerName,
+      customer_email: customerEmail,
       address,
     } = extractedData;
 
@@ -35,24 +44,83 @@ router.post('/from-claude', async (req, res) => {
     // 1. Busca ou cria cliente (usando phone como chave principal)
     const cleanPhone = String(phone).replace(/[^0-9+]/g, '');
 
+    // Alguns ambientes exigem clients.email NOT NULL; use um placeholder estável quando não vier do payload.
+    const normalizedDigits = cleanPhone.replace(/[^0-9]/g, '');
+    const emailCandidate = (customerEmail || '').toString().trim();
+    const fallbackEmail = normalizedDigits
+      ? `whatsapp+${normalizedDigits}@fixfogoes.local`
+      : `whatsapp+unknown@fixfogoes.local`;
+
     const baseClientPayload = {
       phone: cleanPhone,
       name: customerName || 'Cliente WhatsApp',
+      email: emailCandidate.includes('@') ? emailCandidate : fallbackEmail,
       address: address || null,
     };
 
-    const { data: client, error: clientError } = await supabase
+    // Evitar upsert/onConflict: em alguns ambientes o schema cache do PostgREST pode divergir.
+    // Fluxo: tenta localizar por phone; se existir, atualiza campos básicos; se não, insere.
+    const { data: existingClient, error: findClientError } = await supabase
       .from('clients')
-      .upsert(baseClientPayload, { onConflict: 'phone' })
-      .select('*')
-      .single();
+      .select('id, phone, name, email, address')
+      .eq('phone', cleanPhone)
+      .maybeSingle();
 
-    if (clientError) {
-      console.error('[leads/from-claude] Erro ao criar/atualizar cliente:', clientError);
+    if (findClientError) {
+      console.error('[leads/from-claude] Erro ao buscar cliente:', findClientError);
       return res.status(500).json({
         error: true,
-        message: 'Erro ao criar/atualizar cliente',
-        details: clientError.message,
+        message: 'Erro ao buscar cliente',
+        details: findClientError.message,
+      });
+    }
+
+    let client = existingClient;
+    if (client?.id) {
+      const { data: updated, error: updateError } = await supabase
+        .from('clients')
+        .update({
+          name: baseClientPayload.name,
+          address: baseClientPayload.address,
+        })
+        .eq('id', client.id)
+        .select('id, phone, name, email, address')
+        .single();
+
+      if (updateError) {
+        console.error('[leads/from-claude] Erro ao atualizar cliente:', updateError);
+        return res.status(500).json({
+          error: true,
+          message: 'Erro ao atualizar cliente',
+          details: updateError.message,
+        });
+      }
+
+      client = updated;
+    } else {
+      const { data: inserted, error: insertError } = await supabase
+        .from('clients')
+        .insert(baseClientPayload)
+        .select('id, phone, name, email, address')
+        .single();
+
+      if (insertError) {
+        console.error('[leads/from-claude] Erro ao criar cliente:', insertError);
+        return res.status(500).json({
+          error: true,
+          message: 'Erro ao criar cliente',
+          details: insertError.message,
+        });
+      }
+
+      client = inserted;
+    }
+
+    if (!client?.id) {
+      return res.status(500).json({
+        error: true,
+        message: 'Cliente não retornou id após criação/atualização',
+        details: 'client_missing_id',
       });
     }
 
