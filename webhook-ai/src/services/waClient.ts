@@ -39,16 +39,22 @@ class WhatsAppClient extends EventEmitter {
   private async fetchLatestWebVersion(): Promise<string | null> {
     try {
       const https = await import('https');
-      const url = 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/last.json';
+      const url = 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/versions.json';
       const data: string = await new Promise((resolve, reject) => {
         https.get(url, (res) => {
+          const { statusCode } = res;
+          if (statusCode && statusCode >= 400) {
+            res.resume();
+            reject(new Error(`HTTP ${statusCode} ao buscar versions.json`));
+            return;
+          }
           let body = '';
           res.on('data', (c) => (body += c.toString()));
           res.on('end', () => resolve(body));
         }).on('error', reject);
       });
       const json = JSON.parse(data);
-      const v = json?.['desktop'] || json?.['whatsapp'] || json?.['web'] || null;
+      const v = json?.currentVersion || json?.currentAlpha || json?.currentBeta || null;
       return typeof v === 'string' && v.includes('.') ? v : null;
     } catch (e) {
       console.warn('[WA] fetchLatestWebVersion falhou', (e as any)?.message || e);
@@ -873,7 +879,27 @@ class WhatsAppClient extends EventEmitter {
   }
 
   public async sendText(to: string, text: string) {
-    return this.client.sendMessage(to, text);
+    try {
+      return await this.client.sendMessage(to, text);
+    } catch (e: any) {
+      const message = String(e?.message || e);
+
+      // Em produção (Railway), já vimos falha de compatibilidade do WA Web:
+      // "Cannot read properties of undefined (reading 'markedUnread')".
+      // Nesses casos, forçar restart com webVersion atualizada e repetir 1x.
+      if (message.includes('markedUnread')) {
+        console.warn('[WA] sendText falhou (markedUnread). Forçando restart com webVersion mais recente e retry 1x...');
+        const latest = await this.fetchLatestWebVersion();
+        if (latest) {
+          this.overrideWebVersion = latest;
+        }
+        await this.connect(true);
+        await new Promise((res) => setTimeout(res, 5000));
+        return await this.client.sendMessage(to, text);
+      }
+
+      throw e;
+    }
   }
 
   public async reset() {
