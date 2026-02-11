@@ -1,5 +1,14 @@
 {
   "mcpServers": {
+    "fixfogoes": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\akrom\\OneDrive\\Área de Trabalho\\eletro-fix-hub-pro-main2\\mcp\\fixfogoes-mcp\\index.js"
+      ],
+      "env": {
+        "FIX_API_BASE": "https://api.fixfogoes.com.br"
+      }
+    },
     "whatsapp": {
       "command": "C:\\Users\\akrom\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\uv.exe",
       "args": [
