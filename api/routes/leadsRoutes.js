@@ -35,36 +35,17 @@ router.post('/from-claude', async (req, res) => {
     // 1. Busca ou cria cliente (usando phone como chave principal)
     const cleanPhone = String(phone).replace(/[^0-9+]/g, '');
 
-    // Alguns ambientes não têm coluna updated_at em clients.
-    // Tentamos com updated_at e, se o schema não tiver a coluna, refazemos sem.
     const baseClientPayload = {
       phone: cleanPhone,
       name: customerName || 'Cliente WhatsApp',
       address: address || null,
     };
 
-    let client = null;
-    let clientError = null;
-
-    ({ data: client, error: clientError } = await supabase
+    const { data: client, error: clientError } = await supabase
       .from('clients')
-      .upsert(
-        {
-          ...baseClientPayload,
-          updated_at: now,
-        },
-        { onConflict: 'phone' }
-      )
+      .upsert(baseClientPayload, { onConflict: 'phone' })
       .select('*')
-      .single());
-
-    if (clientError && clientError.code === 'PGRST204' && String(clientError.message || '').includes('updated_at')) {
-      ({ data: client, error: clientError } = await supabase
-        .from('clients')
-        .upsert(baseClientPayload, { onConflict: 'phone' })
-        .select('*')
-        .single());
-    }
+      .single();
 
     if (clientError) {
       console.error('[leads/from-claude] Erro ao criar/atualizar cliente:', clientError);
