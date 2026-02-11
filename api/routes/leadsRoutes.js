@@ -59,6 +59,8 @@ router.post('/from-claude', async (req, res) => {
     }
 
     // 2. Cria pré-agendamento em pre_schedules (tabela dedicada para leads do bot/Claude)
+    // Observação: /pending filtra por crm_status e crm_next_followup. Preenchemos aqui
+    // para que o lead recém-chegado apareça como “pendente de ação” imediatamente.
     const { data: preSchedule, error: preScheduleError } = await supabase
       .from('pre_schedules')
       .insert({
@@ -68,6 +70,9 @@ router.post('/from-claude', async (req, res) => {
         urgency_level: urgency || 'medium',
         source: 'whatsapp_claude',
         status: 'pending_response',
+        crm_status: 'aguardando_resposta',
+        crm_last_interaction: now,
+        crm_next_followup: now,
         created_at: now,
         updated_at: now,
       })
@@ -178,9 +183,39 @@ router.put('/:id/status', authenticateBot, async (req, res) => {
 
     if (error) throw error;
 
-    const { error: scoreError } = await supabase.rpc('recalculate_lead_score', { lead_id: id });
+    // Recalcula score e agenda próximo follow-up quando fizer sentido.
+    let recalculatedScore = null;
+    const { data: scoreData, error: scoreError } = await supabase.rpc('recalculate_lead_score', { lead_id: id });
     if (scoreError) {
       console.warn('[LEAD] recalculate_lead_score failed (non-blocking):', scoreError);
+    } else {
+      recalculatedScore = scoreData;
+    }
+
+    const needsFollowup = ['aguardando_resposta', 'interessado'].includes(String(crm_status));
+    if (needsFollowup) {
+      try {
+        const scoreForFollowup = typeof recalculatedScore === 'number' ? recalculatedScore : (data?.crm_score ?? 50);
+        // Preferimos usar a function do banco (mantém a regra em um lugar só).
+        const { data: nextData, error: nextError } = await supabase.rpc('calculate_next_followup', { score: scoreForFollowup });
+        if (nextError) throw nextError;
+        await supabase
+          .from('pre_schedules')
+          .update({ crm_next_followup: nextData })
+          .eq('id', id);
+      } catch (followupError) {
+        console.warn('[LEAD] calculate_next_followup failed (non-blocking):', followupError);
+      }
+    } else {
+      // Se saiu do funil de follow-up, limpa a data para não aparecer como pendente.
+      try {
+        await supabase
+          .from('pre_schedules')
+          .update({ crm_next_followup: null })
+          .eq('id', id);
+      } catch (clearError) {
+        console.warn('[LEAD] clearing crm_next_followup failed (non-blocking):', clearError);
+      }
     }
 
     return res.json({ success: true, lead: data });
