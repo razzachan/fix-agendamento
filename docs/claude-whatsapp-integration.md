@@ -2,6 +2,57 @@
 
 Este documento descreve **como o Claude deve atuar como atendente de WhatsApp** para o sistema Fix Fogões, usando uma **ferramenta HTTP** que registra leads e pré‑agendamentos no backend oficial da empresa.
 
+> Nota de infraestrutura: enquanto o SSL do domínio custom ainda estiver pendente no Railway, use a base do Railway (`https://eletro-fix-hub-pro-production.up.railway.app`) para testes. Quando o SSL estiver ativo, a base oficial volta a ser `https://api.fixfogoes.com.br`.
+
+---
+
+## 0. Arquitetura e papel do bot (visão executiva)
+
+### Componentes
+
+- **WhatsApp (cliente)**: onde o usuário final conversa.
+- **Conector WhatsApp MCP**: conecta WhatsApp ↔ ferramentas MCP. Ele não tem regra de negócio do Fix Fogões; apenas entrega mensagens e executa tools.
+- **Claude (o atendente)**: único agente conversacional. Ele decide quando chamar tools e como responder ao cliente.
+- **API Fix Fogões (Express)**: fonte de verdade. Implementa regras, validações, persistência e integração com Supabase.
+- **Supabase (Postgres + storage)**: banco e serviços.
+- **Railway (runtime + edge + SSL)**: hospeda a API. Também gerencia domínio custom e certificados.
+
+### Papel do “bot”
+
+Aqui “bot” = **conjunto de tools do MCP + endpoints de API** que o Claude usa para:
+
+- **Registrar lead** quando a conversa indica intenção de serviço.
+- **Consultar disponibilidade** e **criar agendamento/OS** quando o cliente decide agendar.
+- **Manter auditoria/rastreabilidade** (via tabelas e registros no backend).
+
+O bot **não conversa diretamente com o cliente**. Quem fala com o cliente é o Claude. O bot apenas executa ações e devolve dados/textos sugeridos.
+
+### Diagrama (arquitetura + fluxo)
+
+```mermaid
+flowchart LR
+  W[Cliente no WhatsApp] -->|mensagens| MCP[Conector WhatsApp MCP]
+  MCP -->|contexto + tools| C[Claude (Atendente)]
+
+  C -->|tool: register_whatsapp_lead| API[API Fix Fogões (Express)]
+  C -->|tools: get_availability / create_appointment| API
+
+  API --> DB[(Supabase Postgres)]
+  API --> ST[(Supabase Storage)]
+
+  API -->|response JSON + suggested_response| C
+  C -->|responde em linguagem natural| MCP
+  MCP -->|envia mensagem| W
+
+  subgraph Deploy
+    R[Railway] --> API
+    D[DNS Cloudflare: api CNAME → *.railway.app] --> R
+    R --> S[SSL/TLS do domínio custom]
+  end
+```
+
+---
+
 ## 1. Visão geral do papel do Claude
 
 - Você (Claude) é o **único agente** que conversa com o cliente no WhatsApp.
@@ -27,10 +78,25 @@ Resumo dos fluxos:
 Backend oficial da API Fix Fogões:
 
 - Base URL: `https://api.fixfogoes.com.br`
+
+Durante validação/SSL do domínio custom no Railway:
+
+- Base URL alternativa: `https://eletro-fix-hub-pro-production.up.railway.app`
+
+O Claude/WhatsApp MCP deve permitir trocar a base via variável de ambiente (`FIX_API_BASE`).
 - Endpoint para leads do WhatsApp (Claude):
 
   - `POST /api/leads/from-claude`
   - Content-Type: `application/json`
+
+### Autenticação (bot/tools)
+
+Alguns endpoints (principalmente tools de agenda/bot) exigem token:
+
+- Header padrão: `Authorization: Bearer <BOT_TOKEN>`
+- Header legado (aceito): `x-bot-token: <BOT_TOKEN>`
+
+Sem token válido, o backend deve retornar `401`.
 
 Corpo esperado:
 
@@ -198,6 +264,45 @@ Exemplo de chamada da ferramenta:
     "address": "Rua Tal, 123"
   }
 }
+
+---
+
+## 6. Tools de agenda (papel do bot no agendamento)
+
+O fluxo de agendamento é dividido em duas etapas para manter regras de negócio no backend:
+
+1. **Consultar disponibilidade** (não cria nada):
+   - Tool MCP: `get_availability`
+   - Backend: `POST /api/bot/tools/getAvailability`
+   - Retorna slots e regras aplicadas.
+
+2. **Criar agendamento + gerar OS** (efeito persistente):
+   - Tool MCP: `create_appointment`
+   - Backend: `POST /api/bot/tools/createAppointment`
+   - Cria evento/calendário e a ordem de serviço conforme regras do Fix Fogões.
+
+Regras importantes:
+
+- O Claude só chama `create_appointment` depois do cliente confirmar dia/horário.
+- O backend é a fonte de verdade: valida horário, duração, conflitos, regras de almoço/jornada, blackouts e cria os registros.
+
+---
+
+## 7. Checklist de deploy/produção (para não quebrar o bot)
+
+- Railway variables (produção):
+  - `SUPABASE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `BOT_TOKEN`
+- DNS:
+  - Cloudflare: **somente** `CNAME api -> t0ui3x1r.up.railway.app` (DNS only, sem proxy durante validação)
+  - Não criar `A/AAAA` para `api`.
+- Validação rápida:
+  - `GET /health`
+  - `GET /api/status`
+  - `POST /api/leads/from-claude`
+  - `POST /api/bot/tools/getAvailability` com token
+  - `POST /api/bot/tools/createAppointment` com token
 ```
 
 A implementação faz o POST HTTP descrito na seção 2 e devolve algo como:
