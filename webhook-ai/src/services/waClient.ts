@@ -54,8 +54,35 @@ class WhatsAppClient extends EventEmitter {
         }).on('error', reject);
       });
       const json = JSON.parse(data);
-      const v = json?.currentVersion || json?.currentAlpha || json?.currentBeta || null;
-      return typeof v === 'string' && v.includes('.') ? v : null;
+
+      const pickFirstString = (...values: any[]) => {
+        for (const v of values) {
+          if (typeof v === 'string' && v.includes('.')) return v;
+        }
+        return null;
+      };
+
+      // Preferir estável sempre que possível.
+      // O arquivo versions.json pode variar de formato; tentamos alguns campos comuns.
+      const stable = pickFirstString(
+        json?.currentVersion,
+        json?.currentStable,
+        json?.stable,
+        json?.current?.stable,
+        json?.current?.version,
+        json?.version
+      );
+      const beta = pickFirstString(
+        json?.currentBeta,
+        json?.beta,
+        json?.current?.beta
+      );
+      const alpha = pickFirstString(
+        json?.currentAlpha,
+        json?.alpha,
+        json?.current?.alpha
+      );
+      return stable || beta || alpha;
     } catch (e) {
       console.warn('[WA] fetchLatestWebVersion falhou', (e as any)?.message || e);
       return null;
@@ -251,7 +278,6 @@ class WhatsAppClient extends EventEmitter {
       '--disable-renderer-backgrounding',
       '--disable-features=TranslateUI',
       '--disable-ipc-flooding-protection',
-      '--single-process',
     ];
 
     const args = isRailway ? [...baseArgs, ...railwayArgs] : baseArgs;
@@ -884,11 +910,20 @@ class WhatsAppClient extends EventEmitter {
     } catch (e: any) {
       const message = String(e?.message || e);
 
+      const isWaRuntimeMismatch =
+        message.includes('markedUnread') ||
+        message.includes('getChat') ||
+        message.includes('Evaluation failed') ||
+        message.includes('Cannot read properties of undefined');
+
       // Em produção (Railway), já vimos falha de compatibilidade do WA Web:
       // "Cannot read properties of undefined (reading 'markedUnread')".
       // Nesses casos, forçar restart com webVersion atualizada e repetir 1x.
-      if (message.includes('markedUnread')) {
-        console.warn('[WA] sendText falhou (markedUnread). Forçando restart com webVersion mais recente e retry 1x...');
+      if (isWaRuntimeMismatch) {
+        console.warn(
+          '[WA] sendText falhou (runtime WA). Forçando restart com webVersion mais recente e retry 1x...',
+          { to, err: message.slice(0, 200) }
+        );
         const latest = await this.fetchLatestWebVersion();
         if (latest) {
           this.overrideWebVersion = latest;
