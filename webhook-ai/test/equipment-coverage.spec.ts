@@ -179,7 +179,7 @@ describe('Cobertura por equipamento - políticas e formatação', () => {
     expect(text).toContain('coletamos, diagnosticamos');
     expect(text).toContain('coleta diagnóstico');
     // causas específicas (injetadas no quote)
-    expect(text).toContain('isso pode ser problema de');
+    expect(/(isso pode ser problema de|poss[íi]veis causas)/i.test(text)).toBe(true);
   });
 });
 

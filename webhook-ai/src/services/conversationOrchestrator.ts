@@ -319,7 +319,21 @@ function guessFunnelFields(text: string) {
   }
 
   // Retornar primeiro equipamento para compatibilidade, mas também a lista completa
-  const equipamento = equipamentosEncontrados[0];
+  // Preferir um equipamento mais específico quando o usuário já informou o tipo
+  // (crítico para política de atendimento e para o gate de orçamento de fogão/cooktop).
+  let equipamento = equipamentosEncontrados[0];
+  try {
+    const rawLower = (braw || '').toLowerCase();
+    const hasFogao = equipamentosEncontrados.some((x) => /fog[ãa]o/i.test(String(x || '')));
+    const hasGas = /\bgas\b|\bg[aá]s\b|a\s*gas/.test(rawLower) || b.includes('gas');
+    const hasInducao = b.includes('inducao') || rawLower.includes('indução');
+    const hasEletrico = b.includes('eletrico') || rawLower.includes('elétrico');
+    if (hasFogao) {
+      if (hasGas) equipamento = 'fogão a gás';
+      else if (hasInducao) equipamento = 'fogão de indução';
+      else if (hasEletrico) equipamento = 'fogão elétrico';
+    }
+  } catch {}
   return { equipamento, equipamentosEncontrados, marca, problema, num_burners };
   function guessAcceptance(text: string) {
     const b = (text || '').toLowerCase();
@@ -1996,6 +2010,25 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
     ) {
       ensurePrefer('coleta_diagnostico');
     }
+
+    // Hard-override: se o usuário explicitou o tipo (ex.: "fogão a gás"),
+    // garanta que isso fique persistido em `dados_coletados` mesmo que o extractor
+    // tenha retornado apenas "fogão".
+    try {
+      const msgNorm = (body || '')
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase();
+      const eqNorm = String(dados.equipamento || '')
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase();
+      if (eqNorm.includes('fogao')) {
+        if (/(\bgas\b|a\s*gas)/.test(msgNorm)) dados.equipamento = 'fogão a gás';
+        else if (msgNorm.includes('inducao')) dados.equipamento = 'fogão de indução';
+        else if (msgNorm.includes('eletrico')) dados.equipamento = 'fogão elétrico';
+      }
+    } catch {}
     const etapaAtual = (session as any)?.state?.funil_etapa || 'equipamento';
 
     let proxima = etapaAtual;
@@ -2099,7 +2132,7 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
     '\n- Para orçamento, capte equipment (ex.: fogão, cooktop), brand/marca, problema/descrição e região/bairro quando o usuário mencionar.' +
     '\n- Para agendamento, use a ferramenta aiScheduleStart quando tiver pelo menos nome, endereço e equipamento. Se o problema não estiver claro, use "problema não especificado". Depois que o cliente escolher 1/2/3, chame aiScheduleConfirm com opcao_escolhida.' +
     '\n- Nunca invente dados: se faltar, pergunte de forma objetiva.' +
-    '\n- Evite frases como "vou solicitar orçamento"; se for usar ferramenta, responda apenas com JSON. Caso contrário, entregue o valor ou faça uma única pergunta objetiva.' +
+    '\n- Evite frases como "vou solicitar orçamento". Se for usar ferramenta, responda apenas com JSON. Se NÃO for usar ferramenta, responda naturalmente e de forma completa (2–12 linhas). Prefira 1–2 parágrafos curtos; quando listar causas/opções, use bullets. Se faltar dado, faça no máximo 2 perguntas objetivas (priorize 1 por vez quando possível).' +
     '\n- Siga o funil: equipamento → marca → problema → causas possíveis (sem instruções de conserto) → oferta do serviço (definido pelas políticas do equipamento; não pergunte preferência).' +
     '\n- IMPORTANTE: Não colete dados pessoais (nome, telefone, endereço, CPF) antes da aceitação explícita do orçamento.' +
     '\n- CRUCIAL: Quando o cliente mencionar equipamentos ambíguos, SEMPRE pergunte para especificar ANTES de mostrar causas ou valores:' +
@@ -2176,7 +2209,7 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
       provider,
       model,
       temperature: llm.temperature ?? 0.7,
-      maxTokens: llm.maxTokens ?? 700,
+      maxTokens: llm.maxTokens ?? (Number(process.env.LLM_MAX_TOKENS) > 0 ? Number(process.env.LLM_MAX_TOKENS) : 1600),
     },
     messages
   );
@@ -2189,6 +2222,24 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
         t
       );
     if (looksLikeDeferral) text = '';
+  } catch {}
+
+  // Guarda de política: não pedir dados pessoais antes do cliente aceitar explicitamente o orçamento.
+  // Se o LLM tentar pedir nome/CPF/endereço/etc antes do orçamento, substitui por uma pergunta segura.
+  try {
+    const st = ((session as any)?.state || {}) as any;
+    const okToAskPersonal = !!st?.orcamento_entregue || !!st?.collecting_personal_data;
+    if (!okToAskPersonal) {
+      const raw = String(text || '');
+      const asksPersonal =
+        /\b(nome|cpf|end(er|e)ço|cep|e-?mail|telefone|complemento|apto|apartamento|bloco)\b/i.test(
+          raw
+        );
+      if (asksPersonal) {
+        text =
+          'Consigo te ajudar sim. Antes de eu pedir dados pessoais, eu preciso primeiro entender o equipamento e o defeito para calcular o orçamento.\n\nQual é a marca e o que exatamente está acontecendo?';
+      }
+    }
   } catch {}
 
   // Execução de ferramenta se o modelo solicitou (passa estado da sessão para reduzir perguntas repetidas)
@@ -2886,10 +2937,29 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
               });
           } catch {}
           if (!marca && !problemaText)
-            return 'Antes do orçamento: me informe a marca e descreva o problema específico, por favor.';
-          if (!marca) return 'Qual é a marca do equipamento?';
-          return 'Pode me dizer o problema específico que está acontecendo?';
+            return 'Antes de eu te passar o orçamento, preciso de 2 informações rápidas: a marca do equipamento e o defeito específico (ex.: não acende, não esquenta, vazando, fazendo barulho). Pode me dizer?';
+          if (!marca) return 'Qual é a marca do equipamento? (Ex.: Brastemp, Consul, Fischer, Electrolux...)';
+          return 'O que exatamente está acontecendo com ele? (Me descreva o defeito específico)';
         }
+
+        // Gate extra (importante): para fogão a gás/cooktop, precisamos de piso/cooktop e nº de bocas
+        // antes de calcular valor, para evitar orçamento incorreto.
+        try {
+          const eqLower = String(equipmentLabel || '').toLowerCase();
+          const msgLower = String(body || '').toLowerCase();
+          const isFogao = /fog[ãa]o|cooktop/.test(eqLower);
+          const isGas = /\bg[áa]s\b/.test(eqLower) || /\bg[áa]s\b/.test(msgLower);
+          const burners = String((g as any)?.num_burners || (collected as any)?.num_burners || '').trim();
+          const mountLower = String(mount || '').trim();
+          if (isFogao && isGas) {
+            const missing: string[] = [];
+            if (!mountLower) missing.push('se é fogão de piso ou cooktop');
+            if (!burners) missing.push('quantas bocas ele tem (4, 5 ou 6)');
+            if (missing.length) {
+              return `Para eu te passar o valor certinho, me diga ${missing.join(' e ')}.`;
+            }
+          }
+        } catch {}
         const quote = await buildQuote({
           service_type,
           equipment: equipmentLabel,
@@ -2925,7 +2995,13 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
       const causas = await getPossibleCauses(session, body);
       if (causas.length) {
         text = text.trim().replace(/\s+$/, '');
-        text += `\n\nIsso pode ser problema de ${causas.join(', ')}.`;
+        const clean = (Array.isArray(causas) ? causas : [])
+          .map((c) => String(c || '').replace(/^[\-*\s]+/, '').trim())
+          .filter(Boolean)
+          .slice(0, 4);
+        if (clean.length) {
+          text += `\n\nPossíveis causas mais comuns:\n${clean.map((c) => `- ${c}`).join('\n')}`;
+        }
       }
     }
     // Sanitizar pedidos de endereço/CEP antes do aceite explícito
@@ -2968,6 +3044,33 @@ async function getPossibleCauses(session?: SessionRecord, lastMessage?: string):
     return Array.from(new Set(causasLista)).slice(0, 4);
   } catch {
     return [];
+  }
+}
+
+function enrichFogaoEquipmentFromMessage(equipamento: any, message: any): string | undefined {
+  try {
+    const eq = String(equipamento || '').normalize('NFC').trim();
+    const msg = String(message || '').normalize('NFC');
+    const lowerMsg = msg.toLowerCase();
+    const lowerEq = eq.toLowerCase();
+
+    const mentionsFogao =
+      /\bfog(ão|ao)\b/.test(lowerMsg) || /\bfog(ão|ao)\b/.test(lowerEq) || /forno\s+do\s+fog(ão|ao)/.test(lowerMsg);
+    if (!mentionsFogao) return eq || undefined;
+
+    // Se já estiver especificado, preserve.
+    if (/g[aá]s|indu(c|ç)ão|el[eé]trico|comum/.test(lowerEq)) return eq || undefined;
+
+    const hasGas = /\bg[aá]s\b|\bgas\b|\bglp\b|a\s*g[aá]s|a\s*gas/.test(lowerMsg);
+    const hasInducao = lowerMsg.includes('indução') || lowerMsg.includes('inducao');
+    const hasEletrico = lowerMsg.includes('elétrico') || lowerMsg.includes('eletrico');
+
+    if (hasGas) return 'fogão a gás';
+    if (hasInducao) return 'fogão de indução';
+    if (hasEletrico) return 'fogão elétrico';
+    return eq || undefined;
+  } catch {
+    return String(equipamento || '').trim() || undefined;
   }
 }
 
@@ -3312,15 +3415,6 @@ DADOS_SESSAO_ATUAL: ${JSON.stringify(sessionData || {}, null, 2)}
 ${policyHints}
 ${guidance}
 
-
-  // Regra para respostas curtas: se a decisão for saudação inicial, limite a 160 caracteres
-  try {
-    if (decision?.intent === 'saudacao_inicial' && decision?.resposta_sugerida) {
-      const s = String(decision.resposta_sugerida);
-      decision.resposta_sugerida = s.length > 160 ? s.slice(0, 157) + '…' : s;
-    }
-  } catch {}
-
 BLOCOS_DISPONIVEIS:
 ${availableBlocks.map((b, i) => `${i + 1}. ${b.key} | eq=${b.equipamento || 'N/A'} | sintomas=${(b.sintomas || []).slice(0, 6).join(', ')}`).join('\n')}
 
@@ -3330,7 +3424,7 @@ Retorne:
   "blocos_relevantes": array<number, max=3>,
   "dados_extrair": {"equipamento"?: string, "marca"?: string, "problema"?: string, "mount"?: oneof["embutido","bancada","industrial"], "num_burners"?: string},
   "acao_principal": oneof["coletar_dados","gerar_orcamento","agendar_servico","responder_informacao","transferir_humano"],
-  "resposta_sugerida": "Resposta natural e empática (máximo 200 chars). Use 'forno comercial' ao invés de 'forno de padaria'"
+  "resposta_sugerida": "Resposta natural e empática (máximo 600 chars). Use 'forno comercial' ao invés de 'forno de padaria'"
 }`;
 
   console.log('[AI-ROUTER] 🔍 Enviando prompt para IA...');
@@ -3361,6 +3455,18 @@ Retorne:
     const candidate = first >= 0 && last > first ? raw.slice(first, last + 1) : raw.trim();
 
     const decision = JSON.parse(candidate);
+
+    // Pós-processamento: preservar qualificadores do fogão via texto do cliente.
+    // Ex.: se o cliente diz "fogão a gás" e a IA retornar apenas "fogão", enriquecemos aqui.
+    try {
+      if (decision && typeof decision === 'object') {
+        if (!decision.dados_extrair || typeof decision.dados_extrair !== 'object') {
+          decision.dados_extrair = {};
+        }
+        const enrichedEq = enrichFogaoEquipmentFromMessage(decision.dados_extrair.equipamento, message);
+        if (enrichedEq) decision.dados_extrair.equipamento = enrichedEq;
+      }
+    } catch {}
 
     // Pós-processamento: Normalizar nomenclatura de equipamentos na resposta_sugerida
     if (decision.resposta_sugerida && typeof decision.resposta_sugerida === 'string') {
@@ -3417,6 +3523,16 @@ async function executeAIDecision(
           /\bfog(ão|ao)\b/.test(newEq) && !/g[aá]s|indu(c|ç)ão|el[eé]trico/.test(newEq);
         if (curIsGas && newIsGenericFogao) {
           merged.equipamento = currentData.equipamento; // mantém "fogão a gás"
+          merged.power_type = merged.power_type || 'gas';
+        }
+      } catch {}
+
+      // Enriquecer qualificadores via texto atual (primeira mensagem também precisa funcionar).
+      try {
+        const enriched = enrichFogaoEquipmentFromMessage(merged.equipamento, body);
+        if (enriched) merged.equipamento = enriched;
+        const eqLower = String(merged.equipamento || '').toLowerCase();
+        if (eqLower.includes('fogão a gás') || (eqLower.includes('fogão') && eqLower.includes('gás'))) {
           merged.power_type = merged.power_type || 'gas';
         }
       } catch {}
@@ -5371,7 +5487,15 @@ async function generateAIQuoteResponse(quote: any, decision: any, dados: any): P
 
         if (causasLista.length > 0) {
           const aiCausas = await generateAICauses(equipamentoConsiderado, dados.problema, causasLista);
-          causasText = `Isso pode ser problema de ${aiCausas.join(', ')}.\n\n`;
+          const causasClean = (Array.isArray(aiCausas) ? aiCausas : [])
+            .map((c) => String(c || '').replace(/^[\-*\s]+/, '').trim())
+            .filter(Boolean)
+            .slice(0, 4);
+          if (causasClean.length) {
+            causasText = `Possíveis causas mais comuns:\n${causasClean
+              .map((c) => `- ${c}`)
+              .join('\n')}\n\n`;
+          }
         }
       } else {
         // Buscar causas dos blocos estruturados (residenciais/gerais)
@@ -5392,7 +5516,15 @@ async function generateAIQuoteResponse(quote: any, decision: any, dados: any): P
 
         if (causasLista.length > 0) {
           const aiCausas = await generateAICauses(dados.equipamento, dados.problema, causasLista);
-          causasText = `Isso pode ser problema de ${aiCausas.join(', ')}.\n\n`;
+          const causasClean = (Array.isArray(aiCausas) ? aiCausas : [])
+            .map((c) => String(c || '').replace(/^[\-*\s]+/, '').trim())
+            .filter(Boolean)
+            .slice(0, 4);
+          if (causasClean.length) {
+            causasText = `Possíveis causas mais comuns:\n${causasClean
+              .map((c) => `- ${c}`)
+              .join('\n')}\n\n`;
+          }
         }
       }
     } catch (e) {
@@ -5942,9 +6074,14 @@ async function summarizeToolResult(
         } catch {}
       }
 
-      const causasText = causasFinais.length
-        ? `Isso pode ser problema de ${causasFinais.join(', ')}.\n\n`
-        : '';
+      const causasText = (() => {
+        const clean = (Array.isArray(causasFinais) ? causasFinais : [])
+          .map((c) => String(c || '').replace(/^[\-*\s]+/, '').trim())
+          .filter(Boolean)
+          .slice(0, 4);
+        if (!clean.length) return '';
+        return `Possíveis causas mais comuns:\n${clean.map((c) => `- ${c}`).join('\n')}\n\n`;
+      })();
       console.log('[DEBUG] causas finais usadas:', causasFinais);
       const v = result.value ?? result.min ?? result.max;
       // CORREÇÃO: Removido notes para evitar texto "(Visita técnica padrão...)" na resposta

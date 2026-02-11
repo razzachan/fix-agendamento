@@ -115,9 +115,12 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
       const problemText = String(input.problem || input.description || '').trim();
       if (!input.brand || !problemText) {
         if (!input.brand && !problemText)
-          return 'Antes do orçamento: qual é a marca do equipamento e qual é o problema específico?';
-        if (!input.brand) return 'Qual é a marca do equipamento?';
-        return 'Pode me descrever o problema específico que está acontecendo?';
+          return (
+            'Antes de eu te passar o orçamento, preciso de 2 informações rápidas: a marca do equipamento e o problema específico (ex.: não acende, não esquenta, vazando, fazendo barulho). Pode me dizer?'
+          );
+        if (!input.brand)
+          return 'Qual é a marca do equipamento? (Ex.: Brastemp, Consul, Fischer, Electrolux...)';
+        return 'O que exatamente está acontecendo com ele? (Me descreva o defeito específico)';
       }
       // Normalizar para as ferramentas downstream
       input.problem = input.problem || problemText;

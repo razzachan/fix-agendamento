@@ -145,7 +145,23 @@ export async function aiGuessFunnelFields(text: string): Promise<AiFunnelFields 
     if (!parsed || typeof parsed !== 'object') return null;
     const equipamentos =
       normalizeEquipments(parsed.equipamentos || parsed.equipment || ([] as string[])) || [];
-    const eq = equipamentos[0];
+    // Preferir rótulos mais específicos quando o usuário explicita o tipo
+    // (ex.: "fogão a gás" vs "fogão elétrico") para política de atendimento.
+    let eq = equipamentos[0];
+    try {
+      const raw = String(text || '').toLowerCase();
+      const hasGas = /\bgas\b|\bg[aá]s\b|a\s*gas/.test(raw);
+      const hasInducao = raw.includes('indução') || raw.includes('inducao');
+      const hasEletrico = raw.includes('elétrico') || raw.includes('eletrico');
+      if (eq && /fog[ãa]o/.test(eq) && (hasGas || hasInducao || hasEletrico)) {
+        if (hasGas) eq = 'fogão a gás';
+        else if (hasInducao) eq = 'fogão de indução';
+        else if (hasEletrico) eq = 'fogão elétrico';
+
+        // Refletir na lista para manter consistência com o resto do pipeline
+        if (equipamentos.length) equipamentos[0] = eq;
+      }
+    } catch {}
     const marca = normStr(parsed.marca || parsed.brand);
     const problema = parsed.problema
       ? String(parsed.problema).trim()
