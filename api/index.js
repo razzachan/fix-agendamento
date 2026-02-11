@@ -28,6 +28,7 @@ import analyticsRoutes from './routes/analyticsRoutes.js';
 import visionRoutes from './routes/visionRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import brandRulesRoutes from './routes/brandRulesRoutes.js';
+import leadsRoutes from './routes/leadsRoutes.js';
 import { botAuth } from './middleware/botAuth.js';
 
 // Configuração
@@ -90,6 +91,7 @@ const maybeBotAuth = process.env.BOT_TOKEN ? botAuth : (_req, _res, next) => { i
 app.use('/api/vision', maybeBotAuth, visionRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/brand-rules', brandRulesRoutes);
+app.use('/api/leads', leadsRoutes);
 
 // Health-check para storage
 app.get('/api/_health/storage', (req, res) => {

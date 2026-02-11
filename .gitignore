@@ -12,6 +12,20 @@ dist
 dist-ssr
 *.local
 
+# Large generated / deployment-unrelated folders
+android/
+ios/
+temp-check/
+backup_projeto_*/
+*.zip
+*.apk
+*.aab
+
+# Python caches / venvs
+__pycache__/
+*.pyc
+.venv/
+
 # Android build cache
 android/.gradle/
 
@@ -25,3 +39,13 @@ android/.gradle/
 *.njsproj
 *.sln
 *.sw?
+
+# Exclude VCS metadata from deploy uploads
+.git/
+
+# Local runtime caches / sessions
+local-wa-session/
+
+# Other services not needed for API deploy
+webhook-ai/
+thermal-print-service/
