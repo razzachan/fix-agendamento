@@ -144,7 +144,7 @@ router.post('/createAppointment', async (req, res) => {
   try {
     const parsed = CreateAppointmentSchema.safeParse(req.body||{});
     if (!parsed.success) return res.status(400).json({ ok:false, error:'invalid_payload', details: parsed.error.format() });
-    const { client_name, start_time, end_time, address='', address_complement='', zip_code='', email='', cpf='', description='', equipment_type=null, phone=null, attendance_preference='', region=null } = parsed.data;
+    const { client_name, start_time, end_time, is_test=false, address='', address_complement='', zip_code='', email='', cpf='', description='', equipment_type=null, phone=null, attendance_preference='', region=null } = parsed.data;
 
     // Classificar tipo de atendimento (em_domicilio | coleta_diagnostico | coleta_conserto)
     const { classifyAttendance } = await import('../services/attendanceClassifier.js');
@@ -186,7 +186,7 @@ router.post('/createAppointment', async (req, res) => {
       description,
       equipment_type,
       status:'scheduled',
-      is_test: false,
+      is_test: !!is_test,
       source: 'bot',
       service_attendance_type: attendanceType,
       client_email: email || null,
@@ -223,6 +223,10 @@ router.post('/createAppointment', async (req, res) => {
     // Criar/vincular ordem de serviço a partir do evento
     let serviceOrder = null;
     try {
+      // Em smoke test, não criar OS para não poluir produção
+      if (is_test) {
+        serviceOrder = null;
+      } else {
       const payload = {
         client_name,
         client_phone: phone || null,
@@ -238,6 +242,7 @@ router.post('/createAppointment', async (req, res) => {
       if (!soErr) {
         serviceOrder = so;
         await supabase.from('calendar_events').update({ service_order_id: so.id }).eq('id', data.id);
+      }
       }
     } catch {}
 

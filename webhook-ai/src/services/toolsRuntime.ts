@@ -414,6 +414,7 @@ export async function createAppointment(input: {
   equipment_type?: string;
   email?: string;
   cpf?: string;
+  is_test?: boolean;
 }) {
   if (process.env.NODE_ENV === 'test') {
     return { ok: true, id: 'test-appointment', input } as any;
@@ -462,6 +463,7 @@ export async function cancelAppointment(input: { id: string; reason?: string }) 
       id: input.id,
       reason: input.reason ?? undefined,
     });
+      is_test: input.is_test ?? undefined,
   } else {
     // Fallback legado
     const resp = await fetch(`${API_URL}/api/schedule/cancel`, {
