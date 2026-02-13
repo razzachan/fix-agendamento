@@ -459,7 +459,29 @@ router.post('/cancelAppointment', async (req, res) => {
     const parsed = CancelAppointmentSchema.safeParse(req.body||{});
     if (!parsed.success) return res.status(400).json({ ok:false, error:'invalid_payload', details: parsed.error.format() });
     const { id, reason='' } = parsed.data;
-    const { data, error } = await supabase.from('calendar_events').update({ status:'canceled', notes: reason }).eq('id', id).select().single();
+    let data, error;
+    try {
+      ({ data, error } = await supabase
+        .from('calendar_events')
+        .update({ status: 'canceled', notes: reason })
+        .eq('id', id)
+        .select()
+        .single());
+      if (error) throw error;
+    } catch (e) {
+      // Fallback: algumas bases não têm coluna "notes"
+      const msg = ((e?.message || '') + ' ' + (e?.hint || '') + ' ' + (e?.details || '')).toLowerCase();
+      if (msg.includes("notes") && msg.includes('column')) {
+        ({ data, error } = await supabase
+          .from('calendar_events')
+          .update({ status: 'canceled' })
+          .eq('id', id)
+          .select()
+          .single());
+      } else {
+        throw e;
+      }
+    }
     if (error) throw error;
     return res.json({ ok:true, event: data });
   } catch (e) {
