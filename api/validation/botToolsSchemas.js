@@ -6,6 +6,7 @@ export const GetAvailabilitySchema = z.object({
   region: z.string().optional(),
   duration: z.number().int().positive().max(480).default(60),
   equipment: z.string().optional(),
+  technician_id: z.string().optional(),
 });
 
 export const CreateAppointmentSchema = z.object({

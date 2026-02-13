@@ -45,6 +45,101 @@ const tools = [
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
+    name: 'fix_leads_all',
+    description: "Lista todos os leads com filtros (GET /api/leads). Use status='ativo' para excluir perdidos/cancelados/entregues. Requer BOT_TOKEN.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: ['string', 'null'], default: null },
+        score_min: { type: ['number', 'null'], default: null },
+        score_max: { type: ['number', 'null'], default: null },
+        limit: { type: ['number', 'null'], default: 20 },
+        page: { type: ['number', 'null'], default: 0 },
+        order_by: { type: ['string', 'null'], default: 'created_at' },
+        order: { type: ['string', 'null'], default: 'desc' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'fix_lead_get',
+    description: 'Busca um lead específico (GET /api/leads/:id). Requer BOT_TOKEN.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'UUID do lead' },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'fix_lead_by_phone',
+    description: 'Busca leads por telefone (GET /api/leads/by-phone/:phone). Requer BOT_TOKEN.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        phone: { type: 'string', description: 'Telefone (ex: 48999999999 ou 5548999999999)' },
+      },
+      required: ['phone'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'fix_lead_update_status',
+    description: 'Atualiza status CRM e adiciona nota opcional (PUT /api/leads/:id/status). Requer BOT_TOKEN.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'UUID do lead' },
+        crm_status: { type: 'string', description: 'Novo status CRM' },
+        notes: { type: ['string', 'null'], default: null },
+        crm_score: { type: ['number', 'null'], default: null },
+      },
+      required: ['id', 'crm_status'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'fix_lead_add_note',
+    description: 'Adiciona uma nota no lead (POST /api/leads/:id/notes). Requer BOT_TOKEN.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'UUID do lead' },
+        note: { type: 'string' },
+        author: { type: ['string', 'null'], default: null },
+      },
+      required: ['id', 'note'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'fix_appointments_list',
+    description: 'Lista agendamentos por período (GET /api/bot/tools/listAppointments). Requer BOT_TOKEN.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        date_from: { type: ['string', 'null'], default: null, description: 'YYYY-MM-DD' },
+        date_to: { type: ['string', 'null'], default: null, description: 'YYYY-MM-DD' },
+        status: { type: ['string', 'null'], default: null },
+        limit: { type: ['number', 'null'], default: null },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'fix_crm_metrics',
+    description: 'Retorna métricas do CRM (GET /api/analytics/crm). Requer BOT_TOKEN.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        period_days: { type: ['number', 'null'], default: 30 },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'fix_get_availability',
     description: 'Consulta slots disponíveis (POST /api/bot/tools/getAvailability). Requer BOT_TOKEN.',
     inputSchema: {
@@ -108,6 +203,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args } = req.params;
 
+  const toQueryString = (obj) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (v === undefined || v === null || v === '') continue;
+      qs.set(k, String(v));
+    }
+    const s = qs.toString();
+    return s ? `?${s}` : '';
+  };
+
   try {
     if (name === 'fix_health') {
       const r = await requestJson('/health');
@@ -116,6 +221,51 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
     if (name === 'fix_leads_pending') {
       const r = await requestJson('/api/leads/pending');
+      return { content: [{ type: 'text', text: JSON.stringify(r.json ?? { status: r.status, body: r.text }, null, 2) }] };
+    }
+
+    if (name === 'fix_leads_all') {
+      const q = toQueryString(args || {});
+      const r = await requestJson(`/api/leads${q}`);
+      return { content: [{ type: 'text', text: JSON.stringify(r.json ?? { status: r.status, body: r.text }, null, 2) }] };
+    }
+
+    if (name === 'fix_lead_get') {
+      const id = args?.id;
+      const r = await requestJson(`/api/leads/${encodeURIComponent(String(id))}`);
+      return { content: [{ type: 'text', text: JSON.stringify(r.json ?? { status: r.status, body: r.text }, null, 2) }] };
+    }
+
+    if (name === 'fix_lead_by_phone') {
+      const phone = args?.phone;
+      const r = await requestJson(`/api/leads/by-phone/${encodeURIComponent(String(phone))}`);
+      return { content: [{ type: 'text', text: JSON.stringify(r.json ?? { status: r.status, body: r.text }, null, 2) }] };
+    }
+
+    if (name === 'fix_lead_update_status') {
+      const id = args?.id;
+      const body = { ...args };
+      delete body.id;
+      const r = await requestJson(`/api/leads/${encodeURIComponent(String(id))}/status`, { method: 'PUT', body });
+      return { content: [{ type: 'text', text: JSON.stringify(r.json ?? { status: r.status, body: r.text }, null, 2) }] };
+    }
+
+    if (name === 'fix_lead_add_note') {
+      const id = args?.id;
+      const body = { note: args?.note, author: args?.author };
+      const r = await requestJson(`/api/leads/${encodeURIComponent(String(id))}/notes`, { method: 'POST', body });
+      return { content: [{ type: 'text', text: JSON.stringify(r.json ?? { status: r.status, body: r.text }, null, 2) }] };
+    }
+
+    if (name === 'fix_appointments_list') {
+      const q = toQueryString(args || {});
+      const r = await requestJson(`/api/bot/tools/listAppointments${q}`);
+      return { content: [{ type: 'text', text: JSON.stringify(r.json ?? { status: r.status, body: r.text }, null, 2) }] };
+    }
+
+    if (name === 'fix_crm_metrics') {
+      const q = toQueryString(args || {});
+      const r = await requestJson(`/api/analytics/crm${q}`);
       return { content: [{ type: 'text', text: JSON.stringify(r.json ?? { status: r.status, body: r.text }, null, 2) }] };
     }
 

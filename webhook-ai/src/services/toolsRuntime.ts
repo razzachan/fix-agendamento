@@ -361,6 +361,7 @@ export async function getAvailability(params: {
   region?: string | null;
   service_type?: string | null;
   duration?: number;
+  technician_id?: string | null;
 }) {
   if (process.env.NODE_ENV === 'test') {
     return {
@@ -380,6 +381,7 @@ export async function getAvailability(params: {
       duration: params.duration ?? 60,
       region: params.region ?? undefined,
       service_type: params.service_type ?? undefined,
+      technician_id: params.technician_id ?? undefined,
     });
   } else {
     // Fallback legado (GET querystring)
@@ -512,6 +514,37 @@ export async function aiScheduleStart(input: {
     return { message: 'Tenho estas opções de horário: 1) 09:00 2) 10:30 3) 14:00' };
   }
 
+  // Preferir Fix API como fonte de verdade quando token estiver configurado.
+  if (FIX_BOT_TOKEN) {
+    try {
+      const data: any = await callFixBotTool('/api/bot/tools/smartSuggestions', {
+        address: input.endereco || '',
+        equipment_type: input.equipamento || null,
+        urgent: !!input.urgente,
+      });
+
+      const suggestionsRaw = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      const horarios_oferecidos = suggestionsRaw.slice(0, 3).map((s: any, idx: number) => ({
+        ...s,
+        idx: String(idx + 1),
+      }));
+
+      const message = horarios_oferecidos.length
+        ? `Tenho estes horários disponíveis:\n${horarios_oferecidos
+            .map((s: any) => `${s.idx}) ${s.text || `${s.date || ''} ${s.window || ''}`.trim()}`)
+            .join('\n')}\n\nQual você prefere? (responda 1, 2 ou 3)`
+        : 'Não encontrei horários disponíveis nos próximos dias. Quer sugerir uma data/horário específico?';
+
+      return {
+        ok: true,
+        message,
+        horarios_oferecidos,
+      } as any;
+    } catch (e: any) {
+      console.warn('[toolsRuntime] aiScheduleStart: Fix API smartSuggestions failed, falling back to middleware', e?.message || e);
+    }
+  }
+
   const mapTipo = (v?: string) => {
     if (!v) return undefined as any;
     const s = String(v).toLowerCase();
@@ -583,6 +616,57 @@ export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhi
   // Test-mode: return deterministic confirmation
   if (process.env.NODE_ENV === 'test') {
     return { message: 'Agendamento confirmado!' };
+  }
+
+  // Preferir Fix API como fonte de verdade quando houver token + sugestões no contexto.
+  if (FIX_BOT_TOKEN) {
+    try {
+      const ctx: any = input.context || {};
+      const suggestions: any[] = Array.isArray(ctx?.horarios_oferecidos)
+        ? ctx.horarios_oferecidos
+        : Array.isArray(ctx?.suggestions)
+          ? ctx.suggestions
+          : [];
+
+      const opt = String(input.opcao_escolhida || '').trim();
+      const idx = Math.max(1, parseInt(opt || '0', 10));
+      const chosen =
+        suggestions.find((s) => String(s?.idx || s?.opcao || s?.choice || '') === opt) ||
+        suggestions[idx - 1] ||
+        null;
+
+      const start_time = String(chosen?.from || chosen?.start_time || input.horario_escolhido || '').trim();
+      const end_time = String(chosen?.to || chosen?.end_time || '').trim();
+
+      if (start_time && end_time) {
+        const clientName = String(ctx?.nome || input.telefone || 'Cliente').trim();
+        const address = String(ctx?.endereco || '').trim();
+        const equipment = String(ctx?.equipamento || '').trim();
+        const problem = String(ctx?.problema || '').trim();
+        const descriptionParts = [equipment && `Equipamento: ${equipment}`, problem && `Problema: ${problem}`].filter(Boolean);
+        const description = descriptionParts.join(' | ') || undefined;
+
+        const booked: any = await callFixBotTool('/api/bot/tools/createAppointment', {
+          client_name: clientName,
+          start_time,
+          end_time,
+          address: address || undefined,
+          address_complement: ctx?.complemento || undefined,
+          description,
+          phone: input.telefone,
+          equipment_type: equipment || undefined,
+          cpf: ctx?.cpf || undefined,
+          email: ctx?.email || undefined,
+        });
+
+        const osNumber = booked?.serviceOrder?.order_number || booked?.serviceOrder?.id || booked?.event?.id || '';
+        const techName = booked?.technician?.name || booked?.technician?.id || '';
+        const msg = `AGENDAMENTO_CONFIRMADO|OS:${osNumber}|CLIENTE:${clientName}|HORARIO:${start_time}|TECNICO:${techName}|VALOR:|EQUIPAMENTOS:${equipment}|QTD_EQUIPAMENTOS:1`;
+        return { ...booked, message: msg } as any;
+      }
+    } catch (e: any) {
+      console.warn('[toolsRuntime] aiScheduleConfirm: Fix API booking failed, falling back to middleware', e?.message || e);
+    }
   }
   // Helper para garantir cache da ETAPA 1 antes de confirmar, quando necessário
   const ensureStartIfNeeded = async () => {

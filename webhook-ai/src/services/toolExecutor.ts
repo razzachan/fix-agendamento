@@ -83,10 +83,12 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
 
     // Preencher pistas com classificação visual salva na sessão
     let sessionState: any = undefined;
+    let sessionRec: any = undefined;
     try {
       const { getOrCreateSession } = await import('./sessionStore.js');
       if (context?.peer) {
         const s = await getOrCreateSession('whatsapp', context.peer);
+        sessionRec = s;
         sessionState = s?.state || {};
         if (
           !input.segment &&
@@ -206,12 +208,35 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
           telefone: phone,
           urgente: input.urgente,
         };
-        return await aiScheduleStart(payload);
+        const result: any = await aiScheduleStart(payload);
+        try {
+          if (sessionRec?.id) {
+            const { setSessionState } = await import('./sessionStore.js');
+            const horarios =
+              (result && (result.horarios_oferecidos || result.suggestions || result.slots)) || null;
+            await setSessionState(sessionRec.id, {
+              ai_schedule_context: payload,
+              ai_schedule_suggestions: horarios,
+              ai_schedule_suggestions_ts: Date.now(),
+            });
+          }
+        } catch {}
+        return result;
       }
       case 'aiScheduleConfirm': {
         const phone = normalizePeerToPhone(context?.peer) || input.telefone || input.phone;
         const opt = String(input.opcao_escolhida || input.choice || '').trim();
-        return await aiScheduleConfirm({ telefone: phone!, opcao_escolhida: opt });
+        // Enriquecer confirmação com o contexto/sugestões salvos na sessão.
+        let ctx: any = undefined;
+        try {
+          const saved = sessionState || {};
+          ctx = {
+            ...(saved.ai_schedule_context || {}),
+            horarios_oferecidos: saved.ai_schedule_suggestions || undefined,
+            suggestions: saved.ai_schedule_suggestions || undefined,
+          };
+        } catch {}
+        return await aiScheduleConfirm({ telefone: phone!, opcao_escolhida: opt, context: ctx });
       }
       default:
         return null;

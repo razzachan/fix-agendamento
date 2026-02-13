@@ -11,6 +11,7 @@ export const toolCatalog = {
         region: { type: 'string' },
         duration: { type: 'number' },
         equipment: { type: 'string' },
+        technician_id: { type: 'string' },
       },
       required: ['date'],
     },
@@ -72,7 +73,7 @@ export const toolCatalog = {
     inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
   },
   aiScheduleStart: {
-    description: 'Iniciar agendamento inteligente (ETAPA 1) usando middleware.py',
+    description: 'Iniciar agendamento inteligente (ETAPA 1) usando Fix API (fonte de verdade)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -87,7 +88,7 @@ export const toolCatalog = {
     },
   },
   aiScheduleConfirm: {
-    description: 'Confirmar agendamento inteligente (ETAPA 2) após cliente escolher 1/2/3',
+    description: 'Confirmar agendamento inteligente (ETAPA 2) após cliente escolher 1/2/3 (Fix API)',
     inputSchema: {
       type: 'object',
       properties: {
