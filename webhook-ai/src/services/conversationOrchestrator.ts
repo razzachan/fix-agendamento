@@ -1939,6 +1939,7 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
     ) {
       ensurePrefer('domicilio');
       dados.equipamento = 'fogão a gás';
+      dados.tipo_atendimento = 'domicilio';
     } else if (
       (msg.includes('fogão') || msgSimple.includes('fogao')) &&
       (msg.includes('indução') ||
@@ -1951,6 +1952,7 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
         msg.includes('indução') || msgSimple.includes('inducao')
           ? 'fogão de indução'
           : 'fogão elétrico';
+      dados.tipo_atendimento = 'coleta_diagnostico';
     }
     // Mapeamento explícito de "forno do fogão" vs "forno elétrico"
     if (
@@ -1960,18 +1962,22 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
       // Usuário está falando do forno do fogão de piso (a gás)
       ensurePrefer('domicilio');
       dados.equipamento = 'fogão a gás';
+      dados.tipo_atendimento = 'domicilio';
     } else if (
       msg.includes('forno') &&
       (msg.includes('elétrico') || msgSimple.includes('eletrico'))
     ) {
       ensurePrefer('coleta_diagnostico');
       dados.equipamento = 'forno elétrico';
+      dados.tipo_atendimento = 'coleta_diagnostico';
     } else if (msg.includes('forno') && msg.includes('embut')) {
       ensurePrefer('coleta_diagnostico');
       dados.equipamento = 'forno elétrico';
+      dados.tipo_atendimento = 'coleta_diagnostico';
     } else if (msg.includes('forno') && msg.includes('bancada')) {
       ensurePrefer('coleta_conserto');
       dados.equipamento = 'forno elétrico';
+      dados.tipo_atendimento = 'coleta_conserto';
     }
     // Complemento: se a mensagem atual trouxer apenas o tipo (ex.: "é a gás"),
     // mas já sabemos que o equipamento é um fogão, ajuste o tipo sem perguntar novamente
@@ -6100,6 +6106,10 @@ async function summarizeToolResult(
         if (st === 'coleta_diagnostico' || st.includes('coleta_diagnostico')) {
           // Template específico para coleta + diagnóstico
           return `${causasText}Coletamos, diagnosticamos, consertamos e entregamos em até 5 dias úteis.\n\nO valor da coleta diagnóstico fica em R$ ${v} (por equipamento).\n\nDepois de diagnosticado, você aceitando o serviço, descontamos 100% do valor da coleta diagnóstico (R$ ${v}) do valor final do serviço.\n\nAceitamos cartão e dividimos também.\n\nO serviço tem 3 meses de garantia.\nGostaria de agendar?`;
+        }
+        // Coifa: visita diagnóstica (no local) com abatimento
+        if (st.includes('coifa')) {
+          return `${causasText}Para coifa, fazemos *visita diagnóstica no local* com orçamento em tempo real.\n\nO valor da visita diagnóstica fica em R$ ${v},00.\n\nSe você aprovar o serviço, abatemos 100% desse valor (R$ ${v}) do total do conserto.\n\nO serviço tem 3 meses de garantia e aceitamos cartão e dividimos também se precisar.\nGostaria de agendar?`;
         }
         if (st.includes('domicilio')) {
           // Prefixar com o equipamento quando reconhecido, para atender expectativas dos testes e dar contexto ao cliente

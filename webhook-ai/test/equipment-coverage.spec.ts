@@ -165,7 +165,8 @@ describe('Cobertura por equipamento - políticas e formatação', () => {
       marca: 'Tramontina',
       problema: 'não liga',
     });
-    expect(text).toContain('valor de manutenção fica em r$');
+    expect(text).toMatch(/visita\s+diagn[oó]stic/i);
+    expect(text).toMatch(/r\$\s*\d+/i);
     expect(text).not.toContain('coleta diagnóstico');
   });
 

@@ -30,58 +30,75 @@ export function getPreferredServicesForEquipment(
   equipamento?: string
 ): string[] {
   if (!equipamento) return [];
-  const e = equipamento.toLowerCase();
+  const normalize = (s: string) =>
+    String(s || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const e = normalize(equipamento);
+  const eCompact = e.replace(/\s+/g, '');
+  const inc = (needle: string) => {
+    const n = normalize(needle);
+    const nCompact = n.replace(/\s+/g, '');
+    return e.includes(n) || eCompact.includes(nCompact);
+  };
+
   console.log('[Policies] Analisando equipamento:', equipamento, '→', e);
 
   // Detectar ambiguidade - retorna vazio para forçar pergunta
   if (
-    e.includes('fogão') &&
-    !e.includes('gás') &&
-    !e.includes('indução') &&
-    !e.includes('elétrico') &&
-    !e.includes('comum')
+    inc('fogao') &&
+    !inc('gas') &&
+    !inc('inducao') &&
+    !inc('eletrico') &&
+    !inc('comum')
   )
     return [];
-  if (e.includes('microondas') && !e.includes('embutido') && !e.includes('bancada')) return [];
-  if (e.includes('forno') && !e.includes('embutido') && !e.includes('bancada')) return [];
+  if (inc('microondas') && !inc('embutido') && !inc('bancada')) return [];
+  if (inc('forno') && !inc('embutido') && !inc('bancada')) return [];
 
   // Regras específicas primeiro (mais prioritárias)
 
   // 1. Coleta conserto - equipamentos pequenos de bancada
-  if (e.includes('microondas') && !e.includes('embutido')) return ['coleta_conserto'];
-  if (e.includes('micro-ondas') && !e.includes('embutido')) return ['coleta_conserto'];
-  if (e.includes('forno') && e.includes('bancada')) return ['coleta_conserto'];
-  if (e.includes('forno') && e.includes('elétrico') && e.includes('bancada'))
+  if (inc('microondas') && !inc('embutido')) return ['coleta_conserto'];
+  if (inc('forno') && inc('bancada')) return ['coleta_conserto'];
+  if (inc('forno') && inc('eletrico') && inc('bancada'))
     return ['coleta_conserto'];
 
   // 2. Coleta diagnóstico - equipamentos específicos
-  if (e.includes('fogão') && (e.includes('indução') || e.includes('elétrico')))
+  if (inc('fogao') && (inc('inducao') || inc('eletrico')))
     return ['coleta_diagnostico'];
   // Forno elétrico de embutir = diagnóstico (nunca domicílio)
-  if (e.includes('forno') && e.includes('elétrico') && e.includes('embut'))
+  if (inc('forno') && inc('eletrico') && inc('embut'))
     return ['coleta_diagnostico'];
-  if (e.includes('micro-ondas') && e.includes('embutido')) return ['coleta_diagnostico'];
-  if (e.includes('microondas') && e.includes('embutido')) return ['coleta_diagnostico'];
-  if (e.includes('adega')) return ['coleta_diagnostico'];
-  if (e.includes('embutido')) return ['coleta_diagnostico'];
-  if (e.includes('lava') && (e.includes('louça') || e.includes('roupa') || e.includes('seca')))
+  if (inc('microondas') && inc('embutido')) return ['coleta_diagnostico'];
+  if (inc('adega')) return ['coleta_diagnostico'];
+  if (inc('embutido')) return ['coleta_diagnostico'];
+  if (inc('lava') && (inc('louca') || inc('roupa') || inc('seca')))
     return ['coleta_diagnostico'];
-  if (e.includes('secadora')) return ['coleta_diagnostico'];
-  if (e.includes('máquina') && e.includes('lavar')) return ['coleta_diagnostico'];
+  if (inc('secadora')) return ['coleta_diagnostico'];
+  if (inc('maquina') && inc('lavar')) return ['coleta_diagnostico'];
 
   // 3. Domicílio - equipamentos de visita técnica (apenas quando especificado)
-  if (e.includes('fogão') && e.includes('gás')) return ['domicilio'];
-  if (e.includes('fogão a gás')) return ['domicilio'];
-  if (e.includes('fogão') && e.includes('comum')) return ['domicilio'];
-  if (e.includes('cooktop')) return ['domicilio'];
+  if (inc('fogao') && inc('gas')) return ['domicilio'];
+  if (inc('fogao') && inc('comum')) return ['domicilio'];
+  if (inc('cooktop')) return ['domicilio'];
   // Nunca oferecer forno elétrico em domicílio (removido)
-  if (e.includes('coifa')) return ['domicilio'];
+  if (inc('coifa')) return ['domicilio'];
 
   // Fallback: se não encontrou nada específico, tenta matching genérico
   const matches = (row: ServicePolicyRow) => {
     return (row.equipments || []).some((x) => {
-      const equipment = String(x || '').toLowerCase();
-      return e.includes(equipment) || equipment.includes(e);
+      const equipment = normalize(String(x || ''));
+      const equipmentCompact = equipment.replace(/\s+/g, '');
+      return (
+        (equipment && (e.includes(equipment) || eCompact.includes(equipmentCompact))) ||
+        (e && (equipment.includes(e) || equipmentCompact.includes(eCompact)))
+      );
     });
   };
 

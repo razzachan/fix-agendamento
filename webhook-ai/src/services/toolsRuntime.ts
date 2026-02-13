@@ -463,7 +463,6 @@ export async function cancelAppointment(input: { id: string; reason?: string }) 
       id: input.id,
       reason: input.reason ?? undefined,
     });
-      is_test: input.is_test ?? undefined,
   } else {
     // Fallback legado
     const resp = await fetch(`${API_URL}/api/schedule/cancel`, {
