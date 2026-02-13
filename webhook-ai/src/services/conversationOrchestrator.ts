@@ -3241,6 +3241,45 @@ async function aiBasedRouting(
       }
     } catch {}
 
+    // Heurística determinística: continuação do orçamento quando estamos aguardando o tipo do fogão
+    // (gás / elétrico / indução) — evita depender da IA para retomar o fluxo.
+    try {
+      const stAll = (session as any)?.state || {};
+      const pendingFogaoPower = !!stAll.pending_fogao_power_type;
+      if (pendingFogaoPower) {
+        const txt = String(body || '').toLowerCase();
+        const isGas = /(\bg[aá]s\b|\bgas\b)/i.test(txt);
+        const isInducao = /induc/i.test(txt);
+        const isEletrico = /el[eé]tr/i.test(txt);
+
+        if (isGas || isInducao || isEletrico) {
+          const prev = (stAll.dados_coletados || {}) as any;
+          const power_type = isGas ? 'gas' : isInducao ? 'inducao' : 'eletrico';
+          const equipamento = isGas
+            ? 'fogão a gás'
+            : isInducao
+              ? 'fogão de indução'
+              : 'fogão elétrico';
+
+          const newDados = { ...prev, equipamento, power_type } as any;
+          const newState = { ...stAll, dados_coletados: newDados, pending_fogao_power_type: false } as any;
+          try {
+            if ((session as any)?.id) await setSessionState((session as any).id, newState);
+            (session as any).state = newState;
+          } catch {}
+
+          return await executeAIOrçamento(
+            { intent: 'orcamento_equipamento', acao_principal: 'gerar_orcamento', dados_extrair: {} },
+            session,
+            body
+          );
+        }
+
+        // Se ainda não respondeu o tipo, mantenha a pergunta focada.
+        return 'Só confirmando para eu classificar certinho: seu fogão é a gás, elétrico ou de indução?';
+      }
+    } catch {}
+
     console.log('[AI-ROUTER] 🔍 Iniciando busca de blocos de conhecimento...');
 
     // 1. Buscar todos os blocos de conhecimento disponíveis
@@ -4159,6 +4198,43 @@ async function executeAIOrçamento(
       /(g[aá]s)/i.test(String(dados.power_type || '').toLowerCase()) ||
       /(g[aá]s)\b|\bgas\b/i.test(String((session as any)?.state?.last_raw_message || '').toLowerCase()) ||
       /(g[aá]s)\b|\bgas\b/i.test(String(body || '').toLowerCase());
+
+    // Logo após identificar que é fogão/cooktop, se não ficou claro o tipo (gás/elétrico/indução), perguntar.
+    // Isso evita classificar errado (ex.: fogão a gás → não deve virar coleta diagnóstico).
+    const isFogFamily = (s: string) => /\bfog(ão|ao)\b|\bcook ?top\b/i.test(String(s || ''));
+    const saysInducao =
+      /induc/i.test(equipLower) ||
+      /induc/i.test(String((session as any)?.state?.dados_coletados?.power_type || '')) ||
+      /induc/i.test(String(dados.power_type || '').toLowerCase()) ||
+      /induc/i.test(String(body || '').toLowerCase());
+    const saysEletrico =
+      /el[eé]tr/i.test(equipLower) ||
+      /el[eé]tr/i.test(String((session as any)?.state?.dados_coletados?.power_type || '')) ||
+      /el[eé]tr/i.test(String(dados.power_type || '').toLowerCase()) ||
+      /el[eé]tr/i.test(String(body || '').toLowerCase());
+
+    try {
+      const st = (session as any)?.state || {};
+      const pending = !!st.pending_fogao_power_type;
+      if (isFogFamily(equipLower) && !saysGas && !saysInducao && !saysEletrico) {
+        if (!pending && process.env.NODE_ENV !== 'test' && !process.env.LLM_FAKE_JSON) {
+          const newState = {
+            ...st,
+            pending_fogao_power_type: true,
+            dados_coletados: { ...(st.dados_coletados || {}), ...dados, equipamento: equipment || dados.equipamento || 'fogão' },
+          } as any;
+          try {
+            if ((session as any)?.id) await setSessionState((session as any).id, newState);
+            (session as any).state = newState;
+          } catch {}
+          return 'Seu fogão é a gás, elétrico ou de indução?';
+        }
+
+        if (pending && process.env.NODE_ENV !== 'test' && !process.env.LLM_FAKE_JSON) {
+          return 'Só confirmando: seu fogão é a gás, elétrico ou de indução?';
+        }
+      }
+    } catch {}
 
     // 🔥 COLETA DETALHADA PARA FOGÕES A GÁS
     if ((/\bfog(ão|ao)\b/i.test(equipLower) || /\bcook ?top\b/i.test(equipLower)) && saysGas) {
