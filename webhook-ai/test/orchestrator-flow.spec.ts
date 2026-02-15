@@ -56,7 +56,7 @@ describe('Orchestrator: cenários avançados de fluxo', () => {
       orcamento_entregue: true,
     });
     // usuário muda para fogão elétrico
-    const out1 = await orchestrateInbound(FROM, 'na verdade é fogão elétrico', session);
+    const out1 = await orchestrateInbound(FROM, 'na verdade é fogao eletrico', session);
     expect(out1).toBeTruthy();
 
     // recarrega sessão; a flag pode ter sido resetada internamente — não dependemos dela aqui
