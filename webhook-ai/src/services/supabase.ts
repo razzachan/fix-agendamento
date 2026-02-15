@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { logger } from './logger.js';
 
 const useMock = process.env.MOCK_SUPABASE === 'true';
 
@@ -43,7 +44,12 @@ function makeMock() {
           },
           async single() {
             if (name === 'bot_sessions') {
-              const row = { id: String(idCounter++), ...payload };
+              const row = {
+                id: String(idCounter++),
+                state_version: 0,
+                ...payload,
+              };
+              if (row.state_version == null) row.state_version = 0;
               sessions.push(row);
               return { data: row } as any;
             } else if (name === 'bot_messages') {
@@ -56,19 +62,39 @@ function makeMock() {
         };
       },
       update(payload: any) {
-        return {
-          async eq(k: string, v: any) {
-            const rows = name === 'bot_sessions' ? sessions : messages;
-            let updated: any[] = [];
-            for (const r of rows) {
-              if (r[k] === v) {
-                Object.assign(r, payload);
-                updated.push(r);
-              }
-            }
-            return { data: updated } as any;
-          },
+        const ctx: any = {
+          _name: name,
+          _rows: name === 'bot_sessions' ? sessions : messages,
+          _query: {},
+          _payload: payload,
         };
+        ctx.eq = function (k: string, v: any) {
+          this._query[k] = v;
+          return this;
+        };
+        ctx.select = function (_cols?: string) {
+          return this;
+        };
+        ctx.single = async function () {
+          const res = await this._exec();
+          const data = Array.isArray(res.data) ? res.data[0] || null : res.data || null;
+          return { data } as any;
+        };
+        ctx._exec = async function () {
+          const rows = this._rows as any[];
+          const matched = matchRows(rows, this._query);
+          const updated: any[] = [];
+          for (const r of matched) {
+            Object.assign(r, this._payload);
+            updated.push(r);
+          }
+          return { data: updated } as any;
+        };
+        // Make it awaitable: `await supabase.from(...).update(...).eq(...).select(...)`
+        ctx.then = function (resolve: any, reject: any) {
+          return this._exec().then(resolve, reject);
+        };
+        return ctx;
       },
     } as any;
   }
@@ -80,22 +106,20 @@ let supabaseImpl: any;
 const envUrl = process.env.SUPABASE_URL;
 const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-console.log('[SUPABASE] Environment check:', {
+logger.info('[SUPABASE] Environment check:', {
   useMock,
   hasUrl: !!envUrl,
-  hasKey: !!envKey,
-  urlPrefix: envUrl?.slice(0, 20),
-  keyPrefix: envKey?.slice(0, 20)
+  hasKey: !!envKey
 });
 
 if (useMock || !envUrl || !envKey) {
   if (!useMock) {
-    console.warn('[SUPABASE] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Using mock client.');
+    logger.warn('[SUPABASE] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Using mock client.');
   }
-  console.log('[SUPABASE] Using mock client');
+  logger.info('[SUPABASE] Using mock client');
   supabaseImpl = makeMock();
 } else {
-  console.log('[SUPABASE] Using real Supabase client');
+  logger.info('[SUPABASE] Using real Supabase client');
   supabaseImpl = createClient(envUrl, envKey, { auth: { persistSession: false } });
 }
 

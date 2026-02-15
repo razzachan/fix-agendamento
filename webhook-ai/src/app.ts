@@ -7,6 +7,7 @@ import { aiPreviewRouter } from './routes/aiPreview.js';
 import { pauseRouter } from './routes/pause.js';
 import { runAdminSeedOnBoot } from './services/adminSeed.js';
 import { getOrCreateSession } from './services/sessionStore.js';
+import { normalizePeerId } from './services/peerId.js';
 
 const Env = z.object({
   PORT: z.string().default(process.env.PORT || '3100'),
@@ -531,7 +532,7 @@ app.post('/test-session', async (req, res) => {
     if (!from) return res.status(400).json({ error: 'Missing from' });
 
     console.log('[TEST-SESSION] Testando sessão para', from);
-    const session = await getOrCreateSession('whatsapp', String(from));
+    const session = await getOrCreateSession('whatsapp', normalizePeerId('whatsapp', String(from)) || String(from));
     console.log('[TEST-SESSION] Sessão criada/recuperada:', session.id);
 
     res.json({ ok: true, from, session_id: session.id, state: session.state });
@@ -560,7 +561,7 @@ app.post('/test-message', async (req, res) => {
 
     // Importar e usar o orchestrator diretamente com sessão persistente
     const { orchestrateInbound } = await import('./services/conversationOrchestrator.js');
-    const session = await getOrCreateSession('whatsapp', String(from));
+    const session = await getOrCreateSession('whatsapp', normalizePeerId('whatsapp', String(from)) || String(from));
     const reply = await orchestrateInbound(from, body, session);
 
     const preview =
@@ -605,7 +606,7 @@ app.post('/test-media', async (req, res) => {
 
     const { getOrCreateSession, setSessionState } = await import('./services/sessionStore.js');
     const { orchestrateInbound } = await import('./services/conversationOrchestrator.js');
-    const session = await getOrCreateSession('whatsapp', String(from));
+    const session = await getOrCreateSession('whatsapp', normalizePeerId('whatsapp', String(from)) || String(from));
 
     let result: any = { ok: true, from, mimetype };
 

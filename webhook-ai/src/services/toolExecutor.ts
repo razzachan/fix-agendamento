@@ -86,8 +86,10 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
     let sessionRec: any = undefined;
     try {
       const { getOrCreateSession } = await import('./sessionStore.js');
+      const { normalizePeerId } = await import('./peerId.js');
       if (context?.peer) {
-        const s = await getOrCreateSession('whatsapp', context.peer);
+        const normalized = normalizePeerId('whatsapp', context.peer) || context.peer;
+        const s = await getOrCreateSession('whatsapp', normalized);
         sessionRec = s;
         sessionState = s?.state || {};
         if (

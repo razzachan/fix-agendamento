@@ -6,6 +6,7 @@ import { processFeedback } from './modules/feedback.js';
 import { tryHandleByFlows } from './flowEngine.js';
 import { orchestrateInbound } from './conversationOrchestrator.js';
 import { getOrCreateSession, logMessage } from './sessionStore.js';
+import { classifyInbound, normalizeInboundText } from './inboundClassifier.js';
 
 const FIX_API_BASE = process.env.FIX_API_BASE || 'https://api.fixfogoes.com.br';
 const FIX_BOT_TOKEN = process.env.FIX_BOT_TOKEN || process.env.BOT_TOKEN || '';
@@ -632,11 +633,8 @@ export async function setupWAInboundAdapter() {
       await (await import('./sessionStore.js')).setSessionState(session.id, st0);
     } catch {}
     // Detectar reset explícito de contexto ("novo atendimento", etc.) antes de qualquer reengajamento/IA
-    const norm = text
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .trim()
-      .toLowerCase();
+    const signals = classifyInbound(text);
+    const norm = signals.norm;
     if (looksLikeContextSwitch(norm)) {
       try {
         // Limpa completamente o estado da sessão
@@ -653,8 +651,7 @@ export async function setupWAInboundAdapter() {
     }
 
     // Saudações curtas: se reengajamento está desligado, não chamar IA; pedir dados básicos
-    const isGreetingOnly = /^(ola|oi|opa|e ai|tudo bem|bom dia|boa tarde|boa noite)[.!? ]*$/.test(norm);
-    if (isGreetingOnly && !REENGAGE_ENABLED) {
+    if (signals.isGreetingOnly && !REENGAGE_ENABLED) {
       const msg = 'Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?';
       await sendTextOnce(session.id, from, msg, meta as any);
       try {
@@ -671,14 +668,8 @@ export async function setupWAInboundAdapter() {
       // Não envia reengajamento – segue para coleta natural
     } else
     if (REENGAGE_ENABLED) try {
-      const norm = text
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .trim()
-        .toLowerCase();
-      const isGreetingOnly = /^(ola|oi|bom dia|boa tarde|boa noite|opa|e ai|tudo bem)[.!? ]*$/.test(
-        norm
-      );
+      const norm = normalizeInboundText(text);
+      const isGreetingOnly = classifyInbound(text).isGreetingOnly;
       const st = (session?.state || {}) as any;
       const lastIn = st.last_in_at ? new Date(st.last_in_at) : null;
       const lastOut = st.last_out_at ? new Date(st.last_out_at) : null;
@@ -753,13 +744,7 @@ export async function setupWAInboundAdapter() {
           last_out_at: new Date().toISOString(),
         });
         // Se a mensagem do cliente for apenas uma saudação, não prossiga para evitar duas mensagens em sequência
-        const norm = text
-          .normalize('NFD')
-          .replace(/\p{Diacritic}/gu, '')
-          .trim()
-          .toLowerCase();
-        const isJustGreeting = /^(ola|oi|bom dia|boa tarde|boa noite)[.!? ]*$/.test(norm);
-        if (isJustGreeting) return;
+        if (classifyInbound(text).isGreetingOnly) return;
       }
     }
     } catch {}
@@ -785,9 +770,7 @@ export async function setupWAInboundAdapter() {
     }
     // Short-circuit: pedidos de STATUS antes de acionar LLM/orquestrador
     try {
-      const lowered0 = text.toLowerCase();
-      const wantsStatus0 = /\b(status|andamento|atualiza[cç][aã]o|novidade|not[ií]cia|previs[aã]o|quando.*(t[eé]cnico|coleta|entrega)|chegou.*pe[çc]a|os\s*#?\d+)\b/i.test(lowered0);
-      if (wantsStatus0) {
+      if (classifyInbound(text).wantsStatus) {
         await processStatus(asWebhookBody(from, text));
         return;
       }
@@ -795,13 +778,7 @@ export async function setupWAInboundAdapter() {
 
     // Despedidas/adiamento: resposta empática e encerra sem empurrar fluxo
     try {
-      const norm2 = text
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .trim()
-        .toLowerCase();
-      const byeOrDefer = /\b(tchau|ate mais|ate logo|obrigado|obrigada|valeu|depois falo|depois eu falo|depois retorno|qualquer coisa.*(volto|falo).*(contigo|com voce)|estou levantando outros valores|estou cotando|pegando outros orcamentos|vou ver (aqui )?e retorno)\b/.test(norm2);
-      if (byeOrDefer) {
+      if (classifyInbound(text).isDeferralOrBye) {
         const msg = 'Perfeito, sem problema! Fico à disposição. Quando quiser retomar, é só mandar mensagem por aqui. Abraço!';
         await waClient.sendText(from, msg);
         await logMessage(session.id, 'out', msg);

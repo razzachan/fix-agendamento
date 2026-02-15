@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { logger } from './logger.js';
 
 const USE_MOCK = process.env.MOCK_SUPABASE === 'true';
 
@@ -21,7 +22,7 @@ export async function getActiveBot() {
     .limit(1)
     .single();
   if (error) {
-    console.error('[webhook-ai] bot config load error', error.message);
+    logger.error('[webhook-ai] bot config load error', error.message);
     return null;
   }
   return data;
@@ -33,7 +34,7 @@ export async function getTemplates() {
   }
   const { data, error } = await supabase.from('bot_templates').select('*').eq('enabled', true);
   if (error) {
-    console.error('[webhook-ai] templates load error', error.message);
+    logger.error('[webhook-ai] templates load error', error.message);
     return [];
   }
   return data || [];

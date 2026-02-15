@@ -16,6 +16,20 @@ import {
   getOfferMessageForServiceType,
 } from './policies.js';
 import { supabase } from './supabase.js';
+import { executeAIAgendamento as executeAIAgendamentoFlow } from './orchestrator/schedulingFlow.js';
+import { classifyInbound, normalizeComparableText } from './inboundClassifier.js';
+import { guessFunnelFields } from './funnelGuesser.js';
+import { buildActionHandlers } from './orchestrator/actionRegistry.js';
+import {
+  parseAIRoutingDecision,
+  type AIRouterAction,
+  type AIRouterDecision,
+} from './orchestrator/aiRouterDecisionSchema.js';
+
+type AmbiguityPrompt = {
+  text: string;
+  options: Array<{ id: string; text: string }>;
+};
 
 async function logAIRoute(event: string, payload: any) {
   // Envia para tabela legada e também para analytics unificado
@@ -54,329 +68,21 @@ function getRoutingLLMConfig() {
 }
 
 function detectPriorityIntent(text: string): string | null {
-  const normalize = (s: string) =>
-    s
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .toLowerCase();
-  const b = normalize(text || '');
+  const signals = classifyInbound(text || '');
+  const b = signals.norm;
   if (/(\breagendar\b|\breagendamento\b|trocar horario|nova data|remarcar)/.test(b))
     return 'reagendamento';
   if (/(\bcancelar\b|\bcancelamento\b|desmarcar)/.test(b)) return 'cancelamento';
   if (/(\bstatus\b|acompanhar|andamento|numero da os|n\u00ba da os|numero da ordem)/.test(b))
     return 'status_ordem';
-  if (/(instalar|instalacao|instala\u00e7\u00e3o)/.test(b)) return 'instalacao';
+  // Evitar falso-positivo de instalação quando houver negação explícita
+  // Ex.: "não é instalação, é manutenção".
+
+  if (signals.mentionsInstall && !signals.negatedInstall && !signals.looksLikeRepair) {
+    return 'instalacao';
+  }
+
   return null;
-}
-
-function guessFunnelFields(text: string) {
-  const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
-  const braw = text || '';
-  const b = normalize(braw.toLowerCase());
-  const equipamentos = [
-    // Fogão / Forno
-    'fogão',
-    'fogao',
-    'forno',
-    'forno elétrico',
-    'forno eletrico',
-    'forno a gás',
-    'forno a gas',
-    'forno de embutir',
-    'forno embutir',
-    // Cooktop
-    'cooktop',
-    'cook top',
-    'cook-top',
-    // Micro-ondas
-    'micro-ondas',
-    'microondas',
-    'micro ondas',
-    'micro ondas',
-    'forno microondas',
-    'forno micro-ondas',
-    'forno de microondas',
-    'micro ondas',
-    'microondas embutido',
-    'micro-ondas embutido',
-    'microondas bancada',
-    'micro-ondas bancada',
-    // Lava-louças (variações sing/plural, com/sem hífen e cedilha)
-    'lava-loucas', // PRIORIDADE: com hífen normalizado (lava-louças → lava-loucas)
-    'lava loucas',
-    'lava louca',
-    'lava-louca',
-    'lavaloucas',
-    'lavalouca',
-    'maquina de lavar loucas',
-    'maquina lavar loucas',
-    // Lava-roupas / Lavadora
-    'lava roupas',
-    'lava-roupas',
-    'lavadora',
-    'lavadora de roupas',
-    'máquina de lavar',
-    'maquina de lavar',
-    'máquina lavar',
-    'maquina lavar',
-    'máquina de lavar roupas',
-    'maquina de lavar roupas',
-    // Lava e seca
-    'lava e seca',
-    'lava-seca',
-    'lava & seca',
-    'lava&seca',
-    'lava seca',
-    // Secadora
-    'secadora',
-    'secadora de roupas',
-    // Coifa
-    'coifa',
-    'exaustor',
-    'depurador',
-    // Adega
-    'adega',
-    'adega climatizada',
-    'adega de vinhos',
-    'adega de vinho',
-  ];
-  const marcas = [
-    'brastemp',
-    'consul',
-    'electrolux',
-    'eletrolux',
-    'lg',
-    'samsung',
-    'bosch',
-    'midea',
-    'philco',
-    'fischer',
-    'mueller',
-    'ge',
-    'continental',
-    'tramontina',
-    'dako',
-    'esmaltec',
-    'atlas',
-    'panasonic',
-  ];
-
-  // Extrair TODOS os equipamentos encontrados (não apenas o primeiro)
-  const equipamentosEncontrados: string[] = [];
-  for (const e of equipamentos) {
-    if (b.includes(e)) {
-      equipamentosEncontrados.push(e.replace('fogao', 'fogão'));
-    }
-  }
-
-  let marca: string | undefined;
-  for (const m of marcas) {
-    if (b.includes(m)) {
-      marca = m;
-      break;
-    }
-  }
-  // Heurística adicional: capturar marcas não listadas quando o usuário escreve "da marca X" ou "marca: X"
-  if (!marca) {
-    try {
-      const m1 = (braw || '').match(/(?:da|de|do)?\s*marca\s*(?:é|eh|:)?\s*([A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9\- ]{1,30})/i);
-      if (m1 && m1[1]) {
-        marca = m1[1].trim().split(/[\n,;.]/)[0];
-      }
-    } catch {}
-  }
-  // Problema: pegar trecho conhecido
-  const problemas = [
-    // instalação
-    'instalação',
-    'instalacao',
-    'instalar',
-    'montagem',
-    'colocar',
-    // acendimento/ligar
-    'não acende',
-    'nao acende',
-    'não liga',
-    'nao liga',
-    'sem chama',
-    'faísca fraca',
-    'faisca fraca',
-    'boca não acende',
-    'boca nao acende',
-    'boca não funciona',
-    'boca nao funciona',
-    // força/cor da chama
-    'chama fraca',
-    'chamas fracas',
-    'chama baixa',
-    'fogo fraco',
-    'boca fraca',
-    'bocas fracas',
-    'duas bocas fracas',
-    'duas chamas fracas',
-    '2 chamas fracas',
-    'chama amarela',
-    'chamas amarelas',
-    'fogo amarelo',
-    'fogo amarelado',
-    // fuligem/panelas escurecendo (sinônimos comuns no WhatsApp)
-    'panela preta',
-    'panelas pretas',
-    'panela escurecida',
-    'panelas ficando pretas',
-    'escurecendo as panelas',
-    'sujeira preta',
-    'fuligem',
-    'fuligem preta',
-    'fumaça preta',
-    'fumaca preta',
-    // quantidade de bocas com defeito
-    '2 bocas',
-    'duas bocas',
-    'duas bocas não funcionam',
-    'duas bocas nao funcionam',
-    'duas bocas não acendem',
-    'duas bocas nao acendem',
-    // gás/cheiro
-    'vazando gás',
-    'vazamento de gás',
-    'cheiro de gás',
-    'cheiro de gas',
-    'cheiro de queimado',
-    'cheiro de queim',
-    // fumaça
-    'fumaça',
-    'fumaca',
-    'fumaça por baixo',
-    'saindo fumaça',
-    // aquecimento/barulho
-    'não esquenta',
-    'nao esquenta',
-    'faz barulho',
-    'não funciona',
-    'nao funciona',
-    // água/entrada/saída (lava-louças, lavadora)
-    'não entra água',
-    'nao entra agua',
-    'não puxa água',
-    'nao puxa agua',
-    'não enche',
-    'nao enche',
-    'não drena',
-    'nao drena',
-    'não escoa',
-    'nao escoa',
-    'vazando água',
-    'vazando agua',
-    'vaza água',
-    'vaza agua',
-    // lava-louças: lavagem/limpeza (ORDEM: mais específico primeiro)
-    'nao lava direito',
-    'nao limpa direito',
-    'nao lava bem',
-    'loucas ficam sujas',
-    'loucas sujas',
-    'louca suja',
-    'pratos ficam sujos',
-    'pratos sujos',
-    'lava mal',
-    'nao lava',
-    'nao limpa',
-    // centrifugação/secagem/porta
-    'não centrifuga',
-    'nao centrifuga',
-    'não seca',
-    'nao seca',
-    'não aquece',
-    'nao aquece',
-    'porta não fecha',
-    'porta nao fecha',
-    'porta não trava',
-    'porta nao trava',
-    'trava da porta',
-  ];
-  let problema: string | undefined;
-  for (const p of problemas) {
-    if (b.includes(p)) {
-      problema = p;
-      break;
-    }
-  }
-
-  // Detectar total de bocas (4/5/6) do equipamento (não confundir com bocas com defeito)
-  let num_burners: string | undefined;
-  const m = b.match(/(?:\b|^)(4|5|6)\s*bocas?\b/);
-  if (m) {
-    num_burners = m[1];
-  } else {
-    const words: Record<string, string> = { quatro: '4', cinco: '5', seis: '6' };
-    for (const [w, n] of Object.entries(words)) {
-      if (b.includes(`${w} bocas`) || b.includes(`${w} boca`)) {
-        num_burners = n;
-        break;
-      }
-    }
-  }
-
-  // Retornar primeiro equipamento para compatibilidade, mas também a lista completa
-  // Preferir um equipamento mais específico quando o usuário já informou o tipo
-  // (crítico para política de atendimento e para o gate de orçamento de fogão/cooktop).
-  let equipamento = equipamentosEncontrados[0];
-  try {
-    const rawLower = (braw || '').toLowerCase();
-    const hasFogao = equipamentosEncontrados.some((x) => /fog[ãa]o/i.test(String(x || '')));
-    const hasGas = /\bgas\b|\bg[aá]s\b|a\s*gas/.test(rawLower) || b.includes('gas');
-    const hasInducao = b.includes('inducao') || rawLower.includes('indução');
-    const hasEletrico = b.includes('eletrico') || rawLower.includes('elétrico');
-    if (hasFogao) {
-      if (hasGas) equipamento = 'fogão a gás';
-      else if (hasInducao) equipamento = 'fogão de indução';
-      else if (hasEletrico) equipamento = 'fogão elétrico';
-    }
-  } catch {}
-  return { equipamento, equipamentosEncontrados, marca, problema, num_burners };
-  function guessAcceptance(text: string) {
-    const b = (text || '').toLowerCase();
-    const yes = [
-      'sim',
-      'pode ser',
-      'pode agendar',
-      'quero',
-      'vamos',
-      'fechado',
-      'ok',
-      'ok pode',
-      'tá bom',
-      'ta bom',
-      'bora',
-      'aceito',
-      'aceitamos',
-      'pode marcar',
-      'marca',
-    ];
-    const no = [
-      'não',
-      'nao',
-      'prefiro não',
-      'prefiro nao',
-      'depois eu vejo',
-      'mais tarde',
-      'talvez',
-    ];
-    if (no.some((w) => b.includes(w))) return { accepted: false };
-    if (yes.some((w) => b.includes(w))) return { accepted: true };
-    return { accepted: undefined };
-  }
-}
-
-function simpleIntent(text: string): string {
-  const b = text.toLowerCase();
-  if (/(ol[aá]|oi|bom dia|boa tarde|boa noite)/.test(b)) return 'saudacao';
-  if (/(pre[cç]o|or[cç]amento|quanto custa)/.test(b)) return 'orcamento';
-  if (/(agendar|marcar|agenda|hor[aá]rio)/.test(b)) return 'agendamento';
-  if (/(status|acompanhar|andamento)/.test(b)) return 'status';
-  if (/(cancelar|cancelamento)/.test(b)) return 'cancelamento';
-  return 'desconhecido';
 }
 
 // Aceitação explícita do orçamento/serviço.
@@ -420,135 +126,25 @@ function hasExplicitAcceptance(text: string): boolean {
   return false;
 }
 
-// FUNÇÃO DINÂMICA DE VERIFICAÇÃO DE AMBIGUIDADE
-type AmbiguityPrompt = { text: string; options: Array<{ id: string; text: string }> };
+function simpleIntent(text: string): string {
+  const signals = classifyInbound(text || '');
+  const b = signals.norm;
+  if (signals.wantsStatus || /\bstatus\b/.test(b)) return 'status';
+  if (signals.wantsHuman || /(humano|atendente|pessoa)/.test(b)) return 'humano';
+  if (signals.isGreetingOnly) return 'saudacao';
+  if (/\b(agendar|marcar|horario|horário|agenda)\b/.test(b)) return 'agendamento';
+  if (/\b(cancelar|cancelamento|desmarcar)\b/.test(b)) return 'cancelamento';
+  if (/\b(reagendar|reagendamento|remarcar)\b/.test(b)) return 'reagendamento';
+  return 'orcamento';
+}
+
 async function checkEquipmentAmbiguity(
   body: string,
-  session: any
+  session?: SessionRecord
 ): Promise<string | AmbiguityPrompt | null> {
-  if (!body) return null;
-
-  // Normalizar texto removendo acentos e caracteres especiais de forma robusta
-  const normalize = (s: string) => {
-    return (
-      s
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .replace(/[àáâãäå]/g, 'a')
-        .replace(/[èéêë]/g, 'e')
-        .replace(/[ìíîï]/g, 'i')
-        .replace(/[òóôõö]/g, 'o')
-        .replace(/[ùúûü]/g, 'u')
-        .replace(/[ç]/g, 'c')
-        .replace(/[ñ]/g, 'n')
-        .replace(/[ý]/g, 'y')
-        // Tratar caracteres corrompidos específicos
-        .replace(/fog�o/g, 'fogao')
-        .replace(/n�o/g, 'nao')
-        .replace(/indu��o/g, 'inducao')
-        .replace(/el�trico/g, 'eletrico')
-        .replace(/�/g, '') // remover caracteres de substituição
-        .toLowerCase()
-        .trim()
-    );
-  };
-
-  const normalized = normalize(body);
-  // Bypass: "forno do fogão" ou menção a forno + piso indica fogão a gás (não perguntar tipo)
-  try {
-    const t = normalized;
-    if (/\bforno\b/.test(t) && (/\bfogao\b/.test(t) || /\bpiso\b/.test(t))) {
-      const prev = (session as any)?.state?.dados_coletados || {};
-      const dados = { ...prev, equipamento: 'fogão a gás' };
-      if ((session as any)?.id) {
-        await setSessionState((session as any).id, {
-          ...(session as any).state,
-          dados_coletados: dados,
-        });
-      }
-      return null;
-    }
-  } catch {}
-
-  const collected = (session as any)?.state?.dados_coletados || {};
-  const lower = body.toLowerCase();
-
-  // Se existe uma pergunta pendente sobre o tipo de equipamento e o cliente respondeu com número/termos,
-  // interpretar a escolha e armazenar, evitando loops.
-  try {
-    const st = (session as any)?.state || {};
-    const pending = st.pendingEquipmentType as string | undefined;
-    if (pending) {
-      const text = (body || '')
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .toLowerCase(); // já normalizado sem acentos
-      const numMatch = text.match(/^\s*([123])\s*$/);
-      const n = numMatch ? numMatch[1] : undefined;
-      let equip: string | undefined;
-
-      if (pending === 'forno') {
-        if (n === '1' || /\bfogao\b/.test(text) || /\bpiso\b/.test(text)) equip = 'fogão a gás';
-        else if (n === '2' || /embut/.test(text) || /eletric/.test(text)) equip = 'forno elétrico';
-        else if (n === '3' || /bancada/.test(text)) equip = 'forno elétrico';
-      } else if (pending === 'fogao' || pending === 'fogão') {
-        if (n === '1' || /\bgas\b/.test(text)) equip = 'fogão a gás';
-        else if (n === '2' || /eletric/.test(text)) equip = 'fogão elétrico';
-        else if (n === '3' || /inducao|\bindu\b/.test(text)) equip = 'fogão de indução';
-      } else if (
-        pending === 'microondas' ||
-        pending === 'micro-ondas' ||
-        pending === 'micro ondas'
-      ) {
-        if (n === '1' || /bancada/.test(text)) equip = 'micro-ondas';
-        else if (n === '2' || /embut/.test(text)) equip = 'micro-ondas';
-      }
-
-      if (equip) {
-        const dadosPrev = st.dados_coletados || {};
-        setSessionState((session as any).id, {
-          ...st,
-          pendingEquipmentType: null,
-          dados_coletados: { ...dadosPrev, equipamento: equip },
-          orcamento_entregue: false,
-          last_quote: null,
-          last_quote_ts: null,
-        });
-        return null;
-      }
-    }
-  } catch {}
-  // Confirmação de troca de equipamento (evitar mudanças acidentais de contexto)
-  try {
-    const st = (session as any)?.state || {};
-    const pendingSwitch = st.pendingEquipmentSwitch as string | undefined;
-    if (pendingSwitch) {
-      const t = normalized;
-      const saidYes = /(\bsim\b|\bpode\b|\btrocar\b|\bmudar\b|\bisso\b)/.test(t);
-      const saidNo = /(\bn[aã]o\b|\bnao\b|\bmanter\b|\bcontinuar\b)/.test(t);
-      if (saidYes || saidNo) {
-        const stAll = (session as any)?.state || {};
-        const dadosPrev = stAll.dados_coletados || {};
-        const newState: any = { ...stAll, pendingEquipmentSwitch: null };
-        let reply = '';
-        if (saidYes) {
-          // Atualiza equipamento e reseta orçamento anterior para evitar agendamento indevido
-          const newDados: any = { ...dadosPrev, equipamento: pendingSwitch };
-          delete newDados.marca;
-          delete newDados.problema;
-          newState.dados_coletados = newDados;
-          newState.orcamento_entregue = false;
-          newState.last_quote = null;
-          newState.last_quote_ts = null;
-          reply = `Perfeito, vamos continuar com ${pendingSwitch}. Qual é a marca?`;
-        } else {
-          reply = `Sem problemas, mantemos ${dadosPrev.equipamento || 'o equipamento atual'}.`;
-        }
-        if ((session as any)?.id) await setSessionState((session as any).id, newState);
-        return reply;
-      }
-    }
-  } catch {}
+  const lower = String(body || '').toLowerCase();
+  const normalized = normalizeComparableText(body || '');
+  const normalize = (s: string) => normalizeComparableText(s || '');
 
   // 🏭 VERIFICAÇÃO PRÉVIA DE EQUIPAMENTOS INDUSTRIAIS (ANTES DA DETECÇÃO DE AMBIGUIDADE)
   const isIndustrialAtendemos =
@@ -728,7 +324,7 @@ export async function orchestrateInbound(
       return 'Um de nossos atendentes humanos vai assumir a conversa.\n\nSe quiser voltar com o assistente, digite: "voltar ao bot".';
     }
 
-    const wantsHumanEarly = /\b(humano|pessoa|atendente|operador|falar\s+com\s+algu[eé]m|transferir|escalar)\b/i.test(String(body || ''));
+    const wantsHumanEarly = classifyInbound(String(body || '')).wantsHuman;
     if (wantsHumanEarly) {
       const newState = { ...stEarly, bot_paused: true, human_requested: true, human_requested_at: new Date().toISOString(), off_topic_count: 0 } as any;
       if ((session as any)?.id) await setSessionState((session as any).id, newState);
@@ -736,6 +332,23 @@ export async function orchestrateInbound(
       await notifyInternalHandoff(from, String(body || ''), session);
       try { console.log(`[HUMAN-ESCALATION] (early) Pausando bot para ${from}`); } catch {}
       return 'Certo! Vou te transferir para um de nossos atendentes. Por favor, aguarde... \n\n*Bot pausado - aguardando atendimento humano*';
+    }
+  } catch {}
+
+  // Despedidas/adiamento: resposta empática e encerra sem empurrar fluxo
+  try {
+    if (classifyInbound(String(body || '')).isDeferralOrBye) {
+      const msg =
+        'Perfeito, sem problema! Fico à disposição. Quando quiser retomar, é só mandar mensagem por aqui. Abraço!';
+      try {
+        const st = ((session as any)?.state || {}) as any;
+        const newState = { ...st, soft_closed_at: new Date().toISOString() } as any;
+        if ((session as any)?.id) await setSessionState((session as any).id, newState);
+        try {
+          (session as any).state = newState;
+        } catch {}
+      } catch {}
+      return msg;
     }
   } catch {}
 
@@ -859,8 +472,27 @@ export async function orchestrateInbound(
   try {
     const stIns = (((session as any)?.state) || {}) as any;
     const txtIns = String(body || '');
-    const isInstallText = /(instalar|instala[çc][aã]o|montagem|colocar)/i.test(txtIns);
-    const inInstallMode = !!stIns.installation_mode || isInstallText;
+    const sigIns = classifyInbound(txtIns);
+    const normIns = sigIns.norm;
+
+    const isInstallText = sigIns.mentionsInstall;
+    const negatedInstall = sigIns.negatedInstall;
+    const looksLikeRepair = sigIns.looksLikeRepair;
+
+    const shouldEnterInstallMode = isInstallText && !negatedInstall && !looksLikeRepair;
+    const inInstallMode = !!stIns.installation_mode || shouldEnterInstallMode;
+
+    // Se o usuário estava em modo instalação mas corrigiu para manutenção/conserto, sair do modo instalação.
+    if (stIns.installation_mode && !shouldEnterInstallMode && (negatedInstall || looksLikeRepair)) {
+      const cleared: any = { ...stIns, installation_mode: false };
+      for (const k of Object.keys(cleared)) {
+        if (k.startsWith('installation_')) delete cleared[k];
+      }
+      if ((session as any)?.id) {
+        await setSessionState((session as any).id, cleared);
+        try { (session as any).state = cleared; } catch {}
+      }
+    }
     if (inInstallMode) {
       const dcIns = (stIns.dados_coletados || {}) as any;
       // tentar inferir equipamento a partir do texto
@@ -1063,11 +695,7 @@ export async function orchestrateInbound(
     try {
       const guessed = guessFunnelFields(String(body || '')) as any;
       newEquip = guessed?.equipamento;
-      const norm = (s: any) => String(s || '')
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .toLowerCase()
-        .trim();
+      const norm = (s: any) => normalizeComparableText(String(s || ''));
       if (newEquip && dcX?.equipamento && norm(newEquip) !== norm(dcX.equipamento)) {
         equipChanged = true;
       }
@@ -1583,6 +1211,28 @@ export async function orchestrateInbound(
   if (ambiguityCheck) {
     return ambiguityCheck;
   }
+
+  // CASO ESPECIAL: após orçamento de coleta_diagnostico, cliente pergunta se pode levar direto na empresa
+  // Sempre responder com script fixo, independente da intenção que a IA sugerir
+  try {
+    const lowered = String(body || '').toLowerCase();
+    const st = ((session as any)?.state || {}) as any;
+    const lastQuote = (st.last_quote || st.lastQuote) as any;
+    const lastType = String(lastQuote?.service_type || '').toLowerCase();
+    const askedDropoff =
+      /(posso|pode|d[aá])/.test(lowered) &&
+      /(levar|entregar|deixar)/.test(lowered) &&
+      /(empresa|escrit[oó]rio|oficina)/.test(lowered);
+    if (askedDropoff && lastType === 'coleta_diagnostico') {
+      return (
+        'Atendemos toda região da Grande Floripa e BC, nossa logistica é atrelada às ordens de serviço.\n\n' +
+        'Coletador pega ai e já leva pra nossa oficina mais próxima por questão logística.\n\n' +
+        'Aqui é só escritório.\n\n' +
+        'Mas coletamos aí e entregamos ai.\n\n' +
+        'Gostaria de agendar?'
+      );
+    }
+  } catch {}
 
   // FAST-PATH: se já estamos em contexto de agendamento, não chame IA — colete dados/ofereça horários
   try {
@@ -3099,6 +2749,51 @@ async function aiBasedRouting(
       }
     } catch {}
 
+    // Confirmação determinística de troca de equipamento (pendingEquipmentSwitch)
+    // Precisa rodar ANTES de qualquer bypass de agendamento para evitar respostas incorretas.
+    try {
+      const stSwitch = ((session as any)?.state || {}) as any;
+      const pendingSwitch = stSwitch.pendingEquipmentSwitch;
+      if (pendingSwitch) {
+        const norm = normalizeComparableText(String(body || ''));
+        const isNo = /\b(nao|n[aã]o|manter|mantem|mantemos|deixa|deixar)\b/i.test(norm);
+        const isYes = /\b(sim|pode|ok|claro|troca|trocar|mudar|altera|alterar)\b/i.test(norm);
+
+        if (isYes && !isNo) {
+          const prevDados = (stSwitch.dados_coletados || {}) as any;
+          const newDados = { ...prevDados, equipamento: pendingSwitch } as any;
+          const newState = {
+            ...stSwitch,
+            dados_coletados: newDados,
+            pendingEquipmentSwitch: null,
+            orcamento_entregue: false,
+            last_quote: null,
+            last_quote_ts: null,
+            accepted_service: false,
+            collecting_personal_data: false,
+            pending_time_selection: false,
+            last_offered_slots: [],
+            last_offered_slots_full: [],
+          } as any;
+          try {
+            if ((session as any)?.id) await setSessionState((session as any).id, newState);
+            (session as any).state = newState;
+          } catch {}
+          return `Perfeito, vamos seguir com ${pendingSwitch}.`;
+        }
+
+        if (isNo) {
+          const currentEquip = String(stSwitch.dados_coletados?.equipamento || '').trim() || 'o equipamento atual';
+          const newState = { ...stSwitch, pendingEquipmentSwitch: null } as any;
+          try {
+            if ((session as any)?.id) await setSessionState((session as any).id, newState);
+            (session as any).state = newState;
+          } catch {}
+          return `Tudo certo — mantemos ${currentEquip}.`;
+        }
+      }
+    } catch {}
+
     // Fast-path: se já estamos aguardando escolha de horário, não chame IA; confirme/agende direto
     try {
       const stFast = (session as any)?.state || {};
@@ -3414,7 +3109,7 @@ async function makeAIRoutingDecision(
   message: string,
   sessionData: any,
   availableBlocks: any[]
-): Promise<any> {
+): Promise<AIRouterDecision> {
   // Inject service policy hints to guide the LLM
   const policyHints = `Políticas de serviço (resumo):
 - Forno elétrico embutido → coleta_diagnostico
@@ -3499,7 +3194,7 @@ Retorne:
     const last = raw.lastIndexOf('}');
     const candidate = first >= 0 && last > first ? raw.slice(first, last + 1) : raw.trim();
 
-    const decision = JSON.parse(candidate);
+    const decision = parseAIRoutingDecision(JSON.parse(candidate));
 
     // Pós-processamento: preservar qualificadores do fogão via texto do cliente.
     // Ex.: se o cliente diz "fogão a gás" e a IA retornar apenas "fogão", enriquecemos aqui.
@@ -3533,7 +3228,7 @@ Retorne:
 
 // **NOVA FUNÇÃO: Executa a decisão da IA**
 async function executeAIDecision(
-  decision: any,
+  decision: AIRouterDecision,
   from: string,
   body: string,
   session?: SessionRecord,
@@ -3542,537 +3237,62 @@ async function executeAIDecision(
   try {
     console.log('[AI-ROUTER] ⚡ Executando decisão:', decision.acao_principal);
 
-    // 1. Atualizar dados da sessão com dados extraídos pela IA
-    if (decision.dados_extrair && Object.keys(decision.dados_extrair).length > 0) {
-      const currentData = (session as any)?.state?.dados_coletados || {};
-      const merged = { ...currentData, ...decision.dados_extrair } as any;
+    const signals = classifyInbound(String(body || ''));
+    const st = ((session as any)?.state || {}) as any;
+    const shouldTreatAsInstall =
+      !!st.installation_mode ||
+      decision.intent === 'instalacao' ||
+      (signals.mentionsInstall && !signals.negatedInstall && !signals.looksLikeRepair);
 
-      // Normalizar micro-ondas: se vier mount=bancada, preferir coleta+conserto no quote
-      try {
-        const eq = String(merged.equipamento || '').toLowerCase();
-        const mount = String(merged.mount || '').toLowerCase();
-        if (/micro[- ]?ondas|microondas|\bmicro\b/.test(eq) && mount === 'bancada') {
-          (session as any)._micro_bancada_hint = true;
-        }
-      } catch {}
+    const installCtx = {
+      negatedInstall: !!signals.negatedInstall,
+      mentionsInstall: !!signals.mentionsInstall,
+      looksLikeRepair: !!signals.looksLikeRepair,
+      shouldTreatAsInstall,
+    };
 
+    const actionHandlers = buildActionHandlers({
+      decision,
+      from,
+      body,
+      session,
+      allBlocks,
+      installCtx,
+      detectPriorityIntent,
+      hasExplicitAcceptance,
+      executeAIOrcamento: executeAIOrçamento,
+      executeAIInformacao: executeAIInformacao,
+      executeAIAgendamento,
+      logAIRoute,
+      buildSystemPrompt,
+      chatComplete,
+      getActiveBot,
+    });
 
-      // Preservar especificadores quando já coletados (ex.: "fogão a gás")
-      try {
-        const curEq = String(currentData.equipamento || '').toLowerCase();
-        const newEq = String(
-          decision.dados_extrair.equipamento || merged.equipamento || ''
-        ).toLowerCase();
-        const curIsGas = /g[aá]s/.test(curEq);
-        const newIsGenericFogao =
-          /\bfog(ão|ao)\b/.test(newEq) && !/g[aá]s|indu(c|ç)ão|el[eé]trico/.test(newEq);
-        if (curIsGas && newIsGenericFogao) {
-          merged.equipamento = currentData.equipamento; // mantém "fogão a gás"
-          merged.power_type = merged.power_type || 'gas';
-        }
-      } catch {}
-
-      // Enriquecer qualificadores via texto atual (primeira mensagem também precisa funcionar).
-      try {
-        const enriched = enrichFogaoEquipmentFromMessage(merged.equipamento, body);
-        if (enriched) merged.equipamento = enriched;
-        const eqLower = String(merged.equipamento || '').toLowerCase();
-        if (eqLower.includes('fogão a gás') || (eqLower.includes('fogão') && eqLower.includes('gás'))) {
-          merged.power_type = merged.power_type || 'gas';
-        }
-      } catch {}
-
-      if (session) {
-        const prevState = ((session as any).state || {}) as any;
-        const newState = { ...prevState, dados_coletados: merged };
-        (session as any).state = newState; // garantir que o objeto em memória reflita os dados mais recentes
-        await setSessionState(session.id, newState);
-        console.log('[AI-ROUTER] 💾 Dados atualizados:', merged);
-      }
-    }
-
-    // 2. Ajustes específicos por intenção (melhor UX)
-    const prIntent = detectPriorityIntent(body);
-    if (
-      prIntent === 'reagendamento' ||
-      (decision.intent === 'reagendamento' && decision.acao_principal === 'coletar_dados')
-    ) {
-      const reply =
-        'Perfeito! Para reagendar, me informe o número da sua OS (se tiver). Se não tiver, me passe nome, telefone e endereço. Qual a melhor data e horário para você?';
-      await logAIRoute('ai_route_effective', {
-        from,
-        body,
-        original: decision,
-        effective: { intent: 'reagendamento', acao_principal: 'coletar_dados' },
-        reply,
-      });
-      return sanitizeAIText(reply);
-    }
-    if (prIntent === 'cancelamento' || decision.intent === 'cancelamento') {
-      const reply =
-        'Tudo certo! Para concluir o cancelamento, me informe o número da sua OS. Se não tiver, me passe nome, telefone e endereço que localizo seu atendimento para cancelar.';
-      await logAIRoute('ai_route_effective', {
-        from,
-        body,
-        original: decision,
-        effective: { intent: 'cancelamento', acao_principal: 'coletar_dados' },
-        reply,
-      });
-      return sanitizeAIText(reply);
-    }
-    if (
-      prIntent === 'instalacao' ||
-      (decision.intent === 'instalacao' && decision.acao_principal === 'coletar_dados')
-    ) {
-      const reply =
-        'Legal! Para a instalação, preciso de: equipamento, tipo (embutido ou bancada), local exato de instalação, distância do ponto de água/gás quando aplicável e se já há fixação/suportes. Pode me passar esses dados?';
-      await logAIRoute('ai_route_effective', {
-        from,
-        body,
-        original: decision,
-        effective: { intent: 'instalacao', acao_principal: 'coletar_dados' },
-        reply,
-      });
-      return sanitizeAIText(reply);
-    }
-
-    // 3. Executar ação principal baseada na decisão da IA
-    let out: string | null = null;
-    switch (decision.acao_principal) {
-      case 'gerar_orcamento': {
-        // Anti-loop: se o cliente respondeu com aceite (ex.: "sim") e já temos
-        // contexto mínimo (equipamento + problema), avance para agendamento
-        try {
-          const sessionData = (session as any)?.state?.dados_coletados || {};
-          const hasEquipmentContext = !!sessionData.equipamento;
-          // Endurecer: não considerar 'gostaria' isolado como intenção de agendar
-          const agendamentoKeywords =
-            /\b(agendar|marcar|aceito|aceitar|quero\s+(agendar|marcar)|vamos\s+(agendar|marcar)|sim|ok|beleza|pode|vou\s+(agendar|marcar)|confirmo|fechado|fechou)\b/i;
-          const isAgendamentoIntent = agendamentoKeywords.test(body || '');
-          const isTimeSelection = !!(body && /^\s*(?:op(?:ç|c)[aã]o\s*)?([123])(?:\s*[-.)]?\s*(?:manh[aã]|tarde|noite))?\s*$/i.test((body as string).trim()));
-          const accepted = hasExplicitAcceptance(body || '');
-          const hasQuoteDelivered = !!(session as any)?.state?.orcamento_entregue;
-          const pendingTime = !!((session as any)?.state?.pending_time_selection);
-          if (
-            (pendingTime && (isTimeSelection || isAgendamentoIntent || accepted)) ||
-            (hasEquipmentContext && hasQuoteDelivered && (accepted || isAgendamentoIntent || isTimeSelection))
-          ) {
-            out = await executeAIAgendamento(decision, session, body, from);
-            break;
-          }
-        } catch {}
-        // Guardião universal: se o usuário enviou 1/2/3 ou períodos (manhã/tarde/noite), priorize agendamento
-        try {
-          const stX = ((session as any)?.state || {}) as any;
-          const hasSlotsX = (Array.isArray(stX.last_offered_slots) && stX.last_offered_slots.length > 0) ||
-                            (Array.isArray(stX.last_offered_slots_full) && stX.last_offered_slots_full.length > 0);
-          const isTimeSelectionX = !!(body && /^\s*(?:op(?:ç|c)[aã]o\s*)?([123])(?:\s*[-.)]?\s*(?:manh[aã]|tarde|noite))?\s*$/i.test((body as string).trim())) || /\b(manh[aã]|tarde|noite)\b/i.test(String(body||''));
-          if (isTimeSelectionX) {
-            out = await executeAIAgendamento(decision, session, body, from);
-            break;
-          }
-        } catch {}
-        // NOVO BYPASS: se a mensagem parece conter dados pessoais E já houve aceite/orçamento,
-        // envie direto para o fluxo de agendamento (coleta de dados), evitando repetir orçamento
-        try {
-          const stG = ((session as any)?.state || {}) as any;
-          const collectingG = !!stG.collecting_personal_data;
-          const acceptedPersistedG = !!stG.accepted_service;
-          const quoteDeliveredG = !!stG.orcamento_entregue;
-          const txtG = String(body || '');
-          const likelyNameG = !!(txtG && /^[A-Za-z\u00C0-\u00ff]{2,}(?:\s+[A-Za-z\u00C0-\u00ff]{2,}){1,}\s*$/.test(txtG.trim()) && !/[\d@]/.test(txtG));
-          const looksPersonalG = /(nome|endere[cç]o|endere[çc]o|rua|avenida|av\.|r\.|cep|cpf|email|@|\b\d{5}-?\d{3}\b)/i.test(txtG) || likelyNameG;
-          if ((collectingG || acceptedPersistedG || quoteDeliveredG) && looksPersonalG) {
-            out = await executeAIAgendamento({ intent: 'agendamento_servico', acao_principal: 'coletar_dados', dados_extrair: {} }, session, body, from);
-            break;
-          }
-        } catch {}
-        out = await executeAIOrçamento(decision, session, body);
-        break;
-      }
-      case 'coletar_dados':
-        // SAUDAÇÕES: Usar GPT humanizado para responder naturalmente
-        if (decision.intent === 'saudacao_inicial') {
-          console.log('[DEBUG] SAUDAÇÃO DETECTADA - Usando GPT humanizado');
-          try {
-            // Em modo de teste, evitar saudação genérica e ir direto ao objetivo do fluxo
-            try {
-              const { isTestModeEnabled } = await import('./testMode.js');
-              if (isTestModeEnabled && isTestModeEnabled()) {
-                const sd = ((session as any)?.state?.dados_coletados || {}) as any;
-                if (!sd.equipamento || !sd.marca || !sd.problema) {
-                  out = 'Para te ajudar melhor: qual é o equipamento? Em seguida, me informe a marca do equipamento e o problema específico.';
-                  await logAIRoute('ai_route_effective', {
-                    from,
-                    body,
-                    original: decision,
-                    effective: { intent: 'saudacao_inicial', acao_principal: 'resposta_deterministica_teste' },
-                    reply: out,
-                  });
-                  break;
-                }
-              }
-            } catch {}
-            // Criar prompt específico para saudação natural
-            const saudacaoPrompt = `${buildSystemPrompt(((await getActiveBot()) as any)?.personality?.systemPrompt, undefined)}
-
-Mensagem do usuário: "${body}"
-
-Responda de forma natural e brasileira como uma pessoa real faria. Cumprimente de volta e depois pergunte como pode ajudar com equipamentos domésticos.`;
-
-            const response = await chatComplete(
-              { provider: 'openai', model: process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini' },
-              [
-                { role: 'system', content: saudacaoPrompt },
-                { role: 'user', content: body || '' },
-              ]
-            );
-
-            out =
-              response || decision.resposta_sugerida || 'Oi! Tudo bem? Como posso te ajudar hoje?';
-            await logAIRoute('ai_route_effective', {
-              from,
-              body,
-              original: decision,
-              effective: { intent: 'saudacao_inicial', acao_principal: 'resposta_humanizada' },
-              reply: out,
-            });
-          } catch (e) {
-            console.log('[DEBUG] Erro no GPT humanizado, usando fallback:', e);
-            out = decision.resposta_sugerida || 'Oi! Tudo bem? Como posso te ajudar hoje?';
-          }
-        } else {
-          // Override por prioridade de intenção (outras situações)
-          const pr = detectPriorityIntent(body);
-          if (pr === 'reagendamento') {
-            out =
-              'Perfeito! Para reagendar, me informe o número da sua OS (se tiver). Se não tiver, me passe nome, telefone e endereço. Qual a melhor data e horário para você?';
-            await logAIRoute('ai_route_effective', {
-              from,
-              body,
-              original: decision,
-              effective: { intent: 'reagendamento', acao_principal: 'coletar_dados' },
-              reply: out,
-            });
-          } else if (pr === 'cancelamento') {
-            out =
-              'Tudo certo! Para concluir o cancelamento, me informe o número da sua OS. Se não tiver, me passe nome, telefone e endereço que localizo seu atendimento para cancelar.';
-            await logAIRoute('ai_route_effective', {
-              from,
-              body,
-              original: decision,
-              effective: { intent: 'cancelamento', acao_principal: 'coletar_dados' },
-              reply: out,
-            });
-          } else if (pr === 'instalacao') {
-            out =
-              'Legal! Para a instalação, preciso de: equipamento, tipo (embutido ou bancada), local exato de instalação, distância do ponto de água/gás quando aplicável e se já há fixação/suportes. Pode me passar esses dados?';
-            await logAIRoute('ai_route_effective', {
-              from,
-              body,
-              original: decision,
-              effective: { intent: 'instalacao', acao_principal: 'coletar_dados' },
-              reply: out,
-            });
-          } else {
-            // SISTEMA DE CONTEXTO INTELIGENTE
-            const sessionData = (session as any)?.state?.dados_coletados || {};
-            const hasEquipmentContext = !!sessionData.equipamento;
-
-            // Detectar intenção de agendamento (palavras-chave mais restritas)
-            const agendamentoKeywords =
-              /\b(agendar|marcar|aceito|aceitar|quero\s+(agendar|marcar)|vamos\s+(agendar|marcar)|sim|ok|beleza|pode|vou\s+(agendar|marcar)|confirmo|fechado|fechou)\b/i;
-            const isAgendamentoIntent = agendamentoKeywords.test(body || '');
-            const isTimeSelection = !!(body && /^\s*(?:op(?:ç|c)[aã]o\s*)?([123])(?:\s*[-.)]?\s*(?:manh[aã]|tarde|noite))?\s*$/i.test((body as string).trim()));
-
-            const hasQuoteDelivered2 = !!(session as any)?.state?.orcamento_entregue;
-            const acceptedPlain2 = hasExplicitAcceptance(body || '');
-            const pendingTime2 = !!((session as any)?.state?.pending_time_selection);
-            const acceptedPersisted2 = !!((session as any)?.state?.accepted_service);
-            const collecting2 = !!((session as any)?.state?.collecting_personal_data);
-            const likelyName = !!(body && /^[A-Za-z\u00c0-\u00ff]{2,}(?:\s+[A-Za-z\u00c0-\u00ff]{2,}){1,}\s*$/.test(body.trim()) && !/[\d@]/.test(body));
-            const looksLikePersonal = !!(body && (/(nome|endere[c\u00e7]o|endere[\u00e7c]o|rua|avenida|av\.|r\.|cep|cpf|email|@|\b\d{5}-?\d{3}\b)/i.test(body) || likelyName));
-
-            // Guardião universal dentro de coletar_dados: se enviaram 1/2/3 ou período do dia, priorize agendamento
-            try {
-              if (isTimeSelection) {
-                out = await executeAIAgendamento(decision, session, body, from);
-                break;
-              }
-            } catch {}
-
-            if (collecting2 || ((acceptedPersisted2 || hasQuoteDelivered2) && !isTimeSelection && !isAgendamentoIntent && looksLikePersonal)) {
-              // Bypass IA: após aceite/orçamento entregue, mensagens com dados pessoais devem cair no fluxo de agendamento
-              out = await executeAIAgendamento(decision, session, body, from);
-            } else if (
-              (pendingTime2 && (isTimeSelection || isAgendamentoIntent || acceptedPlain2)) ||
-              (hasEquipmentContext && (hasQuoteDelivered2 || acceptedPlain2) && (isAgendamentoIntent || isTimeSelection))
-            ) {
-              // Se temos contexto de equipamento E orçamento já foi entregue E usuário demonstra intenção de agendamento
-              out = await executeAIAgendamento(decision, session, body, from);
-            } else if (hasExplicitAcceptance(body || '')) {
-              // Aceite explícito tradicional
-              if (hasEquipmentContext && hasQuoteDelivered2) {
-                out = await executeAIAgendamento(decision, session, body, from);
-              } else if (hasEquipmentContext && !hasQuoteDelivered2) {
-                out =
-                  'Antes de agendarmos, vou te passar o valor e as possíveis causas para alinharmos. Pode me confirmar marca e um breve descritivo do defeito?';
-              } else {
-                out = 'Vou transferir você para um de nossos especialistas. Um momento, por favor.';
-              }
-            } else {
-              // Guardião de ordem + prompts determinísticos para evitar alucinar equipamento
-              try {
-                const prev = (session as any)?.state?.dados_coletados || {};
-                const eq = decision?.dados_extrair?.equipamento || prev.equipamento;
-                const brand = decision?.dados_extrair?.marca || prev.marca;
-                const prob = decision?.dados_extrair?.problema || prev.problema;
-                if (eq && prob && !hasExplicitAcceptance(body || '')) {
-                  out = await executeAIOrçamento(decision, session, body);
-                } else if (eq && !brand) {
-                  try {
-                    const { getTemplates, renderTemplate } = await import('./botConfig.js');
-                    const tpls = await getTemplates();
-                    const askBrand = tpls.find((t: any) => t.key === 'ask-brand');
-                    if (askBrand?.content)
-                      out = renderTemplate(askBrand.content, { equipamento: String(eq) });
-                    else out = `Certo! Qual é a marca do seu ${eq}?`;
-                  } catch {
-                    out = `Certo! Qual é a marca do seu ${eq}?`;
-                  }
-                } else if (eq && brand && !prob) {
-                  try {
-                    const { getTemplates, renderTemplate } = await import('./botConfig.js');
-                    const tpls = await getTemplates();
-                    const askProblem = tpls.find((t: any) => t.key === 'ask-problem');
-                    if (askProblem?.content)
-                      out = renderTemplate(askProblem.content, {
-                        equipamento: String(eq),
-                        marca: brand ? String(brand) : '',
-                      });
-                    else {
-                      const brandTxt = brand ? ` da marca ${brand}` : '';
-                      out = `Olá! Poderia me informar qual é o problema que você está enfrentando com seu ${eq}${brandTxt}?`;
-                    }
-                  } catch {
-                    const brandTxt = brand ? ` da marca ${brand}` : '';
-                    out = `Olá! Poderia me informar qual é o problema que você está enfrentando com seu ${eq}${brandTxt}?`;
-                  }
-                } else {
-                  // Pergunta fora de escopo/tópico: usar template off_topic se houver
-                  try {
-                    const { getTemplates, renderTemplate } = await import('./botConfig.js');
-                    const tpls = await getTemplates();
-                    const offTopic = tpls.find((t: any) => t.key === 'off_topic');
-                    out = offTopic?.content
-                      ? renderTemplate(offTopic.content, {})
-                      : decision.resposta_sugerida ||
-                        'Posso te ajudar com orçamento, agendamento ou status. Qual prefere?';
-                  } catch {
-                    out =
-                      decision.resposta_sugerida ||
-                      'Posso te ajudar com orçamento, agendamento ou status. Qual prefere?';
-                  }
-                }
-              } catch {
-                out = decision.resposta_sugerida || 'Preciso de mais informações. Pode me ajudar?';
-              }
-            }
-          }
-        }
-        break;
-      case 'responder_informacao':
-        out = await executeAIInformacao(decision, allBlocks);
-        break;
-      case 'agendar_servico':
-        // Evitar chamadas externas no ambiente de teste quando orçamento não foi entregue ainda
-        // Porém, se já houve aceite explícito ou estamos coletando dados, permitir seguir
-        // Também permitir quando já temos dados essenciais (equipamento, marca, problema) ou quando a mensagem já contém horário/data
-        {
-          const st = ((session as any)?.state || {}) as any;
-          const hasAcceptance = !!(st.accepted_service || st.collecting_personal_data);
-          const sd = (st.dados_coletados || {}) as any;
-          const hasCoreData = !!((sd.equipamento || st.equipamento) && (sd.marca || st.marca) && (sd.problema || st.problema));
-          const text = String(body || '').toLowerCase();
-          const looksLikeTime = /(amanh[ãa]|hoje|segunda|ter[çc]a|quarta|quinta|sexta|s[aá]bado|domingo|\b\d{1,2}[:h]\d{0,2}\b|\b\d{1,2}\s*h\b)/i.test(text);
-          if (!st.orcamento_entregue && !hasAcceptance && !hasCoreData && !looksLikeTime) {
-            return 'Antes de agendarmos, vou te passar o valor e as possíveis causas para alinharmos. Pode me confirmar a marca e um breve descritivo do defeito?';
-          }
-        }
-        out = await executeAIAgendamento(decision, session, body, from);
-        break;
-      case 'transferir_humano':
-        out = 'Vou transferir você para um de nossos especialistas. Um momento, por favor.';
-        break;
-      default:
-        // PERGUNTAS ALEATÓRIAS: Se intent é 'outros', usar GPT humanizado
-        if (decision.intent === 'outros') {
-          console.log('[DEBUG] PERGUNTA ALEATÓRIA DETECTADA - Usando GPT humanizado');
-          try {
-            // Criar prompt específico para perguntas aleatórias
-            const perguntaPrompt = `${buildSystemPrompt(((await getActiveBot()) as any)?.personality?.systemPrompt, undefined)}
-
-Mensagem do usuário: "${body}"
-
-O usuário fez uma pergunta que não tem a ver com equipamentos domésticos. Responda de forma natural e brasileira como uma pessoa real faria, mas seja BREVE (máximo 2 frases). Depois, redirecione suavemente para equipamentos domésticos.
-
-Exemplos:
-- "Qual a capital do Brasil?" → "Brasília! 😊 Falando nisso, posso te ajudar com algum equipamento doméstico?"
-- "Você gosta de futebol?" → "Ah, eu curto sim! E você, torce pra qual time? Mas me diz, precisa de ajuda com algum equipamento em casa?"
-- "Me conta uma piada" → "Haha, não sou muito bom com piadas não! 😅 Mas sou ótimo com equipamentos! Posso te ajudar com alguma coisa?"`;
-
-            const response = await chatComplete(
-              { provider: 'openai', model: process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini' },
-              [
-                { role: 'system', content: perguntaPrompt },
-                { role: 'user', content: body || '' },
-              ]
-            );
-
-            out =
-              response ||
-              decision.resposta_sugerida ||
-              'Interessante! 😊 Mas me diz, posso te ajudar com algum equipamento doméstico?';
-            await logAIRoute('ai_route_effective', {
-              from,
-              body,
-              original: decision,
-              effective: {
-                intent: 'outros',
-                acao_principal: 'resposta_humanizada_redirecionamento',
-              },
-              reply: out,
-            });
-          } catch (e) {
-            console.log(
-              '[DEBUG] Erro no GPT humanizado para pergunta aleatória, usando fallback:',
-              e
-            );
-            out =
-              decision.resposta_sugerida ||
-              'Interessante! 😊 Mas me diz, posso te ajudar com algum equipamento doméstico?';
-            await logAIRoute('ai_route_effective', {
-              from,
-              body,
-              original: decision,
-              effective: { intent: 'outros', acao_principal: 'fallback' },
-              reply: out,
-            });
-          }
-        } else {
-          // SISTEMA DE CONTEXTO INTELIGENTE (outros casos)
-          const sessionData = (session as any)?.state?.dados_coletados || {};
-          const hasEquipmentContext = !!sessionData.equipamento;
-
-          // Detectar intenção de agendamento (palavras-chave mais restritas)
-          const agendamentoKeywords =
-            /\b(agendar|marcar|aceito|aceitar|quero\s+(agendar|marcar)|vamos\s+(agendar|marcar)|sim|ok|beleza|pode|vou\s+(agendar|marcar)|confirmo|fechado|fechou)\b/i;
-          const isAgendamentoIntent = agendamentoKeywords.test(body || '');
-          const isTimeSelection = !!(body && /^\s*(?:op(?:ç|c)[aã]o\s*)?([123])(?:\s*[-.)]?\s*(?:manh[aã]|tarde|noite))?\s*$/i.test((body as string).trim()));
-
-          const hasQuoteDelivered3 = !!(session as any)?.state?.orcamento_entregue;
-          const acceptedPlain3 = hasExplicitAcceptance(body || '');
-          const pendingTime3 = !!((session as any)?.state?.pending_time_selection);
-          if (
-            (pendingTime3 && (isTimeSelection || isAgendamentoIntent || acceptedPlain3)) ||
-            (hasEquipmentContext && (hasQuoteDelivered3 || acceptedPlain3) && (isAgendamentoIntent || isTimeSelection))
-          ) {
-            // Se temos contexto de equipamento E orçamento já foi entregue E usuário demonstra intenção de agendamento
-            out = await executeAIAgendamento(decision, session, body, from);
-          } else if (hasExplicitAcceptance(body || '')) {
-            // Aceite explícito tradicional
-            if (hasEquipmentContext && hasQuoteDelivered3) {
-              out = await executeAIAgendamento(decision, session, body, from);
-            } else if (hasEquipmentContext && !hasQuoteDelivered3) {
-              out =
-                'Antes de agendarmos, vou te passar o valor e as possíveis causas para alinharmos. Pode me confirmar marca e um breve descritivo do defeito?';
-            } else {
-              out = 'Vou transferir você para um de nossos especialistas. Um momento, por favor.';
-            }
-          } else {
-            try {
-              const { isTestModeEnabled } = await import('./testMode.js');
-              if (isTestModeEnabled && isTestModeEnabled()) {
-                const sdAll = ((session as any)?.state || {}) as any;
-                const sd = (sdAll.dados_coletados || {}) as any;
-                const hasEq = !!sd.equipamento;
-                const hasBrand = !!sd.marca;
-                const hasProb = !!sd.problema;
-                const msg = String(body || '').trim();
-                // Captura determinística de MARCA em test-mode quando a mensagem é só a marca
-                try {
-                  if (!hasBrand && msg && msg.split(/\s+/).length <= 3) {
-                    const m = msg.match(/\b(brastemp|consul|electrolux|eletrolux|lg|samsung|philco|midea|fischer|tramontina|mueller|dako|esmaltec|atlas|bosch|ge|panasonic|continental)\b/i);
-                    if (m) {
-                      const updated = { ...sd, marca: m[1] } as any;
-                      if ((session as any)?.id) {
-                        const newState = { ...sdAll, dados_coletados: updated } as any;
-                        try { await setSessionState((session as any).id, newState); (session as any).state = newState; } catch {}
-                      }
-                      out = 'Pode me descrever o problema específico que está acontecendo?';
-                      return out;
-                    }
-                  }
-                } catch {}
-                if (hasEq && hasBrand && !hasProb && msg && msg.length <= 80) {
-                  const updated = { ...sd, problema: msg };
-                  if ((session as any)?.id) {
-                    const newState = { ...sdAll, dados_coletados: updated } as any;
-                    try { await setSessionState((session as any).id, newState); (session as any).state = newState; } catch {}
-                  }
-                  const eq = String(updated.equipamento);
-                  const mk = String(updated.marca);
-                  out = `Entendi! Para ${eq} ${mk}: valor da visita técnica é R$ 89, diagnóstico incluso. Posso seguir com o agendamento?`;
-                } else if (!hasEq && hasBrand && !hasProb && msg && msg.length <= 80) {
-                  // Assumir fogão a gás por padrão em teste quando há marca e o usuário descreve o defeito
-                  const updated = { ...sd, equipamento: 'fogão a gás', problema: msg };
-                  if ((session as any)?.id) {
-                    const newState = { ...sdAll, dados_coletados: updated } as any;
-                    try { await setSessionState((session as any).id, newState); (session as any).state = newState; } catch {}
-                  }
-                  out = `Entendi! Para fogão a gás ${String(updated.marca)}: valor da visita técnica é R$ 89, diagnóstico incluso. Posso seguir com o agendamento?`;
-                } else if (!hasEq || !hasBrand || !hasProb) {
-                  out = 'Para te ajudar melhor: qual é o equipamento? Em seguida, me informe a marca do equipamento e o problema específico.';
-                } else {
-                  out = decision.resposta_sugerida || 'Como posso ajudar você hoje?';
-                }
-              } else {
-                out = decision.resposta_sugerida || 'Como posso ajudar você hoje?';
-              }
-            } catch {
-              out = decision.resposta_sugerida || 'Como posso ajudar você hoje?';
-            }
-          }
-        }
-    }
-
-    function detectPriorityIntent(text: string): string | null {
-      const normalize = (s: string) =>
-        s
-          .normalize('NFD')
-          .replace(/\p{Diacritic}/gu, '')
-          .toLowerCase();
-      const b = normalize(text || '');
-      if (/(\breagendar\b|\breagendamento\b|trocar horario|nova data|remarcar)/.test(b))
-        return 'reagendamento';
-      if (/(\bcancelar\b|\bcancelamento\b|desmarcar)/.test(b)) return 'cancelamento';
-      if (/(\bstatus\b|acompanhar|andamento|numero da os|n[ºo]\s*da\s*os|numero da ordem)/.test(b))
-        return 'status_ordem';
-      if (/(instalar|instalacao|instala\u00e7\u00e3o)/.test(b)) return 'instalacao';
-      return null;
-    }
+    let out: string | null = await actionHandlers[decision.acao_principal]();
 
     // Sanitizar pedidos de dados pessoais antes do aceite explícito
     if (out) {
-      const st = ((session as any)?.state || {}) as any;
-      const dc = (st.dados_coletados || {}) as any;
+      const st2 = ((session as any)?.state || {}) as any;
+      const dc = (st2.dados_coletados || {}) as any;
       const allPersonal = !!(dc.nome && dc.endereco && dc.email && dc.cpf);
-      const hasSlots = (Array.isArray(st.last_offered_slots) && st.last_offered_slots.length > 0) ||
-                       (Array.isArray(st.last_offered_slots_full) && st.last_offered_slots_full.length > 0);
-      const pendingSel = !!st.pending_time_selection;
-      const isTimeSel = !!(body && /^(?:op(?:ç|c)[aã]o\s*)?[123](?:\s*[-.)]?\s*(?:manh[aã]|tarde|noite))?\s*$/i.test(String(body).trim())) || /\b(manh[aã]|tarde|noite)\b/i.test(String(body||''));
-      const acceptedPersisted = !!st.accepted_service || !!st.orcamento_entregue || !!st.collecting_personal_data;
-      out = sanitizeSensitiveRequests(out, acceptedPersisted || allPersonal || pendingSel || hasSlots || isTimeSel || hasExplicitAcceptance(body));
+      const hasSlots =
+        (Array.isArray(st2.last_offered_slots) && st2.last_offered_slots.length > 0) ||
+        (Array.isArray(st2.last_offered_slots_full) && st2.last_offered_slots_full.length > 0);
+      const pendingSel = !!st2.pending_time_selection;
+      const isTimeSel =
+        !!(
+          body &&
+          /^(?:op(?:ç|c)[aã]o\s*)?[123](?:\s*[-.)]?\s*(?:manh[aã]|tarde|noite))?\s*$/i.test(
+            String(body).trim()
+          )
+        ) || /\b(manh[aã]|tarde|noite)\b/i.test(String(body || ''));
+      const acceptedPersisted =
+        !!st2.accepted_service || !!st2.orcamento_entregue || !!st2.collecting_personal_data;
+      out = sanitizeSensitiveRequests(
+        out,
+        acceptedPersisted || allPersonal || pendingSel || hasSlots || isTimeSel || hasExplicitAcceptance(body)
+      );
       // Hard normalization: nunca deixe mensagens de processamento/bloqueio vazarem para o usuário final
       if (
         /agendamento\s*em\s*andamento/i.test(out) ||
@@ -4083,6 +3303,7 @@ Exemplos:
         out = 'AGENDAMENTO_CONFIRMADO';
       }
     }
+
     return sanitizeAIText(out || '');
   } catch (e) {
     console.error('[AI-ROUTER] ❌ Erro ao executar decisão:', e);
@@ -4186,9 +3407,16 @@ async function executeAIOrçamento(
     } catch {}
 
     // Lógica específica por equipamento (mantida da versão anterior)
-    if (equipamento.includes('micro') && problema.includes('bancada')) {
-      service_type = 'coleta_conserto';
-    }
+    try {
+      const eqLower = String(equipamento || '').toLowerCase();
+      const mountHint = String(dados.mount || '').toLowerCase();
+      const msgLower = String(body || '').toLowerCase();
+      const isMicroOrForno = /micro/.test(eqLower) || /forno/.test(eqLower);
+      const isBancada = mountHint === 'bancada' || /\bbancada\b/.test(msgLower);
+      if (isMicroOrForno && isBancada) {
+        service_type = 'coleta_conserto';
+      }
+    } catch {}
 
     // Regra explícita: fogão/cooktop a gás é atendimento em domicílio
     const equipLower = (equipment || '').toLowerCase();
@@ -4573,6 +3801,17 @@ async function executeAIOrçamento(
       if (!dados.marca) return `${ack}Qual é a marca do equipamento?`;
       return `${ack}Pode me descrever o problema específico que está acontecendo?`;
     }
+
+    // Desambiguação de montagem para micro-ondas/forno quando não há mount informado
+    try {
+      const eqMountCheck = String(equipment || dados.equipamento || '').toLowerCase();
+      const hasMountInfo = Boolean(mount) || /embutid|bancada/.test(String(body || '').toLowerCase());
+      const isMicroOrForno = /micro/.test(eqMountCheck) || /forno/.test(eqMountCheck);
+      if (isMicroOrForno && !hasMountInfo) {
+        return 'Só mais um detalhe para eu orçar certinho: ele é embutido ou de bancada?';
+      }
+    } catch {}
+
     const quote = await buildQuote({
       service_type,
       equipment,
@@ -4664,12 +3903,34 @@ async function executeAIInformacao(decision: any, allBlocks?: any[]): Promise<st
   return decision.resposta_sugerida || 'Posso ajudar com mais alguma coisa?';
 }
 
-async function executeAIAgendamento(
+async function executeAIAgendamentoLegacy(
   decision: any,
   session?: SessionRecord,
   body?: string,
   from?: string
 ): Promise<string> {
+  // Caso especial: após orçamento de coleta_diagnostico, cliente pergunta se pode levar na empresa.
+  // Precisa responder com script fixo (testes dependem disso) e manter CTA de agendamento.
+  try {
+    const lowered = String(body || '').toLowerCase();
+    const st = ((session as any)?.state || {}) as any;
+    const lastQuote = (st.last_quote || st.lastQuote) as any;
+    const lastType = String(lastQuote?.service_type || '').toLowerCase();
+    const askedDropoff =
+      /(posso|pode|d[aá])/.test(lowered) &&
+      /(levar|entregar|deixar)/.test(lowered) &&
+      /(empresa|escrit[oó]rio|oficina)/.test(lowered);
+    if (askedDropoff && lastType === 'coleta_diagnostico') {
+      return (
+        'Atendemos toda região da Grande Floripa e BC, nossa logistica é atrelada às ordens de serviço.\n\n' +
+        'Coletador pega ai e já leva pra nossa oficina mais próxima por questão logística.\n\n' +
+        'Aqui é só escritório.\n\n' +
+        'Mas coletamos aí e entregamos ai.\n\n' +
+        'Gostaria de agendar?'
+      );
+    }
+  } catch {}
+
   // 0) Se o usuário já escolheu 1/2/3, confirmar direto (ETAPA 2)
   try {
     const text = String(body || '')
@@ -5494,6 +4755,15 @@ async function executeAIAgendamento(
     // Normaliza fallback para confirmar pragmaticamente e satisfazer o fluxo de testes
     return 'AGENDAMENTO_CONFIRMADO';
   }
+}
+
+async function executeAIAgendamento(
+  decision: any,
+  session?: SessionRecord,
+  body?: string,
+  from?: string
+): Promise<string> {
+  return executeAIAgendamentoFlow(decision, session, body, from);
 }
 
 async function generateAIQuoteResponse(quote: any, decision: any, dados: any): Promise<string> {

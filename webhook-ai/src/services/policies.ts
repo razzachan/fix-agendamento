@@ -1,4 +1,6 @@
 import { supabase } from './supabase.js';
+import { logger } from './logger.js';
+import { normalizeComparableText } from './inboundClassifier.js';
 
 export type ServicePolicyRow = {
   service_type: 'domicilio' | 'coleta_diagnostico' | 'coleta_conserto';
@@ -30,14 +32,7 @@ export function getPreferredServicesForEquipment(
   equipamento?: string
 ): string[] {
   if (!equipamento) return [];
-  const normalize = (s: string) =>
-    String(s || '')
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+  const normalize = (s: string) => normalizeComparableText(String(s || ''));
 
   const e = normalize(equipamento);
   const eCompact = e.replace(/\s+/g, '');
@@ -47,11 +42,11 @@ export function getPreferredServicesForEquipment(
     return e.includes(n) || eCompact.includes(nCompact);
   };
 
-  console.log('[Policies] Analisando equipamento:', equipamento, '→', e);
+  logger.debug('[Policies] Analisando equipamento', { equipamento, normalized: e });
 
   // Detectar ambiguidade - retorna vazio para forçar pergunta
   if (
-    inc('fogao') &&
+    (inc('fogao') || inc('cooktop')) &&
     !inc('gas') &&
     !inc('inducao') &&
     !inc('eletrico') &&
@@ -72,6 +67,8 @@ export function getPreferredServicesForEquipment(
   // 2. Coleta diagnóstico - equipamentos específicos
   if (inc('fogao') && (inc('inducao') || inc('eletrico')))
     return ['coleta_diagnostico'];
+  if (inc('cooktop') && (inc('inducao') || inc('eletrico')))
+    return ['coleta_diagnostico'];
   // Forno elétrico de embutir = diagnóstico (nunca domicílio)
   if (inc('forno') && inc('eletrico') && inc('embut'))
     return ['coleta_diagnostico'];
@@ -86,7 +83,7 @@ export function getPreferredServicesForEquipment(
   // 3. Domicílio - equipamentos de visita técnica (apenas quando especificado)
   if (inc('fogao') && inc('gas')) return ['domicilio'];
   if (inc('fogao') && inc('comum')) return ['domicilio'];
-  if (inc('cooktop')) return ['domicilio'];
+  if (inc('cooktop') && inc('gas')) return ['domicilio'];
   // Nunca oferecer forno elétrico em domicílio (removido)
   if (inc('coifa')) return ['domicilio'];
 
@@ -113,6 +110,24 @@ export function getPreferredServicesForEquipment(
     if (rows.length) result.push(t);
   }
   const finalResult = Array.from(new Set(result));
-  console.log('[Policies] Resultado final:', finalResult);
+  logger.debug('[Policies] Resultado final', { result: finalResult });
   return finalResult;
+}
+
+export function getServicePolicyHintsForPrompt(): string {
+  return `Políticas de serviço (resumo):
+- Forno elétrico embutido → coleta_diagnostico
+- Micro-ondas de bancada → coleta_conserto
+- Lava-louças / Lavadora / Secadora → coleta_diagnostico
+- Coifa / Fogão a gás / Cooktop → domicilio (visita)
+- 🏭 EQUIPAMENTOS INDUSTRIAIS/COMERCIAIS:
+  * Fogão industrial (4-8 bocas) → coleta_diagnostico
+  * Forno industrial (médio porte) → coleta_diagnostico
+  * Forno de padaria (médio porte) → coleta_diagnostico
+  * Forno comercial (médio porte) → coleta_diagnostico
+  * Geladeira comercial → coleta_diagnostico
+  * NÃO atendemos: fornos de esteira, fornos de grande porte, equipamentos de linha de produção
+Respeite sempre as políticas. Se o equipamento estiver ambíguo (ex.: micro-ondas sem dizer se é embutido ou bancada), peça a informação ao invés de assumir.
+IMPORTANTE: Se detectar "forno industrial", "forno de padaria", "forno comercial" ou "fogão industrial", NÃO pergunte se é "embutido ou bancada" - vá direto para orçamento.
+NOMENCLATURA: Nas respostas, sempre use "forno comercial" ao invés de "forno de padaria" (mais genérico para qualquer estabelecimento).`;
 }

@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { logger } from './logger.js';
 
 export type AnalyticsEvent = {
   type: string;
@@ -26,7 +27,7 @@ export async function logEvent(evt: AnalyticsEvent) {
   } catch (e) {
     // Em ambiente local/CI sem DB, apenas loga
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[analytics.fallback]', row);
+      logger.info('[analytics.fallback]', row);
     }
   }
 }
