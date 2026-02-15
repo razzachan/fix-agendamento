@@ -470,7 +470,7 @@ export async function orchestrateInbound(
 
   // INSTALLATION MODE HANDLER (pre-hard gate)
   try {
-    const stIns = (((session as any)?.state) || {}) as any;
+    let stIns = (((session as any)?.state) || {}) as any;
     const txtIns = String(body || '');
     const sigIns = classifyInbound(txtIns);
     const normIns = sigIns.norm;
@@ -480,7 +480,7 @@ export async function orchestrateInbound(
     const looksLikeRepair = sigIns.looksLikeRepair;
 
     const shouldEnterInstallMode = isInstallText && !negatedInstall && !looksLikeRepair;
-    const inInstallMode = !!stIns.installation_mode || shouldEnterInstallMode;
+    let inInstallMode = !!stIns.installation_mode || shouldEnterInstallMode;
 
     // Se o usuário estava em modo instalação mas corrigiu para manutenção/conserto, sair do modo instalação.
     if (stIns.installation_mode && !shouldEnterInstallMode && (negatedInstall || looksLikeRepair)) {
@@ -492,6 +492,21 @@ export async function orchestrateInbound(
         await setSessionState((session as any).id, cleared);
         try { (session as any).state = cleared; } catch {}
       }
+
+      // IMPORTANTE: não continue o fluxo de instalação nesta mesma mensagem,
+      // senão o bot repete a pergunta de embutido/bancada mesmo após a correção de contexto.
+      stIns = cleared;
+      inInstallMode = false;
+
+      // Se o cliente só corrigiu o contexto (sem informar equipamento/problema), peça os dados básicos.
+      try {
+        const g = guessFunnelFields(txtIns) as any;
+        const hasEquip = !!g?.equipamento;
+        const hasProblem = !!g?.problema || !!g?.descricao_problema;
+        if (!hasEquip && !hasProblem) {
+          return 'Perfeito — então é manutenção/conserto. Qual é o equipamento e qual é o problema?';
+        }
+      } catch {}
     }
     if (inInstallMode) {
       const dcIns = (stIns.dados_coletados || {}) as any;
