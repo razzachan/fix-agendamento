@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { logger } from './logger.js';
 
 /**
  * Ensures there is at least one admin user.
@@ -24,7 +25,7 @@ export async function runAdminSeedOnBoot() {
       .eq('role', 'admin');
 
     if (error) {
-      console.warn('[ADMIN-SEED] Could not query admins:', error?.message || error);
+      logger.warn('[ADMIN-SEED] Could not query admins:', error?.message || error);
       return;
     }
 
@@ -40,24 +41,24 @@ export async function runAdminSeedOnBoot() {
           .select()
           .single();
         if (insErr) {
-          console.warn('[ADMIN-SEED] Failed to insert default admin:', insErr?.message || insErr);
+          logger.warn('[ADMIN-SEED] Failed to insert default admin:', insErr?.message || insErr);
         } else {
-          console.log('[ADMIN-SEED] Default admin created:', { id: created?.id, email });
+          logger.info('[ADMIN-SEED] Default admin created:', { id: created?.id, email });
         }
       } catch (e: any) {
-        console.warn('[ADMIN-SEED] Insert threw:', e?.message || e);
+        logger.warn('[ADMIN-SEED] Insert threw:', e?.message || e);
       }
     } else if (count > 1) {
-      console.warn('[ADMIN-SEED] More than one admin detected. Consider consolidating to a single admin for now.', {
+      logger.warn('[ADMIN-SEED] More than one admin detected. Consider consolidating to a single admin for now.', {
         total_admins: count,
       });
     } else {
       // Exactly one admin: OK
       const admin = admins?.[0];
-      console.log('[ADMIN-SEED] Admin present:', { id: admin?.id, email: admin?.email });
+      logger.info('[ADMIN-SEED] Admin present:', { id: admin?.id, email: admin?.email });
     }
   } catch (e: any) {
-    console.warn('[ADMIN-SEED] Unexpected error:', e?.message || e);
+    logger.warn('[ADMIN-SEED] Unexpected error:', e?.message || e);
   }
 }
 

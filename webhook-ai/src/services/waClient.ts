@@ -39,17 +39,50 @@ class WhatsAppClient extends EventEmitter {
   private async fetchLatestWebVersion(): Promise<string | null> {
     try {
       const https = await import('https');
-      const url = 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/last.json';
+      const url = 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/versions.json';
       const data: string = await new Promise((resolve, reject) => {
         https.get(url, (res) => {
+          const { statusCode } = res;
+          if (statusCode && statusCode >= 400) {
+            res.resume();
+            reject(new Error(`HTTP ${statusCode} ao buscar versions.json`));
+            return;
+          }
           let body = '';
           res.on('data', (c) => (body += c.toString()));
           res.on('end', () => resolve(body));
         }).on('error', reject);
       });
       const json = JSON.parse(data);
-      const v = json?.['desktop'] || json?.['whatsapp'] || json?.['web'] || null;
-      return typeof v === 'string' && v.includes('.') ? v : null;
+
+      const pickFirstString = (...values: any[]) => {
+        for (const v of values) {
+          if (typeof v === 'string' && v.includes('.')) return v;
+        }
+        return null;
+      };
+
+      // Preferir estável sempre que possível.
+      // O arquivo versions.json pode variar de formato; tentamos alguns campos comuns.
+      const stable = pickFirstString(
+        json?.currentVersion,
+        json?.currentStable,
+        json?.stable,
+        json?.current?.stable,
+        json?.current?.version,
+        json?.version
+      );
+      const beta = pickFirstString(
+        json?.currentBeta,
+        json?.beta,
+        json?.current?.beta
+      );
+      const alpha = pickFirstString(
+        json?.currentAlpha,
+        json?.alpha,
+        json?.current?.alpha
+      );
+      return stable || beta || alpha;
     } catch (e) {
       console.warn('[WA] fetchLatestWebVersion falhou', (e as any)?.message || e);
       return null;
@@ -245,12 +278,14 @@ class WhatsAppClient extends EventEmitter {
       '--disable-renderer-backgrounding',
       '--disable-features=TranslateUI',
       '--disable-ipc-flooding-protection',
-      '--single-process',
     ];
 
     const args = isRailway ? [...baseArgs, ...railwayArgs] : baseArgs;
     // Forçar um dataPath estável para o cache de sessão (evita reconnect infinito)
-    const defaultData = path.join(os.homedir(), '.wwebjs_auth', 'fixbot-v2');
+    // Railway: se houver Volume montado em /data, esse default permite persistir auth entre deploys.
+    const defaultData = isRailway
+      ? '/data/wwebjs_auth/fixbot-v2'
+      : path.join(os.homedir(), '.wwebjs_auth', 'fixbot-v2');
     const chromeUserData = path.join(os.homedir(), '.wwebjs_chrome');
     const dataPath = process.env.WA_DATA_PATH || defaultData;
     try {
@@ -870,7 +905,36 @@ class WhatsAppClient extends EventEmitter {
   }
 
   public async sendText(to: string, text: string) {
-    return this.client.sendMessage(to, text);
+    try {
+      return await this.client.sendMessage(to, text);
+    } catch (e: any) {
+      const message = String(e?.message || e);
+
+      const isWaRuntimeMismatch =
+        message.includes('markedUnread') ||
+        message.includes('getChat') ||
+        message.includes('Evaluation failed') ||
+        message.includes('Cannot read properties of undefined');
+
+      // Em produção (Railway), já vimos falha de compatibilidade do WA Web:
+      // "Cannot read properties of undefined (reading 'markedUnread')".
+      // Nesses casos, forçar restart com webVersion atualizada e repetir 1x.
+      if (isWaRuntimeMismatch) {
+        console.warn(
+          '[WA] sendText falhou (runtime WA). Forçando restart com webVersion mais recente e retry 1x...',
+          { to, err: message.slice(0, 200) }
+        );
+        const latest = await this.fetchLatestWebVersion();
+        if (latest) {
+          this.overrideWebVersion = latest;
+        }
+        await this.connect(true);
+        await new Promise((res) => setTimeout(res, 5000));
+        return await this.client.sendMessage(to, text);
+      }
+
+      throw e;
+    }
   }
 
   public async reset() {

@@ -14,7 +14,18 @@ async function waitForApi(timeoutMs=15000){
     }catch{}
     await new Promise(r=>setTimeout(r, 300));
   }
-  throw new Error('API não respondeu a tempo');
+  return false;
+}
+
+async function requireApi(t, timeoutMs=15000){
+  const ok = await waitForApi(timeoutMs);
+  if (!ok) {
+    const must = String(process.env.API_TESTS_REQUIRE_API || '').toLowerCase() === 'true';
+    if (must) throw new Error(`API não respondeu a tempo em ${BASE} (API_TESTS_REQUIRE_API=true)`);
+    t.skip(`API offline em ${BASE} (rode a API ou defina API_BASE).`);
+    return false;
+  }
+  return true;
 }
 
 async function post(path, body, retries=2){
@@ -37,8 +48,8 @@ async function post(path, body, retries=2){
   throw last || new Error('Falha no POST');
 }
 
-await test('createAppointment cria evento com logistics_group e service_attendance_type', async () => {
-  await waitForApi();
+await test('createAppointment cria evento com logistics_group e service_attendance_type', async (t) => {
+  if (!(await requireApi(t))) return;
   const now = new Date();
   const toIso = (d)=> new Date(d).toISOString().split('.')[0]+"Z";
   const start = toIso(Date.now()+3*60*60*1000); // +3h p/ TZ

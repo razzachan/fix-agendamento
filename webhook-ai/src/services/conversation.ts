@@ -1,7 +1,10 @@
 import { supabase } from './supabase.js';
 import { getActiveBot } from './botConfig.js';
+import { normalizePeerId } from './peerId.js';
+import { logger } from './logger.js';
 
 export async function ensureThread(contact: string, channel: 'whatsapp' | 'web' = 'whatsapp') {
+  const canonicalContact = normalizePeerId(channel, contact) || contact;
   const bot = await getActiveBot();
   if (!bot) return null;
   const bot_id = bot.id;
@@ -10,7 +13,7 @@ export async function ensureThread(contact: string, channel: 'whatsapp' | 'web' 
     .from('conversation_threads')
     .select('id')
     .eq('bot_id', bot_id)
-    .eq('contact', contact)
+    .eq('contact', canonicalContact)
     .eq('channel', channel)
     .is('closed_at', null)
     .order('started_at', { ascending: false })
@@ -21,11 +24,11 @@ export async function ensureThread(contact: string, channel: 'whatsapp' | 'web' 
 
   const { data, error } = await supabase
     .from('conversation_threads')
-    .insert({ bot_id, contact, channel })
+    .insert({ bot_id, contact: canonicalContact, channel })
     .select('id')
     .single();
   if (error) {
-    console.error('[conversation] create thread error', error);
+    logger.error('[conversation] create thread error', error);
     return null;
   }
   return data.id as string;
@@ -54,6 +57,7 @@ export async function logOutbound(contact: string, content: string) {
 }
 
 export async function closeThread(contact: string) {
+  const canonicalContact = normalizePeerId('whatsapp', contact) || contact;
   const bot = await getActiveBot();
   if (!bot) return;
   const bot_id = bot.id;
@@ -61,7 +65,7 @@ export async function closeThread(contact: string) {
     .from('conversation_threads')
     .select('id')
     .eq('bot_id', bot_id)
-    .eq('contact', contact)
+    .eq('contact', canonicalContact)
     .eq('channel', 'whatsapp')
     .is('closed_at', null)
     .order('started_at', { ascending: false })

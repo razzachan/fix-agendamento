@@ -118,14 +118,3 @@ whatsappRouter.get('/send', async (req, res) => {
     res.status(500).json({ error: true, message: e?.message || String(e) });
   }
 });
-
-// Reset WhatsApp para forçar novo QR
-whatsappRouter.post('/reset', async (_req, res) => {
-  try {
-    if (!requireEnabled(res)) return;
-    await waClient.reset();
-    res.json({ success: true, message: 'WhatsApp resetado, novo QR será gerado' });
-  } catch (e: any) {
-    res.status(500).json({ error: true, message: e?.message || String(e) });
-  }
-});

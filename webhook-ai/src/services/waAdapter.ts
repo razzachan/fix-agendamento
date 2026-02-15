@@ -6,6 +6,86 @@ import { processFeedback } from './modules/feedback.js';
 import { tryHandleByFlows } from './flowEngine.js';
 import { orchestrateInbound } from './conversationOrchestrator.js';
 import { getOrCreateSession, logMessage } from './sessionStore.js';
+import { classifyInbound, normalizeInboundText } from './inboundClassifier.js';
+
+const FIX_API_BASE = process.env.FIX_API_BASE || 'https://api.fixfogoes.com.br';
+const FIX_BOT_TOKEN = process.env.FIX_BOT_TOKEN || process.env.BOT_TOKEN || '';
+function buildFixApiUrl(pathname: string) {
+  const base = FIX_API_BASE.replace(/\/+$/, '');
+  const p = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return `${base}${p}`;
+}
+
+function normalizePhoneForCrm(from: string) {
+  const raw = String(from || '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`;
+  if (digits.length === 11) return `+55${digits}`;
+  if (digits.length >= 10) return `+${digits}`;
+  return digits;
+}
+
+const __recentCrmSync = new Map<string, number>();
+function __shouldCrmSync(key: string, windowMs = 6000) {
+  const now = Date.now();
+  const last = __recentCrmSync.get(key) || 0;
+  if (now - last < windowMs) return false;
+  __recentCrmSync.set(key, now);
+  if (__recentCrmSync.size > 5000) {
+    for (const [k, v] of __recentCrmSync) {
+      if (now - v > 5 * 60 * 1000) __recentCrmSync.delete(k);
+    }
+  }
+  return true;
+}
+
+async function syncLeadToCrmFromBot(params: {
+  from: string;
+  message: string;
+  sessionId: string;
+  meta?: { id?: string };
+}) {
+  try {
+    if (!FIX_BOT_TOKEN) return;
+    const phone = normalizePhoneForCrm(params.from);
+    if (!phone) return;
+
+    const key = params.meta?.id
+      ? `id::${params.sessionId}::${String(params.meta.id)}`
+      : `txt::${params.sessionId}::${params.message}`;
+    if (!__shouldCrmSync(key)) return;
+
+    const fresh = await getOrCreateSession('whatsapp', params.from);
+    const state = (fresh as any)?.state || {};
+    const dados = (state?.dados_coletados || {}) as any;
+    const extracted_data: any = {
+      customer_name: dados?.nome || dados?.cliente_nome || dados?.name || undefined,
+      address: dados?.endereco || dados?.address || undefined,
+      equipment_type: dados?.equipamento || dados?.equipment || undefined,
+      problem: dados?.problema || dados?.description || undefined,
+      urgency: dados?.urgencia || dados?.urgency || undefined,
+      brand: dados?.marca || undefined,
+    };
+
+    await fetch(buildFixApiUrl('/api/leads/sync-from-bot'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${FIX_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        phone,
+        message: params.message,
+        state,
+        extracted_data,
+      }),
+    }).catch(() => null);
+  } catch (e) {
+    console.warn('[Adapter] CRM sync failed (ignored):', String((e as any)?.message || e));
+  }
+}
 
 
 // Feature flags para controlar mensagens proativas (política atual: reativo por padrão)
@@ -225,6 +305,14 @@ export async function setupWAInboundAdapter() {
             const session = await getOrCreateSession('whatsapp', msg.from);
             try { __markInbound(session.id, meta as any); } catch {}
             const reply = await orchestrateInbound(msg.from, transcript, session);
+
+            // CRM sync (best-effort) com delay para pegar estado já persistido
+            try {
+              setTimeout(() => {
+                void syncLeadToCrmFromBot({ from: msg.from, message: transcript, sessionId: session.id, meta: meta as any });
+              }, 1200);
+            } catch {}
+
             if (reply) {
               let outText: string;
               if (typeof reply === 'string') outText = reply;
@@ -523,6 +611,13 @@ export async function setupWAInboundAdapter() {
     // Carregar/abrir sessão e registrar inbound
     const session = await getOrCreateSession('whatsapp', from);
     await logMessage(session.id, 'in', text);
+
+    // CRM sync (best-effort) com delay para pegar estado já persistido pelo orquestrador
+    try {
+      setTimeout(() => {
+        void syncLeadToCrmFromBot({ from, message: text, sessionId: session.id, meta: meta as any });
+      }, 1200);
+    } catch {}
     try {
       const { logEvent } = await import('./analytics.js');
       await logEvent({ type: 'msg:in', session_id: session.id, from, channel: 'whatsapp', data: { text } });
@@ -538,11 +633,8 @@ export async function setupWAInboundAdapter() {
       await (await import('./sessionStore.js')).setSessionState(session.id, st0);
     } catch {}
     // Detectar reset explícito de contexto ("novo atendimento", etc.) antes de qualquer reengajamento/IA
-    const norm = text
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .trim()
-      .toLowerCase();
+    const signals = classifyInbound(text);
+    const norm = signals.norm;
     if (looksLikeContextSwitch(norm)) {
       try {
         // Limpa completamente o estado da sessão
@@ -559,8 +651,7 @@ export async function setupWAInboundAdapter() {
     }
 
     // Saudações curtas: se reengajamento está desligado, não chamar IA; pedir dados básicos
-    const isGreetingOnly = /^(ola|oi|opa|e ai|tudo bem|bom dia|boa tarde|boa noite)[.!? ]*$/.test(norm);
-    if (isGreetingOnly && !REENGAGE_ENABLED) {
+    if (signals.isGreetingOnly && !REENGAGE_ENABLED) {
       const msg = 'Oi! Para te ajudar rapidinho, me diga: qual é o equipamento e qual o problema?';
       await sendTextOnce(session.id, from, msg, meta as any);
       try {
@@ -577,14 +668,8 @@ export async function setupWAInboundAdapter() {
       // Não envia reengajamento – segue para coleta natural
     } else
     if (REENGAGE_ENABLED) try {
-      const norm = text
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .trim()
-        .toLowerCase();
-      const isGreetingOnly = /^(ola|oi|bom dia|boa tarde|boa noite|opa|e ai|tudo bem)[.!? ]*$/.test(
-        norm
-      );
+      const norm = normalizeInboundText(text);
+      const isGreetingOnly = classifyInbound(text).isGreetingOnly;
       const st = (session?.state || {}) as any;
       const lastIn = st.last_in_at ? new Date(st.last_in_at) : null;
       const lastOut = st.last_out_at ? new Date(st.last_out_at) : null;
@@ -659,13 +744,7 @@ export async function setupWAInboundAdapter() {
           last_out_at: new Date().toISOString(),
         });
         // Se a mensagem do cliente for apenas uma saudação, não prossiga para evitar duas mensagens em sequência
-        const norm = text
-          .normalize('NFD')
-          .replace(/\p{Diacritic}/gu, '')
-          .trim()
-          .toLowerCase();
-        const isJustGreeting = /^(ola|oi|bom dia|boa tarde|boa noite)[.!? ]*$/.test(norm);
-        if (isJustGreeting) return;
+        if (classifyInbound(text).isGreetingOnly) return;
       }
     }
     } catch {}
@@ -691,9 +770,7 @@ export async function setupWAInboundAdapter() {
     }
     // Short-circuit: pedidos de STATUS antes de acionar LLM/orquestrador
     try {
-      const lowered0 = text.toLowerCase();
-      const wantsStatus0 = /\b(status|andamento|atualiza[cç][aã]o|novidade|not[ií]cia|previs[aã]o|quando.*(t[eé]cnico|coleta|entrega)|chegou.*pe[çc]a|os\s*#?\d+)\b/i.test(lowered0);
-      if (wantsStatus0) {
+      if (classifyInbound(text).wantsStatus) {
         await processStatus(asWebhookBody(from, text));
         return;
       }
@@ -701,13 +778,7 @@ export async function setupWAInboundAdapter() {
 
     // Despedidas/adiamento: resposta empática e encerra sem empurrar fluxo
     try {
-      const norm2 = text
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .trim()
-        .toLowerCase();
-      const byeOrDefer = /\b(tchau|ate mais|ate logo|obrigado|obrigada|valeu|depois falo|depois eu falo|depois retorno|qualquer coisa.*(volto|falo).*(contigo|com voce)|estou levantando outros valores|estou cotando|pegando outros orcamentos|vou ver (aqui )?e retorno)\b/.test(norm2);
-      if (byeOrDefer) {
+      if (classifyInbound(text).isDeferralOrBye) {
         const msg = 'Perfeito, sem problema! Fico à disposição. Quando quiser retomar, é só mandar mensagem por aqui. Abraço!';
         await waClient.sendText(from, msg);
         await logMessage(session.id, 'out', msg);

@@ -1,7 +1,14 @@
 import express from 'express';
 import { supabase } from '../config/supabase.js';
+import { requireBotOrAdmin } from '../middleware/botOrAdmin.js';
 
 const router = express.Router();
+
+function coercePeriodDays(input, fallback = 30) {
+  const n = parseInt(String(input ?? ''), 10);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(Math.max(n, 1), 365);
+}
 
 router.get('/kpis', async (req, res) => {
   try {
@@ -93,6 +100,128 @@ router.get('/pricing-divergences', async (req, res) => {
   } catch (e) {
     console.error('[analytics/pricing-divergences] error', e);
     res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// GET /api/analytics/crm
+router.get('/crm', requireBotOrAdmin, async (req, res) => {
+  try {
+    const periodDays = coercePeriodDays(req.query?.period_days, 30);
+
+    // Use view directly for default period (30d)
+    if (periodDays === 30) {
+      const { data, error } = await supabase
+        .from('crm_dashboard_metrics')
+        .select('*')
+        .maybeSingle();
+
+      if (error) throw error;
+      const row = data || {};
+
+      const metrics = {
+        novos_leads: row.novos_leads ?? 0,
+        orcamentos_enviados: row.orcamentos_enviados ?? 0,
+        aguardando_resposta: row.aguardando_resposta ?? 0,
+        interessados: row.interessados ?? 0,
+        agendamentos_pendentes: row.agendamentos_pendentes ?? 0,
+        coletas_agendadas: row.coletas_agendadas ?? 0,
+        em_diagnostico: row.em_diagnostico ?? 0,
+        orcamentos_detalhados: row.orcamentos_detalhados ?? 0,
+        aprovados: row.aprovados ?? 0,
+        em_reparo: row.em_reparo ?? 0,
+        prontos_entrega: row.prontos_entrega ?? 0,
+        entregues: row.entregues ?? 0,
+        perdidos: row.perdidos ?? 0,
+        leads_quentes: row.leads_quentes ?? 0,
+        leads_mornos: row.leads_mornos ?? 0,
+        leads_frios: row.leads_frios ?? 0,
+        leads_congelados: row.leads_congelados ?? 0,
+      };
+
+      return res.json({ success: true, metrics, period_days: row.period_days ?? 30 });
+    }
+
+    // Optional period: compute from pre_schedules (same logic as view)
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - periodDays);
+    const fromIso = fromDate.toISOString();
+
+    const statuses = [
+      'novo_lead',
+      'orcamento_enviado',
+      'aguardando_resposta',
+      'interessado',
+      'agendamento_pendente',
+      'coleta_agendada',
+      'em_diagnostico',
+      'orcamento_detalhado',
+      'aprovado',
+      'em_reparo',
+      'pronto_entrega',
+      'entregue',
+      'perdido',
+    ];
+
+    const metrics = {
+      novos_leads: 0,
+      orcamentos_enviados: 0,
+      aguardando_resposta: 0,
+      interessados: 0,
+      agendamentos_pendentes: 0,
+      coletas_agendadas: 0,
+      em_diagnostico: 0,
+      orcamentos_detalhados: 0,
+      aprovados: 0,
+      em_reparo: 0,
+      prontos_entrega: 0,
+      entregues: 0,
+      perdidos: 0,
+      leads_quentes: 0,
+      leads_mornos: 0,
+      leads_frios: 0,
+      leads_congelados: 0,
+    };
+
+    const statusToKey = {
+      novo_lead: 'novos_leads',
+      orcamento_enviado: 'orcamentos_enviados',
+      aguardando_resposta: 'aguardando_resposta',
+      interessado: 'interessados',
+      agendamento_pendente: 'agendamentos_pendentes',
+      coleta_agendada: 'coletas_agendadas',
+      em_diagnostico: 'em_diagnostico',
+      orcamento_detalhado: 'orcamentos_detalhados',
+      aprovado: 'aprovados',
+      em_reparo: 'em_reparo',
+      pronto_entrega: 'prontos_entrega',
+      entregue: 'entregues',
+      perdido: 'perdidos',
+    };
+
+    // Fetch minimal fields and aggregate in JS (keeps compatibility without RPC)
+    const { data, error } = await supabase
+      .from('pre_schedules')
+      .select('crm_status, crm_score')
+      .gte('created_at', fromIso)
+      .in('crm_status', statuses);
+
+    if (error) throw error;
+
+    for (const row of data || []) {
+      const key = statusToKey[row.crm_status];
+      if (key) metrics[key] += 1;
+
+      const s = Number(row.crm_score ?? 0);
+      if (s >= 80) metrics.leads_quentes += 1;
+      else if (s >= 60) metrics.leads_mornos += 1;
+      else if (s >= 40) metrics.leads_frios += 1;
+      else metrics.leads_congelados += 1;
+    }
+
+    return res.json({ success: true, metrics, period_days: periodDays });
+  } catch (e) {
+    console.error('[analytics/crm] error', e);
+    return res.status(500).json({ success: false, error: 'crm_metrics_failed', message: e?.message });
   }
 });
 

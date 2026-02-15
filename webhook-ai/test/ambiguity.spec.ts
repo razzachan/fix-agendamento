@@ -58,3 +58,43 @@ describe('Anti-loop de agendamento', () => {
     expect(out).toBeTruthy();
   });
 });
+
+describe('Desambiguação de mount (micro/forno)', () => {
+  const originalFake = process.env.LLM_FAKE_JSON;
+
+  afterEach(() => {
+    process.env.LLM_FAKE_JSON = originalFake || '';
+  });
+
+  it('pergunta embutido/bancada quando micro-ondas vem sem mount', async () => {
+    process.env.LLM_FAKE_JSON = JSON.stringify({
+      intent: 'orcamento_equipamento',
+      acao_principal: 'gerar_orcamento',
+      dados_extrair: { equipamento: 'micro-ondas', marca: 'LG', problema: 'não esquenta' },
+    });
+    const out = await orchestrateInbound('whatsapp:+550000', 'não esquenta', {
+      id: 's4',
+      channel: 'whatsapp',
+      peer: '+550000',
+      state: {},
+    } as any);
+    const text = typeof out === 'string' ? out : (out as any).text || '';
+    expect(text.toLowerCase()).toMatch(/embutid|bancada/);
+  });
+
+  it('pergunta embutido/bancada quando forno vem sem mount', async () => {
+    process.env.LLM_FAKE_JSON = JSON.stringify({
+      intent: 'orcamento_equipamento',
+      acao_principal: 'gerar_orcamento',
+      dados_extrair: { equipamento: 'forno elétrico', marca: 'Philco', problema: 'não esquenta' },
+    });
+    const out = await orchestrateInbound('whatsapp:+550000', 'não esquenta', {
+      id: 's5',
+      channel: 'whatsapp',
+      peer: '+550000',
+      state: {},
+    } as any);
+    const text = typeof out === 'string' ? out : (out as any).text || '';
+    expect(text.toLowerCase()).toMatch(/embutid|bancada/);
+  });
+});

@@ -59,6 +59,13 @@ import AI from './pages/AI';
 import BotStudio from './pages/BotStudio';
 import AIRouterDashboard from './pages/ai-router-dashboard';
 
+// CRM صفحات
+import CRMDashboard from './pages/crm/CRMDashboard';
+import LeadsList from './pages/crm/LeadsList';
+import LeadDetail from './pages/crm/LeadDetail';
+import LeadsKanban from './pages/crm/LeadsKanban';
+import CRMAnalytics from './pages/crm/CRMAnalytics';
+
 import WhatsApp from './pages/WhatsApp';
 import AdminBotTracing from './pages/AdminBotTracing';
 import ForceLogout from './pages/ForceLogout';
@@ -296,6 +303,48 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <AppLayout><Analytics /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* CRM (admin) */}
+              <Route
+                path="/crm"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><CRMDashboard /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/crm/leads"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><LeadsList /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/crm/leads/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><LeadDetail /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/crm/kanban"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><LeadsKanban /></AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/crm/analytics"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AppLayout><CRMAnalytics /></AppLayout>
                   </ProtectedRoute>
                 }
               />

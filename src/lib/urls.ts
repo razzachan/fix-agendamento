@@ -1,4 +1,6 @@
 export function backendBase() {
+  const env = (import.meta as any)?.env?.VITE_API_URL as string | undefined;
+  if (env && String(env).trim()) return String(env).trim().replace(/\/+$/, '');
   if (typeof window !== 'undefined') {
     const host = window.location.hostname || 'localhost';
     return `http://${host}:3001`;

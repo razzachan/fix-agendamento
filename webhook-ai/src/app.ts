@@ -7,6 +7,7 @@ import { aiPreviewRouter } from './routes/aiPreview.js';
 import { pauseRouter } from './routes/pause.js';
 import { runAdminSeedOnBoot } from './services/adminSeed.js';
 import { getOrCreateSession } from './services/sessionStore.js';
+import { normalizePeerId } from './services/peerId.js';
 
 const Env = z.object({
   PORT: z.string().default(process.env.PORT || '3100'),
@@ -216,15 +217,41 @@ app.get('/admin/messages', async (req, res) => {
     // Resolve session_id via channel+peer (se fornecidos)
     let effectiveSessionId = session_id || '';
     if (!effectiveSessionId && (channel || peer)) {
-      let sessQ = sb.from('bot_sessions').select('id, channel, peer_id');
-      if (channel) sessQ = sessQ.eq('channel', channel);
-      if (peer) sessQ = sessQ.eq('peer_id', peer);
-      const { data: sess, error: sessErr } = await sessQ.order('created_at', { ascending: false }).limit(1);
-      if (sessErr) {
-        return res.status(500).json({ ok: false, error: sessErr.message || String(sessErr) });
+      // Em produção, bot_sessions pode não ter created_at/updated_at.
+      // Então NÃO usamos order em bot_sessions. Se houver múltiplas sessões,
+      // derivamos a sessão mais recente via bot_messages.created_at.
+      let sessRows: any[] = [];
+      {
+        let q = sb.from('bot_sessions').select('id');
+        if (channel) q = q.eq('channel', channel);
+        if (peer) q = q.eq('peer_id', peer);
+        const { data, error } = await q.limit(50);
+        if (error) {
+          return res.status(500).json({ ok: false, error: error.message || String(error) });
+        }
+        sessRows = Array.isArray(data) ? (data as any[]) : [];
       }
-      const s0: any = Array.isArray(sess) ? sess[0] : null;
-      if (s0?.id) effectiveSessionId = String(s0.id);
+
+      if (sessRows.length === 1 && sessRows[0]?.id) {
+        effectiveSessionId = String(sessRows[0].id);
+      } else if (sessRows.length > 1) {
+        const ids = sessRows
+          .map((r) => String(r?.id || ''))
+          .filter(Boolean)
+          .slice(0, 50);
+        if (ids.length > 0) {
+          const { data: lastMsg, error: lastErr } = await sb
+            .from('bot_messages')
+            .select('session_id, created_at')
+            .in('session_id', ids)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          if (!lastErr) {
+            const m0: any = Array.isArray(lastMsg) ? lastMsg[0] : null;
+            if (m0?.session_id) effectiveSessionId = String(m0.session_id);
+          }
+        }
+      }
     }
 
     let q = sb
@@ -271,6 +298,181 @@ app.get('/admin/messages', async (req, res) => {
     });
 
     res.json({ ok: true, limit, filters: { channel: channel || null, peer: peer || null, session_id: effectiveSessionId || null, direction: dir }, messages: enriched });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) });
+  }
+});
+
+// Admin: últimas conversas (sessões) com métricas simples
+// GET /admin/conversations?limit=100&channel=whatsapp&peer=5548...
+app.get('/admin/conversations', async (req, res) => {
+  try {
+    const adminKey = process.env.ADMIN_API_KEY;
+    const provided = String(req.headers['x-admin-key'] || '');
+    if (!adminKey || provided !== adminKey) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+      return res.status(500).json({ ok: false, error: 'missing_supabase_env' });
+    }
+
+    const limitRaw = Number(req.query.limit ?? 100);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, Math.trunc(limitRaw))) : 100;
+
+    const channel = String(req.query.channel || '').trim();
+    const peer = String(req.query.peer || '').trim();
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const sb = createClient(url, key, { auth: { persistSession: false } });
+
+    // Importante: não dependemos de bot_sessions.created_at/updated_at (podem não existir).
+    // Derivamos as "últimas conversas" via bot_messages.created_at (que existe porque /admin/messages usa).
+
+    // Buscar uma janela recente de mensagens e derivar as sessões a partir dela.
+    // Nota: evitamos `.in('session_id', manyIds)` porque isso pode gerar URLs enormes e falhar (fetch failed).
+    const msgLimit = Math.min(5000, Math.max(800, limit * 120));
+    const msgQ = sb
+      .from('bot_messages')
+      .select('session_id, direction, body, created_at')
+      .order('created_at', { ascending: false })
+      .limit(msgLimit);
+
+    const { data: msgs, error: msgErr } = await msgQ;
+    if (msgErr) {
+      return res.status(500).json({ ok: false, error: msgErr.message || String(msgErr) });
+    }
+
+    const rows: any[] = Array.isArray(msgs) ? msgs : [];
+    const sessionIdsOrdered: string[] = [];
+    const seen = new Set<string>();
+    for (const m of rows) {
+      const sid = String(m.session_id || '');
+      if (!sid || seen.has(sid)) continue;
+      seen.add(sid);
+      sessionIdsOrdered.push(sid);
+      // Pegue mais candidatos do que o necessário para permitir filtrar por canal/peer depois.
+      if (sessionIdsOrdered.length >= Math.min(200, limit * 5)) break;
+    }
+    const candidateSessionIds = sessionIdsOrdered;
+
+    // Carrega metadados básicos das sessões
+    let sessRows: any[] = [];
+    if (candidateSessionIds.length > 0) {
+      const { data: sess, error: sErr } = await sb
+        .from('bot_sessions')
+        .select('id, channel, peer_id')
+        .in('id', candidateSessionIds);
+      if (sErr) {
+        return res.status(500).json({ ok: false, error: sErr.message || String(sErr) });
+      }
+      sessRows = Array.isArray(sess) ? sess : [];
+    }
+
+    const sessionMetaById = new Map<string, any>();
+    for (const s of sessRows) sessionMetaById.set(String(s.id), s);
+
+    // Aplicar filtros de canal/peer (se houver) e limitar ao total pedido
+    const sessionIds = candidateSessionIds
+      .filter((sid) => {
+        const meta = sessionMetaById.get(String(sid));
+        if (!meta) return false;
+        if (channel && String(meta.channel) !== channel) return false;
+        if (peer && String(meta.peer_id) !== peer) return false;
+        return true;
+      })
+      .slice(0, limit);
+
+    const statsBySession = new Map<
+      string,
+      {
+        in_count: number;
+        out_count: number;
+        out_chars_total: number;
+        out_short_count: number;
+        last_in_at: string | null;
+        last_out_at: string | null;
+        last_in_body: string | null;
+        last_out_body: string | null;
+      }
+    >();
+
+    for (const id of sessionIds) {
+      statsBySession.set(id, {
+        in_count: 0,
+        out_count: 0,
+        out_chars_total: 0,
+        out_short_count: 0,
+        last_in_at: null,
+        last_out_at: null,
+        last_in_body: null,
+        last_out_body: null,
+      });
+    }
+
+    // Reaproveita o mesmo window de mensagens já carregado (rows)
+    for (const m of rows) {
+      const sid = String(m.session_id || '');
+      const st = statsBySession.get(sid);
+      if (!st) continue;
+
+      const dir = String(m.direction || '');
+      const body = typeof m.body === 'string' ? m.body : m.body == null ? '' : String(m.body);
+      const at = m.created_at ? String(m.created_at) : null;
+
+      if (dir === 'in') {
+        st.in_count++;
+        if (!st.last_in_at && at) {
+          st.last_in_at = at;
+          st.last_in_body = body.slice(0, 200);
+        }
+      } else if (dir === 'out') {
+        st.out_count++;
+        st.out_chars_total += body.length;
+        if (body.length <= 240) st.out_short_count++;
+        if (!st.last_out_at && at) {
+          st.last_out_at = at;
+          st.last_out_body = body.slice(0, 200);
+        }
+      }
+    }
+
+    const enriched = sessionIds.map((sid) => {
+      const s = sessionMetaById.get(String(sid)) || { id: sid, channel: null, peer_id: null };
+      const st = statsBySession.get(sid) || {
+        in_count: 0,
+        out_count: 0,
+        out_chars_total: 0,
+        out_short_count: 0,
+        last_in_at: null,
+        last_out_at: null,
+        last_in_body: null,
+        last_out_body: null,
+      };
+      const avgOutChars = st.out_count > 0 ? Math.round(st.out_chars_total / st.out_count) : 0;
+      const pctShortOut = st.out_count > 0 ? Math.round((st.out_short_count / st.out_count) * 100) : 0;
+      return {
+        id: s.id,
+        channel: s.channel ?? null,
+        peer_id: s.peer_id ?? null,
+        metrics: {
+          in_count: st.in_count,
+          out_count: st.out_count,
+          avg_out_chars: avgOutChars,
+          pct_out_short_240: pctShortOut,
+          last_in_at: st.last_in_at,
+          last_out_at: st.last_out_at,
+        },
+        last: {
+          in: st.last_in_body,
+          out: st.last_out_body,
+        },
+      };
+    });
+
+    res.json({ ok: true, limit, filters: { channel: channel || null, peer: peer || null }, sessions: enriched });
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e?.message || String(e) });
   }
@@ -330,7 +532,7 @@ app.post('/test-session', async (req, res) => {
     if (!from) return res.status(400).json({ error: 'Missing from' });
 
     console.log('[TEST-SESSION] Testando sessão para', from);
-    const session = await getOrCreateSession('whatsapp', String(from));
+    const session = await getOrCreateSession('whatsapp', normalizePeerId('whatsapp', String(from)) || String(from));
     console.log('[TEST-SESSION] Sessão criada/recuperada:', session.id);
 
     res.json({ ok: true, from, session_id: session.id, state: session.state });
@@ -359,7 +561,7 @@ app.post('/test-message', async (req, res) => {
 
     // Importar e usar o orchestrator diretamente com sessão persistente
     const { orchestrateInbound } = await import('./services/conversationOrchestrator.js');
-    const session = await getOrCreateSession('whatsapp', String(from));
+    const session = await getOrCreateSession('whatsapp', normalizePeerId('whatsapp', String(from)) || String(from));
     const reply = await orchestrateInbound(from, body, session);
 
     const preview =
@@ -404,7 +606,7 @@ app.post('/test-media', async (req, res) => {
 
     const { getOrCreateSession, setSessionState } = await import('./services/sessionStore.js');
     const { orchestrateInbound } = await import('./services/conversationOrchestrator.js');
-    const session = await getOrCreateSession('whatsapp', String(from));
+    const session = await getOrCreateSession('whatsapp', normalizePeerId('whatsapp', String(from)) || String(from));
 
     let result: any = { ok: true, from, mimetype };
 

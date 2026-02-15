@@ -16,6 +16,7 @@ dist-ssr
 android/
 ios/
 temp-check/
+railway_bundle/
 backup_projeto_*/
 *.zip
 *.apk

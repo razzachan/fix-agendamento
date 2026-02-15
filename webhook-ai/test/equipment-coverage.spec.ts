@@ -63,6 +63,19 @@ describe('Cobertura por equipamento - políticas e formatação', () => {
     expect(text).not.toContain('valor de manutenção fica em r$');
   });
 
+  // 3b) Cooktop elétrico → coleta diagnóstico (não domicílio)
+  it('Cooktop elétrico: coleta diagnóstico (não domicílio)', async () => {
+    const text = await runWithLLMFake('cooktop elétrico não esquenta', {
+      equipamento: 'cooktop elétrico',
+      marca: 'Fischer',
+      problema: 'não esquenta',
+    });
+    const askedBrand = text.includes('qual é a marca') || text.includes('marca do equipamento');
+    const diag = text.includes('coleta diagnóstico') || text.includes('coletamos, diagnosticamos');
+    expect(askedBrand || diag).toBe(true);
+    expect(text).not.toContain('valor de manutenção fica em r$');
+  });
+
   // 4) Forno elétrico embutido → coleta diagnóstico
   it('Forno elétrico embutido: coleta diagnóstico', async () => {
     const text = await runWithLLMFake('meu forno elétrico embutido não esquenta', {
@@ -165,7 +178,8 @@ describe('Cobertura por equipamento - políticas e formatação', () => {
       marca: 'Tramontina',
       problema: 'não liga',
     });
-    expect(text).toContain('valor de manutenção fica em r$');
+    expect(text).toMatch(/visita\s+diagn[oó]stic/i);
+    expect(text).toMatch(/r\$\s*\d+/i);
     expect(text).not.toContain('coleta diagnóstico');
   });
 
@@ -179,7 +193,7 @@ describe('Cobertura por equipamento - políticas e formatação', () => {
     expect(text).toContain('coletamos, diagnosticamos');
     expect(text).toContain('coleta diagnóstico');
     // causas específicas (injetadas no quote)
-    expect(text).toContain('isso pode ser problema de');
+    expect(/(isso pode ser problema de|poss[íi]veis causas)/i.test(text)).toBe(true);
   });
 });
 

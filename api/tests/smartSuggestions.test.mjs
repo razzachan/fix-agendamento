@@ -14,7 +14,18 @@ async function waitForApi(timeoutMs=15000){
     }catch{}
     await new Promise(r=>setTimeout(r, 300));
   }
-  throw new Error('API não respondeu a tempo');
+  return false;
+}
+
+async function requireApi(t, timeoutMs=15000){
+  const ok = await waitForApi(timeoutMs);
+  if (!ok) {
+    const must = String(process.env.API_TESTS_REQUIRE_API || '').toLowerCase() === 'true';
+    if (must) throw new Error(`API não respondeu a tempo em ${BASE} (API_TESTS_REQUIRE_API=true)`);
+    t.skip(`API offline em ${BASE} (rode a API ou defina API_BASE).`);
+    return false;
+  }
+  return true;
 }
 
 async function post(path, body, retries=2){
@@ -37,8 +48,8 @@ async function post(path, body, retries=2){
   throw last || new Error('Falha no POST');
 }
 
-await test('smartSuggestions Grupo A/B retorna 2 opções', async () => {
-  await waitForApi();
+await test('smartSuggestions Grupo A/B retorna 2 opções', async (t) => {
+  if (!(await requireApi(t))) return;
   const { status, ok, data } = await post('/api/bot/tools/smartSuggestions', { address:'Florianópolis' });
   assert.equal(status, 200);
   assert.equal(ok, true);
@@ -46,8 +57,8 @@ await test('smartSuggestions Grupo A/B retorna 2 opções', async () => {
   assert.ok(data.suggestions.length > 0);
 });
 
-await test('smartSuggestions Grupo C respeita regras de C', async () => {
-  await waitForApi();
+await test('smartSuggestions Grupo C respeita regras de C', async (t) => {
+  if (!(await requireApi(t))) return;
   const { status, ok, data } = await post('/api/bot/tools/smartSuggestions', { address:'Balneário Camboriú' });
   assert.equal(status, 200);
   assert.equal(ok, true);

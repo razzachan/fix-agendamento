@@ -83,10 +83,14 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
 
     // Preencher pistas com classificação visual salva na sessão
     let sessionState: any = undefined;
+    let sessionRec: any = undefined;
     try {
       const { getOrCreateSession } = await import('./sessionStore.js');
+      const { normalizePeerId } = await import('./peerId.js');
       if (context?.peer) {
-        const s = await getOrCreateSession('whatsapp', context.peer);
+        const normalized = normalizePeerId('whatsapp', context.peer) || context.peer;
+        const s = await getOrCreateSession('whatsapp', normalized);
+        sessionRec = s;
         sessionState = s?.state || {};
         if (
           !input.segment &&
@@ -115,9 +119,12 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
       const problemText = String(input.problem || input.description || '').trim();
       if (!input.brand || !problemText) {
         if (!input.brand && !problemText)
-          return 'Antes do orçamento: qual é a marca do equipamento e qual é o problema específico?';
-        if (!input.brand) return 'Qual é a marca do equipamento?';
-        return 'Pode me descrever o problema específico que está acontecendo?';
+          return (
+            'Antes de eu te passar o orçamento, preciso de 2 informações rápidas: a marca do equipamento e o problema específico (ex.: não acende, não esquenta, vazando, fazendo barulho). Pode me dizer?'
+          );
+        if (!input.brand)
+          return 'Qual é a marca do equipamento? (Ex.: Brastemp, Consul, Fischer, Electrolux...)';
+        return 'O que exatamente está acontecendo com ele? (Me descreva o defeito específico)';
       }
       // Normalizar para as ferramentas downstream
       input.problem = input.problem || problemText;
@@ -203,12 +210,35 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
           telefone: phone,
           urgente: input.urgente,
         };
-        return await aiScheduleStart(payload);
+        const result: any = await aiScheduleStart(payload);
+        try {
+          if (sessionRec?.id) {
+            const { setSessionState } = await import('./sessionStore.js');
+            const horarios =
+              (result && (result.horarios_oferecidos || result.suggestions || result.slots)) || null;
+            await setSessionState(sessionRec.id, {
+              ai_schedule_context: payload,
+              ai_schedule_suggestions: horarios,
+              ai_schedule_suggestions_ts: Date.now(),
+            });
+          }
+        } catch {}
+        return result;
       }
       case 'aiScheduleConfirm': {
         const phone = normalizePeerToPhone(context?.peer) || input.telefone || input.phone;
         const opt = String(input.opcao_escolhida || input.choice || '').trim();
-        return await aiScheduleConfirm({ telefone: phone!, opcao_escolhida: opt });
+        // Enriquecer confirmação com o contexto/sugestões salvos na sessão.
+        let ctx: any = undefined;
+        try {
+          const saved = sessionState || {};
+          ctx = {
+            ...(saved.ai_schedule_context || {}),
+            horarios_oferecidos: saved.ai_schedule_suggestions || undefined,
+            suggestions: saved.ai_schedule_suggestions || undefined,
+          };
+        } catch {}
+        return await aiScheduleConfirm({ telefone: phone!, opcao_escolhida: opt, context: ctx });
       }
       default:
         return null;

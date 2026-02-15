@@ -97,6 +97,7 @@ export function buildSystemPrompt(
   contextBlocks?: Array<{ key: string; description?: string; variables?: Record<string, string> }>
 ): string {
   const parts: string[] = [];
+  const style = String(process.env.LLM_STYLE || '').toLowerCase();
   parts.push(
     basePrompt ||
       'Você é um assistente brasileiro da Fix Fogões. Seja natural, amigável e genuinamente humano! 🇧🇷\n\n' +
@@ -107,6 +108,17 @@ export function buildSystemPrompt(
   if (contextBlocks && contextBlocks.length) {
     const ctx = contextBlocks.map((b) => `[${b.key}] ${b.description || ''}`.trim()).join('\n');
     parts.push('Contextos relevantes:\n' + ctx);
+  }
+
+  if (style === 'claude') {
+    parts.push(
+      'Estilo (modo claude):\n' +
+        '- Escreva de forma clara e completa (não telegráfico).\n' +
+        '- Use parágrafos curtos; quando ajudar, use listas/etapas.\n' +
+        '- Faça perguntas de esclarecimento objetivas quando faltar dado (no máx. 2).\n' +
+        '- Evite emojis e gírias em excesso; mantenha tom humano e profissional.\n' +
+        '- Não invente fatos, valores ou procedimentos fora do escopo.'
+    );
   }
   parts.push(
     'Regras: 1) Só prometa o que o sistema permite. 2) Se faltar dado, peça educadamente. 3) Nunca invente preços fora do mecanismo de orçamento. 4) Responda em pt-BR. 5) NUNCA peça dados pessoais (nome, telefone, endereço, CPF) antes do cliente aceitar explicitamente o orçamento.'
