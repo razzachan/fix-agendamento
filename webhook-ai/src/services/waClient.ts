@@ -18,6 +18,7 @@ class WhatsAppClient extends EventEmitter {
   private client: any;
   private status: WAStatus = { connected: false, me: null, qr: null, qrUpdatedAt: null };
   private started = false;
+  private reconnecting: Promise<void> | null = null;
   private messageHandlers: Array<
     (
       from: string,
@@ -935,6 +936,13 @@ class WhatsAppClient extends EventEmitter {
         message.includes('Evaluation failed') ||
         message.includes('Cannot read properties of undefined');
 
+      const isPuppeteerPageGone =
+        message.includes("Cannot read properties of null (reading 'evaluate')") ||
+        message.includes("Cannot read properties of null (reading \"evaluate\")") ||
+        message.includes('Execution context was destroyed') ||
+        message.includes('Target closed') ||
+        message.includes('Protocol error');
+
       // Em produção (Railway), já vimos falha de compatibilidade do WA Web:
       // "Cannot read properties of undefined (reading 'markedUnread')".
       // Nesses casos, forçar restart com webVersion atualizada e repetir 1x.
@@ -949,6 +957,29 @@ class WhatsAppClient extends EventEmitter {
         }
         await this.connect(true);
         await new Promise((res) => setTimeout(res, 5000));
+        return await this.client.sendMessage(to, text);
+      }
+
+      // Erro comum em produção quando o navegador do whatsapp-web.js cai e a página Puppeteer some.
+      // Nesse caso, tentamos um reconnect idempotente + retry 1x.
+      if (isPuppeteerPageGone) {
+        console.warn('[WA] sendText falhou (Puppeteer/page). Tentando reconnect + retry 1x...', {
+          to,
+          err: message.slice(0, 200),
+        });
+
+        if (!this.reconnecting) {
+          this.reconnecting = (async () => {
+            try {
+              await this.connect(true);
+              await new Promise((res) => setTimeout(res, 5000));
+            } finally {
+              this.reconnecting = null;
+            }
+          })();
+        }
+
+        await this.reconnecting;
         return await this.client.sendMessage(to, text);
       }
 
