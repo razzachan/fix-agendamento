@@ -525,7 +525,26 @@ export async function orchestrateInbound(
     const nextFunnel = mergeFunnelState(shouldResetByTopic ? getDefaultFunnelState() : prevFunnel, patch);
 
     const prevDados = prevDados0;
-    const nextDados = applyFunnelToDadosColetados(shouldResetByTopic ? {} : prevDados, nextFunnel);
+    let nextDados = applyFunnelToDadosColetados(shouldResetByTopic ? {} : prevDados, nextFunnel);
+
+    // IMPORTANT: `setSessionState()` faz merge profundo de `dados_coletados` ({...prev, ...patch}).
+    // Para realmente limpar marca/problema antigos em um reset por troca de equipamento,
+    // precisamos sobrescrever explicitamente com `null` (senão o merge preserva os valores antigos).
+    if (shouldResetByTopic) {
+      nextDados = {
+        ...(nextDados || {}),
+        // manter equipamento/mount inferidos do texto atual (se houver)
+        equipamento: nextFunnel?.equipamento || (nextDados as any)?.equipamento || null,
+        mount: nextFunnel?.mount || (nextDados as any)?.mount || null,
+        power_type: nextFunnel?.power_type || (nextDados as any)?.power_type || null,
+        num_burners: null,
+        // limpar core antigo
+        marca: null,
+        problema: null,
+        descricao_problema: null,
+        description: null,
+      };
+    }
 
     try {
       const prob = normalizeProblemFromDados(nextDados);
