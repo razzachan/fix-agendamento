@@ -5091,7 +5091,7 @@ async function executeAIOrçamento(
       // (ex.: “quanto fica?”) sem cair em respostas genéricas/off-topic.
       try {
         const v = Number((quote as any).value ?? (quote as any).min ?? (quote as any).max ?? 0);
-        if ((session as any)?.id && Number.isFinite(v) && v > 0) {
+        if (Number.isFinite(v) && v > 0 && session) {
           const prevSt = ((session as any)?.state || {}) as any;
           const nextSt: any = {
             ...prevSt,
@@ -5099,10 +5099,14 @@ async function executeAIOrçamento(
             last_quote: quote,
             last_quote_ts: Date.now(),
           };
-          await setSessionState((session as any).id, nextSt);
+          // Atualiza estado em memória (importante em endpoints/testes que não tenham session.id)
           try {
             (session as any).state = nextSt;
           } catch {}
+          // E persiste quando possível
+          if ((session as any)?.id) {
+            await setSessionState((session as any).id, nextSt);
+          }
         }
       } catch {}
 
