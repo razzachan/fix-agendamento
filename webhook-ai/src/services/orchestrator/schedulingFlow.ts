@@ -1,7 +1,7 @@
 import { supabase } from '../supabase.js';
 import { setSessionState, type SessionRecord } from '../sessionStore.js';
 import { logger } from '../logger.js';
-import { classifyInbound } from '../inboundClassifier.js';
+import { classifyInbound, normalizeComparableText } from '../inboundClassifier.js';
 import { isPeerAllowedForTestMode, isTestModeEnabled } from '../testMode.js';
 
 function shouldMarkAppointmentsAsTest(peer?: string): boolean {
@@ -409,7 +409,138 @@ export async function executeAIAgendamento(
   try {
     const hasQuoteDelivered = !!(session as any)?.state?.orcamento_entregue;
     if (!hasQuoteDelivered) {
-      return sanitizeAIText('Antes de agendarmos, preciso te passar o orçamento.');
+      // Em vez de travar em uma frase genérica (que pode gerar loop),
+      // tente gerar o orçamento agora usando o contexto disponível.
+      try {
+        const stQ = ((session as any)?.state || {}) as any;
+        const dcQ = (stQ.dados_coletados || {}) as any;
+
+        const equipamentoQ = (dcQ.equipamento || (dados as any)?.equipamento || '').trim();
+        const marcaQ = (dcQ.marca || (dados as any)?.marca || '').trim();
+        const problemaQ = (dcQ.problema || (dados as any)?.problema || '').trim();
+
+        if (!equipamentoQ) {
+          return 'Pra eu te passar o orçamento certinho: qual é o equipamento (ex.: coifa, fogão, cooktop, forno, micro-ondas)?';
+        }
+        if (!marcaQ) {
+          return `Certo! Qual é a marca da sua ${equipamentoQ}?`;
+        }
+        if (!problemaQ) {
+          return `E qual é o problema que está acontecendo com sua ${equipamentoQ} ${marcaQ}?`;
+        }
+
+        const eqNorm = normalizeComparableText(equipamentoQ);
+        const inferredServiceType =
+          /coifa|depurador|exaustor/.test(eqNorm) || /fogao|cooktop/.test(eqNorm)
+            ? 'domicilio'
+            : ((dcQ as any).tipo_atendimento_1 || 'coleta_diagnostico');
+
+        let quote: any = null;
+        try {
+          const { buildQuote } = await import('../toolsRuntime.js');
+          quote = await buildQuote({
+            service_type: inferredServiceType,
+            equipment: equipamentoQ,
+            brand: marcaQ || null,
+            problem: problemaQ || null,
+            mount: (dcQ as any)?.mount || null,
+            num_burners: (dcQ as any)?.num_burners || null,
+            origin: (dcQ as any)?.origin || null,
+            is_industrial: !!((session as any)?.state?.visual_segment === 'industrial'),
+          } as any);
+        } catch {}
+
+        if (!quote || typeof quote.value !== 'number' || !(quote.value > 0)) {
+          try {
+            const { buildLocalQuoteMessage, computeLocalQuote } = await import('../quoteLocal.js');
+            const preview = computeLocalQuote({
+              equipment: equipamentoQ,
+              brand: marcaQ || undefined,
+              description: problemaQ || undefined,
+              segment: (dcQ as any)?.segment || undefined,
+              problemCategory: (dcQ as any)?.problemCategory || undefined,
+            } as any);
+            if (preview && typeof preview.value === 'number' && preview.value > 0) {
+              quote = {
+                title: preview.title,
+                value: preview.value,
+                min: preview.min,
+                max: preview.max,
+                details: preview.details,
+                source: 'local',
+              };
+              // Mensagem local já fecha com "Deseja agendar?"
+              const msgLocal = buildLocalQuoteMessage({
+                equipment: equipamentoQ,
+                brand: marcaQ || undefined,
+                description: problemaQ || undefined,
+                segment: (dcQ as any)?.segment || undefined,
+                problemCategory: (dcQ as any)?.problemCategory || undefined,
+              } as any);
+              // Persistir estado do orçamento também no fallback local
+              try {
+                if ((session as any)?.id) {
+                  const mergedDados = {
+                    ...dcQ,
+                    equipamento: dcQ.equipamento || equipamentoQ,
+                    marca: dcQ.marca || marcaQ,
+                    problema: dcQ.problema || problemaQ,
+                  };
+                  const newStateQ: any = {
+                    ...stQ,
+                    dados_coletados: mergedDados,
+                    orcamento_entregue: true,
+                    last_quote: quote,
+                    last_quote_ts: Date.now(),
+                  };
+                  await setSessionState((session as any).id, newStateQ);
+                  try {
+                    (session as any).state = newStateQ;
+                  } catch {}
+                }
+              } catch {}
+              return sanitizeAIText(msgLocal);
+            }
+          } catch {}
+        }
+
+        if (quote && typeof quote.value === 'number' && quote.value > 0) {
+          // Persistir para liberar o gate nas próximas mensagens
+          try {
+            if ((session as any)?.id) {
+              const mergedDados = {
+                ...dcQ,
+                equipamento: dcQ.equipamento || equipamentoQ,
+                marca: dcQ.marca || marcaQ,
+                problema: dcQ.problema || problemaQ,
+              };
+              const newStateQ: any = {
+                ...stQ,
+                dados_coletados: mergedDados,
+                orcamento_entregue: true,
+                last_quote: quote,
+                last_quote_ts: Date.now(),
+              };
+              await setSessionState((session as any).id, newStateQ);
+              try {
+                (session as any).state = newStateQ;
+              } catch {}
+            }
+          } catch {}
+
+          const v = Number(quote.value);
+          const min = typeof quote.min === 'number' ? Number(quote.min) : null;
+          const max = typeof quote.max === 'number' ? Number(quote.max) : null;
+          const faixa = min != null && max != null ? ` (faixa: R$ ${min}–R$ ${max})` : '';
+          return sanitizeAIText(
+            `Orçamento estimado para ${equipamentoQ} ${marcaQ} — ${problemaQ}: R$ ${v}${faixa}.
+
+Deseja agendar? Se sim, pode responder "aceito".`
+          );
+        }
+      } catch {}
+
+      return sanitizeAIText('Antes de agendarmos, preciso te passar o orçamento. Qual é a marca e qual o problema específico?');
     }
   } catch {}
 

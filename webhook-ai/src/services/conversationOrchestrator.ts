@@ -3000,8 +3000,11 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
         const prevEq = String(collected?.equipamento || '').toLowerCase();
         const newEq = String(equipamento || '').toLowerCase();
         const isFogFam = (s: string) => /fog[aã]o|cook ?top/.test(s);
+        const isCoifaFam = (s: string) => /coifa|depurador|exaustor/.test(s);
         const sameFamily =
-          (isFogFam(prevEq) && isFogFam(newEq)) || (/micro/.test(prevEq) && /micro/.test(newEq));
+          (isFogFam(prevEq) && isFogFam(newEq)) ||
+          (/micro/.test(prevEq) && /micro/.test(newEq)) ||
+          (isCoifaFam(prevEq) && isCoifaFam(newEq));
         if (prevEq && newEq && prevEq !== newEq && !sameFamily) {
           // Se marca veio apenas do coletado (não na mensagem atual), limpe
           if (!g?.marca) (marca as any) = undefined;
@@ -4338,6 +4341,21 @@ async function executeAIDecision(
         decision.intent === 'instalacao' ||
         (signals.mentionsInstall && !signals.negatedInstall && !signals.looksLikeRepair));
 
+    // Persistir o modo instalação quando ativado pela decisão/sinais.
+    // Sem isso, `shouldTreatAsInstall` nunca se mantém entre mensagens.
+    try {
+      if (shouldTreatAsInstall && !st.installation_mode) {
+        const nextSt: any = { ...st, installation_mode: true };
+        if ((session as any)?.id) {
+          await setSessionState((session as any).id, nextSt);
+          try {
+            (session as any).state = nextSt;
+          } catch {}
+        }
+        st.installation_mode = true;
+      }
+    } catch {}
+
     const installCtx = {
       negatedInstall: !!signals.negatedInstall,
       mentionsInstall: !!signals.mentionsInstall,
@@ -4490,8 +4508,11 @@ async function executeAIOrçamento(
       const prevEq = String(persisted.equipamento || '').toLowerCase();
       const newEq = String(dados.equipamento || '').toLowerCase();
       const isFog = (s: string) => /\bfog(ão|ao)\b|\bcook ?top\b/.test(s);
+      const isCoifa = (s: string) => /coifa|depurador|exaustor/.test(s);
       const sameFamily =
-        (isFog(prevEq) && isFog(newEq)) || (prevEq.includes('micro') && newEq.includes('micro'));
+        (isFog(prevEq) && isFog(newEq)) ||
+        (prevEq.includes('micro') && newEq.includes('micro')) ||
+        (isCoifa(prevEq) && isCoifa(newEq));
       if (newEq && prevEq && newEq !== prevEq && !sameFamily) {
         if (!decision.dados_extrair?.marca) delete dados.marca;
         if (!decision.dados_extrair?.problema) delete dados.problema;
@@ -4521,6 +4542,16 @@ async function executeAIOrçamento(
     try {
       if ((session as any)?._micro_bancada_hint) {
         service_type = 'coleta_conserto';
+      }
+    } catch {}
+
+    // Regra explícita: coifa/depurador/exaustor é atendimento em domicílio (visita diagnóstica no local)
+    try {
+      const eqLower0 = String(equipamento || '').toLowerCase();
+      const equipLower0 = String(equipment || '').toLowerCase();
+      if (/coifa|depurador|exaustor/.test(eqLower0) || /coifa|depurador|exaustor/.test(equipLower0)) {
+        service_type = 'domicilio';
+        equipment = 'coifa';
       }
     } catch {}
 
@@ -4849,9 +4880,11 @@ async function executeAIOrçamento(
           ).toLowerCase();
           const eqNow = String(equipment || '').toLowerCase();
           const isFogFam = (s: string) => /fog[aã]o|cook ?top/.test(s);
+          const isCoifaFam = (s: string) => /coifa|depurador|exaustor/.test(s);
           const sameFam =
             (isFogFam(prevEqStore) && isFogFam(eqNow)) ||
-            (/micro/.test(prevEqStore) && /micro/.test(eqNow));
+            (/micro/.test(prevEqStore) && /micro/.test(eqNow)) ||
+            (isCoifaFam(prevEqStore) && isCoifaFam(eqNow));
           if (prevEqStore && eqNow && prevEqStore !== eqNow && !sameFam && !dados.marca) {
             return 'Qual é a marca do equipamento?';
           }
@@ -4864,9 +4897,11 @@ async function executeAIOrçamento(
           ).toLowerCase();
           const newEq2 = String(equipment || '').toLowerCase();
           const isFog = (s: string) => /\bfog( e3o|ao)\b|\bcook ?top\b/.test(s);
+          const isCoifa = (s: string) => /coifa|depurador|exaustor/.test(s);
           const sameFamily2 =
             (isFog(prevEq2) && isFog(newEq2)) ||
-            (prevEq2.includes('micro') && newEq2.includes('micro'));
+            (prevEq2.includes('micro') && newEq2.includes('micro')) ||
+            (isCoifa(prevEq2) && isCoifa(newEq2));
           if (newEq2 && prevEq2 && newEq2 !== prevEq2 && !sameFamily2) {
             delete dados.marca;
             if (!decision.dados_extrair?.problema) delete dados.problema;
@@ -4880,9 +4915,11 @@ async function executeAIOrçamento(
           ).toLowerCase();
           const newEq2b = String(equipment || '').toLowerCase();
           const isFogB = (s: string) => /fog[aã]o|cook ?top/i.test(s);
+          const isCoifaB = (s: string) => /coifa|depurador|exaustor/i.test(s);
           const sameFamily2b =
             (isFogB(prevEq2b) && isFogB(newEq2b)) ||
-            (/micro/i.test(prevEq2b) && /micro/i.test(newEq2b));
+            (/micro/i.test(prevEq2b) && /micro/i.test(newEq2b)) ||
+            (isCoifaB(prevEq2b) && isCoifaB(newEq2b));
           if (newEq2b && prevEq2b && newEq2b !== prevEq2b && !sameFamily2b) {
             delete dados.marca;
             if (!decision.dados_extrair?.problema) delete dados.problema;
