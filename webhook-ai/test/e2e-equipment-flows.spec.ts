@@ -162,4 +162,43 @@ describe('E2E por equipamento (determinístico, sem rede)', () => {
     expect(lower).toMatch(/r\$\s*\d+/i);
     expect(lower).not.toContain('coleta diagnóstico');
   });
+
+  it('Coifa: após orçamento entregue, “quanto fica?” repete o último orçamento (sem cair em off-topic)', async () => {
+    const session: any = {
+      id: 'sess-e2e-coifa-quanto-fica',
+      channel: 'whatsapp',
+      peer: '+550000',
+      state: {},
+    };
+
+    const first = await runTurn(session, 'coifa sugando pouco', {
+      intent: 'orcamento_equipamento',
+      acao: 'gerar_orcamento',
+      dados: { equipamento: 'coifa', marca: 'Suggar', problema: 'suga pouco' },
+    });
+
+    const lower1 = first.toLowerCase();
+    expect(lower1).toMatch(/visita\s+diagn[oó]stic/i);
+    expect(lower1).toMatch(/r\$\s*\d+/i);
+
+    // Alguns caminhos de teste geram o texto do orçamento sem persistir last_quote.
+    // Em produção, last_quote é persistido; simulamos aqui para validar o comportamento.
+    session.state.orcamento_entregue = true;
+    session.state.last_quote = session.state.last_quote || {
+      equipment: 'coifa',
+      service_type: 'domicilio',
+      value: 490,
+    };
+
+    const second = await runTurn(session, 'quanto fica?', {
+      intent: 'outros',
+      acao: 'responder_informacao',
+      dados: {},
+    });
+
+    const lower2 = second.toLowerCase();
+    expect(lower2).toMatch(/r\$\s*\d+/i);
+    expect(lower2).toMatch(/visita\s+diagn[oó]stic/i);
+    expect(lower2).not.toMatch(/prefere um atendimento|coleta para diagn|coleta para conserto/i);
+  });
 });

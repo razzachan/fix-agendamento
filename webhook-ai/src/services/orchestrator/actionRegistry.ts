@@ -335,6 +335,42 @@ export function buildActionHandlers(
           }
         }
 
+        // Se já entregamos orçamento, “quanto fica?” deve repetir o último orçamento
+        // (evita cair em resposta genérica/off-topic e mantém funil estável).
+        try {
+          const st = ((session as any)?.state || {}) as any;
+          const msg = String(body || '').toLowerCase();
+          const asksPrice = /\b(quanto|pre[cç]o|preco|valor|custa|or[cç]amento|orcamento)\b/i.test(msg);
+          const quoteRaw = st.last_quote || st.lastQuote || st.quote;
+          const quoteText = (() => {
+            if (typeof quoteRaw === 'string') return quoteRaw.trim();
+            if (!quoteRaw || typeof quoteRaw !== 'object') return '';
+            const value = Number((quoteRaw as any).value ?? (quoteRaw as any).total ?? (quoteRaw as any).price ?? 0);
+            if (!Number.isFinite(value) || value <= 0) return '';
+
+            const dc = (st.dados_coletados || {}) as any;
+            const equipment = String((quoteRaw as any).equipment || dc.equipamento || st.equipamento || '').trim() || 'equipamento';
+            const stype = String((quoteRaw as any).service_type || (quoteRaw as any).serviceType || dc.tipo_atendimento_1 || '').toLowerCase();
+            const eqLower = equipment.toLowerCase();
+            const policy = /coifa|depurador|exaustor/.test(eqLower)
+              ? 'visita diagnóstica no local'
+              : /coleta/.test(stype) && /conserto/.test(stype)
+                ? 'coleta + conserto'
+                : /coleta/.test(stype) && /diagn/.test(stype)
+                  ? 'coletamos, diagnosticamos'
+                  : /domic/.test(stype)
+                    ? 'visita técnica no local'
+                    : '';
+
+            const policyTxt = policy ? ` — ${policy}` : '';
+            return `Para o seu ${equipment}${policyTxt}: valor do atendimento R$ ${value}.`;
+          })();
+          const hasQuote = !!quoteText || !!st.orcamento_entregue;
+          if (asksPrice && hasQuote && quoteText) {
+            return `${quoteText}\n\nQuer que eu já veja datas pra agendar?`;
+          }
+        } catch {}
+
         // Fora de escopo/tópico
         try {
           // Quando o cliente quer “conversar”/perguntar algo fora do funil,
@@ -411,7 +447,41 @@ export function buildActionHandlers(
       }
     },
 
-    responder_informacao: async () => await executeAIInformacao(decision, allBlocks),
+    responder_informacao: async () => {
+      try {
+        const st = ((session as any)?.state || {}) as any;
+        const msg = String(body || '').toLowerCase();
+        const asksPrice = /\b(quanto|pre[cç]o|preco|valor|custa|or[cç]amento|orcamento)\b/i.test(msg);
+        const quoteRaw = st.last_quote || st.lastQuote || st.quote;
+        const quoteText = (() => {
+          if (typeof quoteRaw === 'string') return quoteRaw.trim();
+          if (!quoteRaw || typeof quoteRaw !== 'object') return '';
+          const value = Number((quoteRaw as any).value ?? (quoteRaw as any).total ?? (quoteRaw as any).price ?? 0);
+          if (!Number.isFinite(value) || value <= 0) return '';
+
+          const dc = (st.dados_coletados || {}) as any;
+          const equipment = String((quoteRaw as any).equipment || dc.equipamento || st.equipamento || '').trim() || 'equipamento';
+          const stype = String((quoteRaw as any).service_type || (quoteRaw as any).serviceType || dc.tipo_atendimento_1 || '').toLowerCase();
+          const eqLower = equipment.toLowerCase();
+          const policy = /coifa|depurador|exaustor/.test(eqLower)
+            ? 'visita diagnóstica no local'
+            : /coleta/.test(stype) && /conserto/.test(stype)
+              ? 'coleta + conserto'
+              : /coleta/.test(stype) && /diagn/.test(stype)
+                ? 'coletamos, diagnosticamos'
+                : /domic/.test(stype)
+                  ? 'visita técnica no local'
+                  : '';
+
+          const policyTxt = policy ? ` — ${policy}` : '';
+          return `Para o seu ${equipment}${policyTxt}: valor do atendimento R$ ${value}.`;
+        })();
+        if (asksPrice && quoteText) {
+          return `${quoteText}\n\nQuer que eu já veja datas pra agendar?`;
+        }
+      } catch {}
+      return await executeAIInformacao(decision, allBlocks);
+    },
 
     agendar_servico: async () => {
       // Evitar chamadas externas no ambiente de teste quando orçamento não foi entregue ainda
