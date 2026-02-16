@@ -5086,6 +5086,26 @@ async function executeAIOrçamento(
         (quote as any).equipment =
           (quote as any).equipment || equipment || dados.equipamento || null;
       } catch {}
+
+      // Persistir orçamento entregue e o último orçamento para permitir follow-ups
+      // (ex.: “quanto fica?”) sem cair em respostas genéricas/off-topic.
+      try {
+        const v = Number((quote as any).value ?? (quote as any).min ?? (quote as any).max ?? 0);
+        if ((session as any)?.id && Number.isFinite(v) && v > 0) {
+          const prevSt = ((session as any)?.state || {}) as any;
+          const nextSt: any = {
+            ...prevSt,
+            orcamento_entregue: true,
+            last_quote: quote,
+            last_quote_ts: Date.now(),
+          };
+          await setSessionState((session as any).id, nextSt);
+          try {
+            (session as any).state = nextSt;
+          } catch {}
+        }
+      } catch {}
+
       // Injetar causas específicas quando aplicável (ex.: Adega), para padronizar com outros fluxos
       try {
         const eq = (equipment || '').toLowerCase();
