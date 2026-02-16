@@ -4519,6 +4519,63 @@ async function executeAIOrçamento(
       }
     } catch {}
 
+    // Se acabamos de perguntar marca/problema, aceite respostas curtas como valor
+    // mesmo quando a IA/regex não reconhece (ex.: "Suggar").
+    try {
+      const stLP = ((session as any)?.state || {}) as any;
+      const now = Date.now();
+      const lastBrandAt = Number(stLP.lastAskBrandAt || 0);
+      const lastProblemAt = Number(stLP.lastAskProblemAt || 0);
+      const txtRaw = String(body || '').trim();
+      const txt = txtRaw.replace(/^marca\s*[:\-]?\s*/i, '').trim();
+
+      const withinWindow = (t: number) => t && now - t < 5 * 60 * 1000; // 5min
+      const expectingBrand = !dados.marca && withinWindow(lastBrandAt);
+      const expectingProblem = !dados.problema && withinWindow(lastProblemAt);
+
+      const looksLikeProblemText = (s: string) =>
+        /(n[aã]o|nao|parou|vaza|vazando|quebrou|defeito|falha|n[aã]o liga|nao liga|n[aã]o esquenta|nao esquenta|faz(endo)? barulho|cheiro|chama|porta|gira|fa[ií]sca|faisca|suga|fraco|fraca)/i.test(
+          s
+        );
+
+      const looksLikeNonBrand = (s: string) =>
+        /@|\b(rua|avenida|av\.|cep|cpf|e-?mail|email|\d{3}\.??\d{3}\.??\d{3}-?\d{2})\b/i.test(s) ||
+        /^(?:op(?:ç|c)[aã]o\s*)?[123]\s*$/i.test(s);
+
+      if (txt && txt.length >= 2 && txt.length <= 60) {
+        // Se pedimos os dois (marca e problema), decide por heurística
+        if (expectingBrand && expectingProblem) {
+          if (!dados.marca && !looksLikeNonBrand(txt) && !looksLikeProblemText(txt)) {
+            dados.marca = txt;
+          } else if (!dados.problema && looksLikeProblemText(txt)) {
+            dados.problema = txt;
+          }
+        } else if (expectingBrand && !looksLikeNonBrand(txt) && !looksLikeProblemText(txt)) {
+          dados.marca = txt;
+        } else if (expectingProblem && looksLikeProblemText(txt)) {
+          dados.problema = txt;
+        }
+
+        // Persistir o que inferimos para não perder entre turns
+        if ((session as any)?.id && (dados.marca || dados.problema)) {
+          const merged = {
+            ...persisted,
+            ...dados,
+          };
+          await setSessionState((session as any).id, {
+            ...((session as any).state || {}),
+            dados_coletados: merged,
+          });
+          try {
+            (session as any).state = {
+              ...((session as any).state || {}),
+              dados_coletados: merged,
+            };
+          } catch {}
+        }
+      }
+    } catch {}
+
     const { buildQuote } = await import('./toolsRuntime.js');
 
     // Determinar tipo de serviço baseado no equipamento
@@ -4966,6 +5023,7 @@ async function executeAIOrçamento(
         const isBancada = /bancada/.test(String(dados.mount || '')) || /bancada/.test(msg);
         if (/micro/.test(lower) && isBancada) policyHint = 'coleta + conserto';
         else if (/forno/.test(lower) && isBancada) policyHint = 'coleta + conserto';
+        else if (/coifa|depurador|exaustor/.test(lower)) policyHint = 'visita diagnóstica no local';
         else if (/fog[aã]o/.test(lower) && /g[aá]s/.test(lower)) policyHint = '';
         else if (lower) policyHint = 'coletamos, diagnosticamos';
       } catch {}
@@ -4985,9 +5043,11 @@ async function executeAIOrçamento(
           gGuard?.equipamento || equipment || dados.equipamento || ''
         ).toLowerCase();
         const isFogFamGuard = (s: string) => /fog[aã]o|cook ?top/.test(s);
+        const isCoifaFamGuard = (s: string) => /coifa|depurador|exaustor/.test(s);
         const sameFamGuard =
           (isFogFamGuard(prevEqGuard) && isFogFamGuard(eqNowGuard)) ||
-          (/micro/.test(prevEqGuard) && /micro/.test(eqNowGuard));
+          (/micro/.test(prevEqGuard) && /micro/.test(eqNowGuard)) ||
+          (isCoifaFamGuard(prevEqGuard) && isCoifaFamGuard(eqNowGuard));
         if (prevEqGuard && eqNowGuard && prevEqGuard !== eqNowGuard && !sameFamGuard) {
           return `${ack}Qual é a marca do equipamento?`;
         }
