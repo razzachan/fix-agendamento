@@ -26,6 +26,8 @@ import {
   applyFunnelToDadosColetados,
   normalizeProblemFromDados,
   isSameEquipmentFamily,
+  equipmentFamilyOf,
+  type EquipmentFamily,
 } from './funnelState.js';
 import { buildActionHandlers } from './orchestrator/actionRegistry.js';
 import {
@@ -381,6 +383,7 @@ export async function orchestrateInbound(
           handoff_paused: false,
           stage: 'collecting_core',
           human_requested: false,
+          human_requested_at: null,
           off_topic_count: 0,
         } as any;
         if ((session as any)?.id) await setSessionState((session as any).id, newState);
@@ -475,21 +478,53 @@ export async function orchestrateInbound(
     // Reset defensivo: se o usuário explicitamente muda de família de equipamento
     // (ex.: antes era fogão e agora é micro-ondas), zera campos core para evitar
     // reaproveitar marca/problema antigos.
-    const prevEquip =
-      prevFunnel?.equipamento || (st0.dados_coletados || {})?.equipamento || (st0.funnel || {})?.equipamento || null;
+    // Importante: em alguns fluxos o `equipamento` pode não ter sido persistido no turno anterior,
+    // mas `marca/problema` já foram coletados. Nesse caso, inferimos a família pelo texto do problema.
+    const inferFamilyFromProblemText = (problemText: string): EquipmentFamily => {
+      const p = normalizeComparableText(String(problemText || ''));
+      if (!p) return 'unknown';
+      if (/(\bchama\b|\bchamas\b|\bboca\b|\bbocas\b|\bgas\b|\bfuligem\b|panelas?\s+pretas?)/.test(p))
+        return 'fogao';
+      if (/(\bmicro\b|microondas|\bmagnetron\b|\bprato\b|nao\s+esquenta)/.test(p)) return 'microondas';
+      return 'unknown';
+    };
+
+    const prevDados0 = (st0.dados_coletados || {}) as any;
+    const prevEquip = prevFunnel?.equipamento || prevDados0?.equipamento || null;
     const incomingEquip = patch?.equipamento || null;
+
+    const prevFamilyExplicit = (prevFunnel?.equipment_family || equipmentFamilyOf(prevEquip)) as EquipmentFamily;
+    const prevProblemText = String(prevFunnel?.problema || prevDados0?.problema || (st0 as any)?.last_problem_text || '');
+    const prevFamily = (prevFamilyExplicit !== 'unknown'
+      ? prevFamilyExplicit
+      : inferFamilyFromProblemText(prevProblemText)) as EquipmentFamily;
+    const incomingFamily = equipmentFamilyOf(incomingEquip) as EquipmentFamily;
+
     const explicitEquipInMessage = !!guess0?.equipamento;
+    const hasPrevCore =
+      !!prevFunnel?.marca ||
+      !!prevFunnel?.problema ||
+      !!prevFunnel?.mount ||
+      !!prevFunnel?.power_type ||
+      !!prevFunnel?.num_burners ||
+      !!prevDados0?.marca ||
+      !!prevDados0?.problema ||
+      !!prevDados0?.mount ||
+      !!prevDados0?.power_type ||
+      !!prevDados0?.num_burners;
+    const switchHint = /\b(agora|na\s+verdade|outro|tambem)\b/.test(normalizeComparableText(String(body || '')));
+
     const shouldResetByTopic =
       explicitEquipInMessage &&
-      !!prevEquip &&
-      !!incomingEquip &&
-      !isSameEquipmentFamily(prevEquip, incomingEquip) &&
+      incomingFamily !== 'unknown' &&
       !st0.bot_paused &&
-      !st0.handoff_paused;
+      !st0.handoff_paused &&
+      ((prevFamily !== 'unknown' && prevFamily !== incomingFamily) ||
+        (prevFamily === 'unknown' && hasPrevCore && switchHint));
 
     const nextFunnel = mergeFunnelState(shouldResetByTopic ? getDefaultFunnelState() : prevFunnel, patch);
 
-    const prevDados = (st0.dados_coletados || {}) as any;
+    const prevDados = prevDados0;
     const nextDados = applyFunnelToDadosColetados(shouldResetByTopic ? {} : prevDados, nextFunnel);
 
     try {
