@@ -1001,9 +1001,22 @@ Deseja agendar? Se sim, pode responder "aceito".`
   const marcaCombined = dados.marca || dc.marca;
 
   // Atualizar dados combinados na sessão para não perder contexto
+  const dcBefore = JSON.stringify(dc);
   if (eqCombined && !dc.equipamento) dc.equipamento = eqCombined;
   if (probCombined && !dc.problema) dc.problema = probCombined;
   if (marcaCombined && !dc.marca) dc.marca = marcaCombined;
+
+  // Persistir imediatamente os dados principais (equipamento/marca/problema)
+  // para não perder contexto entre turns antes do aceite.
+  try {
+    const dcAfter = JSON.stringify(dc);
+    if (dcAfter !== dcBefore && (session as any)?.id) {
+      await setSessionState((session as any).id, {
+        ...(session as any).state,
+        dados_coletados: dc,
+      });
+    }
+  } catch {}
 
   const missing: string[] = [];
   if (!eqCombined) missing.push('equipamento');
