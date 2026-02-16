@@ -1,17 +1,9 @@
-.git/
-node_modules/
-api/node_modules/
+# Deploy somente o webhook-ai.
+# O serviço webhook-ai-docker no Railway está configurado com rootDirectory=webhook-ai,
+# então o upload precisa conter a pasta webhook-ai/.
 
-# Pastas auxiliares que não precisam ir pro deploy
-# webhook-ai/  (não ignorar: service webhook-ai-docker usa rootDirectory=webhook-ai)
+*
 
-# Artefatos e binários grandes
-**/*.exe
-**/*.msi
-**/*.zip
-**/*.7z
-**/*.rar
-
-# Logs e caches
-**/*.log
-.cache/
+!webhook-ai/
+!webhook-ai/**
+!.railwayignore
