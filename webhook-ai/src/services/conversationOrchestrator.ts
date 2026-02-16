@@ -418,6 +418,58 @@ export async function orchestrateInbound(
     }
   } catch {}
 
+  // Fast-path: se já entregamos orçamento e o usuário pergunta preço/“quanto fica?”,
+  // repetir o último orçamento imediatamente (sem depender do roteamento por IA).
+  try {
+    const msg = String(body || '').toLowerCase();
+    const asksPrice = /\b(quanto|pre[cç]o|preco|valor|custa|or[cç]amento|orcamento)\b/i.test(msg);
+    if (asksPrice && session) {
+      let stFast = ((session as any)?.state || {}) as any;
+      try {
+        if ((session as any)?.id) {
+          const { data: row } = await supabase
+            .from('bot_sessions')
+            .select('state')
+            .eq('id', (session as any).id)
+            .single();
+          if ((row as any)?.state) stFast = (row as any).state;
+        }
+      } catch {}
+
+      const quoteRaw = (stFast as any)?.last_quote || (stFast as any)?.lastQuote || (stFast as any)?.quote;
+      const quoteText = (() => {
+        if (typeof quoteRaw === 'string') return quoteRaw.trim();
+        if (!quoteRaw || typeof quoteRaw !== 'object') return '';
+        const value = Number((quoteRaw as any).value ?? (quoteRaw as any).total ?? (quoteRaw as any).price ?? 0);
+        if (!Number.isFinite(value) || value <= 0) return '';
+
+        const dc = ((stFast as any)?.dados_coletados || {}) as any;
+        const equipment =
+          String((quoteRaw as any).equipment || dc.equipamento || (stFast as any).equipamento || '').trim() ||
+          'equipamento';
+        const stype = String((quoteRaw as any).service_type || (quoteRaw as any).serviceType || dc.tipo_atendimento_1 || '').toLowerCase();
+        const eqLower = equipment.toLowerCase();
+
+        const isCoifa = /coifa|depurador|exaustor/.test(eqLower) || /coifa|depurador|exaustor/.test(stype);
+        const policy = isCoifa
+          ? 'visita diagnóstica no local'
+          : /coleta/.test(stype) && /conserto/.test(stype)
+            ? 'coleta + conserto'
+            : /coleta/.test(stype) && /diagn/.test(stype)
+              ? 'coletamos, diagnosticamos'
+              : /domic/.test(stype)
+                ? 'visita técnica no local'
+                : '';
+        const policyTxt = policy ? ` — ${policy}` : '';
+        return `Para o seu ${equipment}${policyTxt}: valor do atendimento R$ ${value}.`;
+      })();
+
+      if (quoteText) {
+        return `${quoteText}\n\nQuer que eu já veja datas pra agendar?`;
+      }
+    }
+  } catch {}
+
   // Canonical extraction/persistence (pre-router): keep funnel data stable across layers.
   // This reduces misroutes and repeated questions (marca/problema).
   try {
