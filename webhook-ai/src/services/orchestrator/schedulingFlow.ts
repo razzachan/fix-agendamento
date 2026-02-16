@@ -2,6 +2,15 @@ import { supabase } from '../supabase.js';
 import { setSessionState, type SessionRecord } from '../sessionStore.js';
 import { logger } from '../logger.js';
 import { classifyInbound } from '../inboundClassifier.js';
+import { isPeerAllowedForTestMode, isTestModeEnabled } from '../testMode.js';
+
+function shouldMarkAppointmentsAsTest(peer?: string): boolean {
+  try {
+    return !!(isTestModeEnabled && isTestModeEnabled()) && isPeerAllowedForTestMode(peer);
+  } catch {
+    return false;
+  }
+}
 
 async function logAIRoute(event: string, payload: any) {
   // Envia para tabela legada e também para analytics unificado
@@ -250,6 +259,7 @@ export async function executeAIAgendamento(
         cpf: dc0full.cpf || undefined,
         email: dc0full.email || undefined,
         complemento: dc0full.complemento || undefined,
+        is_test: shouldMarkAppointmentsAsTest(from),
         tipo_atendimento_1: dc0full.tipo_atendimento_1 || undefined,
         tipo_atendimento_2: dc0full.tipo_atendimento_2 || undefined,
         tipo_atendimento_3: dc0full.tipo_atendimento_3 || undefined,
@@ -647,6 +657,7 @@ export async function executeAIAgendamento(
           cpf: dc1full.cpf || undefined,
           email: dc1full.email || undefined,
           complemento: dc1full.complemento || undefined,
+          is_test: shouldMarkAppointmentsAsTest(from),
           tipo_atendimento_1: dc1full.tipo_atendimento_1 || undefined,
           tipo_atendimento_2: dc1full.tipo_atendimento_2 || undefined,
           tipo_atendimento_3: dc1full.tipo_atendimento_3 || undefined,

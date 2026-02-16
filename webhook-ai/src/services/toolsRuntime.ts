@@ -433,6 +433,7 @@ export async function createAppointment(input: {
       client_name: input.client_name,
       start_time: input.start_time,
       end_time: input.end_time,
+      is_test: !!input.is_test,
       address: input.address ?? undefined,
       address_complement: input.address_complement ?? undefined,
       description: input.description ?? undefined,
@@ -620,7 +621,25 @@ export async function aiScheduleStart(input: {
   return data;
 }
 
-export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhida: string; horario_escolhido?: string; context?: { nome?: string; endereco?: string; equipamento?: string; problema?: string; urgente?: boolean; cpf?: string; email?: string; complemento?: string; tipo_atendimento_1?: string; tipo_atendimento_2?: string; tipo_atendimento_3?: string; } }) {
+export async function aiScheduleConfirm(input: {
+  telefone: string;
+  opcao_escolhida: string;
+  horario_escolhido?: string;
+  context?: {
+    nome?: string;
+    endereco?: string;
+    equipamento?: string;
+    problema?: string;
+    urgente?: boolean;
+    cpf?: string;
+    email?: string;
+    complemento?: string;
+    tipo_atendimento_1?: string;
+    tipo_atendimento_2?: string;
+    tipo_atendimento_3?: string;
+    is_test?: boolean;
+  };
+}) {
   // Test-mode: return deterministic confirmation
   if (process.env.NODE_ENV === 'test') {
     return { message: 'Agendamento confirmado!' };
@@ -658,6 +677,7 @@ export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhi
           client_name: clientName,
           start_time,
           end_time,
+          is_test: !!ctx?.is_test,
           address: address || undefined,
           address_complement: ctx?.complemento || undefined,
           description,
