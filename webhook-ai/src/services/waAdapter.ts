@@ -7,6 +7,13 @@ import { tryHandleByFlows } from './flowEngine.js';
 import { orchestrateInbound } from './conversationOrchestrator.js';
 import { getOrCreateSession, logMessage } from './sessionStore.js';
 import { classifyInbound, normalizeInboundText } from './inboundClassifier.js';
+import { guessFunnelFields } from './funnelGuesser.js';
+import {
+  getDefaultFunnelState,
+  mergeFunnelState,
+  deriveFunnelPatchFromGuess,
+  applyFunnelToDadosColetados,
+} from './funnelState.js';
 
 const FIX_API_BASE = process.env.FIX_API_BASE || 'https://api.fixfogoes.com.br';
 const FIX_BOT_TOKEN = process.env.FIX_BOT_TOKEN || process.env.BOT_TOKEN || '';
@@ -92,6 +99,35 @@ async function syncLeadToCrmFromBot(params: {
 // Mantemos a leitura das envs, mas adicionamos um safe-guard para não reengajar durante troca de contexto
 const REENGAGE_ENABLED = (process.env.WA_ENABLE_REENGAGE || 'false').toLowerCase() === 'true';
 const GREETING_ENABLED = (process.env.WA_ENABLE_GREETING || 'false').toLowerCase() === 'true';
+
+function parseYesNo(text: string): 'yes' | 'no' | null {
+  const norm = normalizeInboundText(text || '');
+  if (/^(s|sim|ok|certo|isso|tenho|possuo|possuo sim|tenho sim)[.!? ]*$/.test(norm)) return 'yes';
+  if (/^(n|nao|não|negativo|nao tenho|não tenho|nao possuo|não possuo)[.!? ]*$/.test(norm)) return 'no';
+  return null;
+}
+
+function isGasRegisterQuestion(outText: string): boolean {
+  const norm = normalizeInboundText(outText || '');
+  // Heurística: captura variações como
+  // "Você já possui o registro de gás (na parede ou do botijão)? (sim/não)"
+  // e também versões "sim ou não".
+  const hasRegister = norm.includes('registro de gas');
+  if (!hasRegister) return false;
+  const asksYesNo =
+    norm.includes('sim/nao') ||
+    norm.includes('(sim/nao)') ||
+    norm.includes('sim ou nao') ||
+    norm.includes('(sim ou nao)');
+  return asksYesNo || norm.includes('?');
+}
+
+function looksLikeRepairNorm(norm: string): boolean {
+  const t = String(norm || '');
+  return /(nao\s*(acende|liga|funciona)|falh(a|ando)|defeito|problema|chama(s)?\s*(nao)|bocas?\s*(nao)|vaz(a|ando)|cheiro\s+de\s+gas)/i.test(
+    t
+  );
+}
 
 function looksLikeConfirmation(text: string) {
   const t = text.toLowerCase();
@@ -353,6 +389,8 @@ export async function setupWAInboundAdapter() {
       const { getOrCreateSession, setSessionState } = await import('./sessionStore.js');
       const session = await getOrCreateSession('whatsapp', msg.from);
 
+      const captionText = String(msg?.body || '').trim();
+
 
       // Marcar início de inbound para lock de resposta única
       try { __markInbound(session.id, meta as any); } catch {}
@@ -379,9 +417,42 @@ export async function setupWAInboundAdapter() {
           classificationResult = {
             segment: data.segment,
             type: data.type,
+            burners: data.burners ?? data?.attributes?.burners ?? data?.attributes?.num_burners,
             confidence: data.confidence,
             source: 'api',
           };
+
+          // Se a API (CLIP) não souber as bocas, tenta inferir só as bocas via Vision.
+          if (!classificationResult.burners || classificationResult.burners === 'indeterminado') {
+            try {
+              const { chatComplete } = await import('./llmClient.js');
+              const imageData = `data:${media.mimetype};base64,${media.data}`;
+              const visionResponse = await chatComplete(
+                {
+                  provider: 'openai',
+                  model: process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini',
+                  temperature: 0.1,
+                  maxTokens: 120,
+                },
+                [
+                  {
+                    role: 'user',
+                    content: [
+                      { type: 'text', text: 'Analise esta imagem de fogão e responda APENAS com JSON no formato: {"type":"floor|cooktop|indeterminado","segment":"basico|inox|premium|indeterminado","burners":"4|5|6|indeterminado"}.' },
+                      { type: 'image_url', image_url: { url: imageData } },
+                    ],
+                  },
+                ]
+              );
+              const cleaned = String(visionResponse || '')
+                .replace(/^```json\s*/i, '')
+                .replace(/^```\s*/i, '')
+                .replace(/```\s*$/i, '')
+                .trim();
+              const parsed = JSON.parse(cleaned || '{}');
+              if (parsed?.burners) classificationResult.burners = String(parsed.burners);
+            } catch {}
+          }
           console.log('[Adapter] Classificação via API:', classificationResult);
           try { const { logEvent } = await import('./analytics.js'); await logEvent({ type: 'media:image:classified', from: msg.from, channel: 'whatsapp', data: classificationResult }); } catch {}
 
@@ -508,6 +579,33 @@ export async function setupWAInboundAdapter() {
         await setSessionState(session.id, st);
         console.log('[Adapter] Classificação salva na sessão:', st);
       }
+
+      // Se a imagem veio com legenda, processar a legenda APÓS salvar visual_* na sessão.
+      // Isso garante que o fluxo de orçamento enxergue as pistas visuais.
+      try {
+        if (captionText) {
+          const fresh = await getOrCreateSession('whatsapp', msg.from);
+          const reply = await orchestrateInbound(msg.from, captionText, fresh);
+          if (reply) {
+            const outText = typeof reply === 'string' ? reply : JSON.stringify(reply);
+            await sendTextOnce(fresh.id, msg.from, outText, meta as any);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('[Adapter] Erro ao orquestrar legenda de imagem:', e);
+      }
+
+      // Fallback: se não houve resposta (sem legenda ou falha), enviar ack genérico.
+      try {
+        const ack = 'Recebi a foto! Para eu orçar certinho, me diga a marca e um breve descritivo do problema.';
+        await new Promise((r) => setTimeout(r, 700));
+        const lk = __inboundLocks.get(session.id);
+        if (!lk || lk.sentCount === 0) {
+          await sendTextOnce(session.id, msg.from, ack, meta as any);
+          try { const { logEvent } = await import('./analytics.js'); await logEvent({ type: 'media:image:ack_generic_sent', session_id: session.id, from: msg.from, channel: 'whatsapp' }); } catch {}
+        }
+      } catch {}
     } catch (e) {
       console.error('[Adapter] Erro ao processar imagem', e);
     }
@@ -516,6 +614,13 @@ export async function setupWAInboundAdapter() {
   waClient.onMessage(async (from, body, meta?: { id?: string; ts?: number; type?: string }) => {
     const text = (body || '').trim();
     console.log('[Adapter] Mensagem recebida de', from, 'texto:', text);
+
+    // Para mensagens de mídia (ex.: image com legenda), deixamos o onAnyMessage cuidar.
+    // Isso evita responder antes de salvar visual_* na sessão.
+    if (meta?.type && meta.type !== 'chat') {
+      console.log('[Adapter] Ignorando onMessage de mídia (type=', meta.type, ') de', from);
+      return;
+    }
 
     // Ignora eventos sem texto (mídia sem legenda) — já tratados em onAnyMessage
     if (!text) {
@@ -631,6 +736,83 @@ export async function setupWAInboundAdapter() {
       const nowIso = new Date().toISOString();
       const st0 = { ...(session?.state || {}), last_in_at: nowIso, last_raw_message: text } as any;
       await (await import('./sessionStore.js')).setSessionState(session.id, st0);
+    } catch {}
+
+    // Pré-extrair campos básicos (marca/problema/equipamento) para evitar loops do tipo
+    // "é consul" -> bot pergunta marca de novo.
+    try {
+      const g = guessFunnelFields(text) as any;
+      if (g && (g.marca || g.problema || g.equipamento || g.num_burners)) {
+        const stPrev = (session?.state || {}) as any;
+
+        const prevFunnel = (stPrev.funnel || getDefaultFunnelState()) as any;
+        const patch = deriveFunnelPatchFromGuess(g, text);
+        const nextFunnel = mergeFunnelState(prevFunnel, patch);
+
+        const dcPrev = (stPrev.dados_coletados || {}) as any;
+        const dcNext = applyFunnelToDadosColetados(dcPrev, nextFunnel);
+
+        const next = { ...stPrev, funnel: nextFunnel, dados_coletados: dcNext } as any;
+        const { setSessionState } = await import('./sessionStore.js');
+        await setSessionState(session.id, next);
+        try {
+          (session as any).state = next;
+        } catch {}
+      }
+    } catch {}
+
+    // ✅ Consumir respostas curtas (sim/não) para perguntas pendentes e evitar loop de LLM.
+    // Caso clássico: LLM pergunta "registro de gás" e, ao receber "sim", pergunta de novo.
+    try {
+      const stp = (session?.state || {}) as any;
+      const pending = String(stp.pending_yesno_question || '');
+      if (pending) {
+        // Expira pendências antigas para não sequestrar "sim/não" em outro contexto.
+        try {
+          const since = stp.pending_yesno_since ? new Date(stp.pending_yesno_since).getTime() : 0;
+          if (since && Date.now() - since > 5 * 60 * 1000) {
+            const { setSessionState } = await import('./sessionStore.js');
+            await setSessionState(session.id, { ...stp, pending_yesno_question: null, pending_yesno_since: null } as any);
+          }
+        } catch {}
+
+        const yn = parseYesNo(text);
+        if (yn) {
+          const nextState: any = { ...stp };
+          nextState.pending_yesno_question = null;
+          nextState.pending_yesno_since = null;
+          nextState.last_yesno_answer_at = new Date().toISOString();
+
+          if (pending === 'gas_registro') {
+            nextState.dados_coletados = nextState.dados_coletados || {};
+            nextState.dados_coletados.tem_registro_gas = yn === 'yes';
+          }
+
+          const { setSessionState } = await import('./sessionStore.js');
+          await setSessionState(session.id, nextState);
+
+          const followUp =
+            pending === 'gas_registro'
+              ? (() => {
+                  const dc = (nextState.dados_coletados || {}) as any;
+                  if (!dc.marca) return 'Perfeito. Qual é a marca do fogão e quais bocas (ou todas) não acendem?';
+                  return 'Perfeito. Quais bocas (ou todas) não acendem?';
+                })()
+              : (() => {
+                  const dc = (nextState.dados_coletados || {}) as any;
+                  const hasBrand = !!dc.marca;
+                  const hasProblem = !!(dc.problema || dc.description || dc.descricao_problema);
+                  if (!hasBrand && !hasProblem)
+                    return 'Perfeito. Me diga a marca e o problema específico, por favor.';
+                  if (!hasBrand) return 'Perfeito. Qual é a marca do equipamento?';
+                  if (!hasProblem) return 'Perfeito. O que exatamente está acontecendo com ele?';
+                  return 'Perfeito. Pode me dizer mais um detalhe do defeito (ex.: quais bocas falham, se a chama apaga, etc.)?';
+                })();
+
+          await sendTextOnce(session.id, from, followUp, meta as any);
+          return;
+        }
+      }
     } catch {}
     // Detectar reset explícito de contexto ("novo atendimento", etc.) antes de qualquer reengajamento/IA
     const signals = classifyInbound(text);
@@ -865,6 +1047,59 @@ export async function setupWAInboundAdapter() {
         console.log('[Adapter] LLM respondeu:', preview);
         if (reply) {
           if (typeof reply === 'string') {
+            // Guard: fora de modo instalação, nunca perguntar sobre registro/válvula/mangueira de gás.
+            // Se a IA gerar isso, reescreva para a próxima pergunta útil (marca/problema).
+            try {
+              if (isGasRegisterQuestion(reply)) {
+                const stLocal = (session as any)?.state || {};
+                const lastSig = classifyInbound(String((stLocal as any).last_raw_message || ''));
+                const forceNotInstall = !!lastSig.looksLikeRepair || looksLikeRepairNorm(lastSig.norm);
+                const installationMode = !!(stLocal as any).installation_mode;
+                if (!installationMode || forceNotInstall) {
+                  // Se ficou preso em modo instalação, limpe para não repetir perguntas de instalação.
+                  if (installationMode && forceNotInstall) {
+                    try {
+                      const { setSessionState } = await import('./sessionStore.js');
+                      const cleared: any = { ...stLocal, installation_mode: false };
+                      for (const k of Object.keys(cleared)) {
+                        if (k.startsWith('installation_')) delete cleared[k];
+                      }
+                      await setSessionState(session.id, cleared);
+                      try {
+                        (session as any).state = cleared;
+                      } catch {}
+                    } catch {}
+                  }
+                  const dc = ((stLocal as any).dados_coletados || {}) as any;
+                  if (!dc.marca) {
+                    reply = 'Qual é a marca do equipamento? (Ex.: Consul, Brastemp, Electrolux...)';
+                  } else if (!dc.problema && !dc.description && !dc.descricao_problema) {
+                    reply = 'O que exatamente está acontecendo com ele? (Ex.: quais bocas não acendem, se a chama apaga, se está vazando gás, etc.)';
+                  } else {
+                    // Se já temos o básico, avance para detalhe objetivo do fogão.
+                    reply = 'Perfeito. Para eu entender melhor: quais bocas não acendem (ou a chama apaga) e se é fogão de piso ou cooktop?';
+                  }
+                }
+              }
+            } catch {}
+
+            // Persistir última saída e perguntas pendentes (sim/não) para evitar loop.
+            try {
+              const { setSessionState } = await import('./sessionStore.js');
+              const st = ((await getOrCreateSession('whatsapp', from)) as any)?.state || (session as any)?.state || {};
+              const next: any = { ...st, last_out_text: reply, last_out_at: new Date().toISOString() };
+              if (isGasRegisterQuestion(reply)) {
+                // Só marca pendente se ainda não existir.
+                const lastSig = classifyInbound(String((next as any).last_raw_message || ''));
+                const forceNotInstall = !!lastSig.looksLikeRepair || looksLikeRepairNorm(lastSig.norm);
+                if (!forceNotInstall && !next.pending_yesno_question && !!(next as any).installation_mode) {
+                  next.pending_yesno_question = 'gas_registro';
+                  next.pending_yesno_since = new Date().toISOString();
+                }
+              }
+              await setSessionState(session.id, next);
+            } catch {}
+
             await sendTextOnce(session.id, from, reply, meta as any);
             try {
               const { logEvent } = await import('./analytics.js');
@@ -876,9 +1111,54 @@ export async function setupWAInboundAdapter() {
               id: o.id || String(i + 1),
               text: o.text,
             }));
+
+            // Mesmo guard para replies com botões
+            try {
+              if (isGasRegisterQuestion(r.text)) {
+                const stLocal = (session as any)?.state || {};
+                const lastSig = classifyInbound(String((stLocal as any).last_raw_message || ''));
+                const forceNotInstall = !!lastSig.looksLikeRepair || looksLikeRepairNorm(lastSig.norm);
+                const installationMode = !!(stLocal as any).installation_mode;
+                if (!installationMode || forceNotInstall) {
+                  const dc = ((stLocal as any).dados_coletados || {}) as any;
+                  const newText = !dc.marca
+                    ? 'Qual é a marca do equipamento? (Ex.: Consul, Brastemp, Electrolux...)'
+                    : !dc.problema && !dc.description && !dc.descricao_problema
+                      ? 'O que exatamente está acontecendo com ele? (Ex.: quais bocas não acendem, se a chama apaga, se está vazando gás, etc.)'
+                      : 'Perfeito. Para eu entender melhor: quais bocas não acendem (ou a chama apaga) e se é fogão de piso ou cooktop?';
+                  // Reescreve para texto simples (sem botões) para não criar UI errada
+                  await sendTextOnce(session.id, from, newText, meta as any);
+                  return;
+                }
+              }
+            } catch {}
+
+            // Persistir última saída (buttons) e perguntas pendentes
+            try {
+              const { setSessionState } = await import('./sessionStore.js');
+              const st = ((await getOrCreateSession('whatsapp', from)) as any)?.state || (session as any)?.state || {};
+              const next: any = { ...st, last_out_text: r.text, last_out_at: new Date().toISOString() };
+              if (isGasRegisterQuestion(r.text)) {
+                const lastSig = classifyInbound(String((next as any).last_raw_message || ''));
+                const forceNotInstall = !!lastSig.looksLikeRepair || looksLikeRepairNorm(lastSig.norm);
+                if (!forceNotInstall && !next.pending_yesno_question && !!(next as any).installation_mode) {
+                  next.pending_yesno_question = 'gas_registro';
+                  next.pending_yesno_since = new Date().toISOString();
+                }
+              }
+              await setSessionState(session.id, next);
+            } catch {}
+
             await sendButtonsOnce(session.id, from, r.text, options, meta as any);
           } else {
             const text = JSON.stringify(reply);
+
+            try {
+              const { setSessionState } = await import('./sessionStore.js');
+              const st = ((await getOrCreateSession('whatsapp', from)) as any)?.state || (session as any)?.state || {};
+              await setSessionState(session.id, { ...st, last_out_text: text, last_out_at: new Date().toISOString() } as any);
+            } catch {}
+
             await sendTextOnce(session.id, from, text, meta as any);
           }
           console.log('[Adapter] Resposta enviada via LLM');

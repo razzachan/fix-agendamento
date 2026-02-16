@@ -129,7 +129,10 @@ async function adaptedFetch(endpoint: string, options: any) {
 }
 const MIDDLEWARE_URL = process.env.MIDDLEWARE_URL || 'http://127.0.0.1:8000';
 const QUOTE_OFFLINE_FALLBACK =
-  process.env.QUOTE_OFFLINE_FALLBACK === 'true' || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'production';
+  // Só ativar fallback offline determinístico quando explicitamente pedido ou em testes.
+  // Em produção o normal é consultar a API (que usa a tabela price_list) e só cair em fail-soft
+  // local se a API estiver indisponível.
+  process.env.QUOTE_OFFLINE_FALLBACK === 'true' || process.env.NODE_ENV === 'test';
 
 function computeLocalQuote(payload: any) {
   // Fallback determinístico com valores corretos por tipo de serviço e equipamento
@@ -300,6 +303,12 @@ export async function buildQuote(input: BuildQuoteInput) {
     payload.class_level = String(input['class_level']).toLowerCase();
   }
 
+  // Em ambiente de teste, não chamar rede. Isso deixa os testes E2E 100% determinísticos
+  // e evita ruído de logs/stack traces (ECONNREFUSED/fetch failed).
+  if (process.env.NODE_ENV === 'test') {
+    return computeLocalQuote(payload);
+  }
+
   const primary = API_URL;
   const fallback = 'http://127.0.0.1:3001';
   async function postQuote(base: string) {
@@ -324,11 +333,9 @@ export async function buildQuote(input: BuildQuoteInput) {
         return await postQuote(fallback);
       } catch {}
     }
-    // Em ambiente de teste, permitir fallback offline determinístico
-    if (QUOTE_OFFLINE_FALLBACK) {
-      return null as any;
-    }
-    throw e;
+    // Não interromper a conversa: retornar null e deixar o fluxo abaixo decidir
+    // entre retry/fallback local (fail-soft) conforme disponibilidade.
+    return null as any;
   });
   if (!resp || !resp.ok) {
     if (!resp && !primary.includes('127.0.0.1') && !primary.includes('localhost')) {

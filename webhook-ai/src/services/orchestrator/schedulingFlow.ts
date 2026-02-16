@@ -103,12 +103,87 @@ function sanitizeAIText(text: string): string {
   return t;
 }
 
+function formatAgendamentoExternalReturnIfNeeded(text: string): string {
+  const raw = String(text || '').trim();
+  if (!raw) return raw;
+  if (!/\|/.test(raw)) return raw;
+  if (!/\bagendamento_confirmado\b/i.test(raw)) return raw;
+
+  const parts = raw.split('|').map((p) => p.trim());
+  const header = parts.shift() || 'AGENDAMENTO_CONFIRMADO';
+  if (!/agendamento_confirmado/i.test(header)) return raw;
+
+  const data: Record<string, string> = {};
+  for (const p of parts) {
+    const idx = p.indexOf(':');
+    if (idx <= 0) continue;
+    const k = p.slice(0, idx).trim().toLowerCase();
+    const v = p.slice(idx + 1).trim();
+    if (!k) continue;
+    data[k] = v;
+  }
+
+  const os = data['os'] || '';
+  let cliente = data['cliente'] || 'Cliente';
+  const onlyDigits = (cliente || '').replace(/\D+/g, '');
+  if (onlyDigits.length >= 11 && onlyDigits.length >= Math.floor((cliente || '').length * 0.8)) {
+    cliente = 'Cliente';
+  }
+
+  const tecnico = (data['tecnico'] || '').trim() || 'A definir';
+  const valor = (data['valor'] || '').trim() || 'A definir';
+  const equipamentos = (data['equipamentos'] || '').trim() || 'Equipamento';
+  const qtd = (data['qtd_equipamentos'] || '').trim();
+
+  const horario = (data['horario'] || '').trim();
+  let dataBr = '';
+  let horaBr = '';
+  if (horario.includes('T') && horario.length >= 16) {
+    try {
+      const datePart = horario.slice(0, 10);
+      const timePart = horario.split('T')[1].slice(0, 5);
+      const [y, m, d] = datePart.split('-');
+      if (y && m && d) dataBr = `${d}/${m}/${y}`;
+      if (timePart) horaBr = timePart;
+    } catch {}
+  }
+
+  const lines: string[] = [];
+  lines.push('*Agendamento confirmado*');
+  if (os) lines.push(`OS: ${os}`);
+  lines.push(`Cliente: ${cliente}`);
+  if (dataBr) lines.push(`Data: ${dataBr}`);
+  if (horaBr) lines.push(`Horário: ${horaBr}`);
+  lines.push(`Técnico: ${tecnico}`);
+  if (qtd) lines.push(`Equipamento(s): ${equipamentos} (${qtd})`);
+  else lines.push(`Equipamento(s): ${equipamentos}`);
+  lines.push(`Valor: ${valor}`);
+
+  return lines.join('\n').trim();
+}
+
 export async function executeAIAgendamento(
   decision: any,
   session?: SessionRecord,
   body?: string,
   from?: string
 ): Promise<string> {
+  // Em alguns cenários (ex.: testes e/ou múltiplos writers), o objeto `session` em memória pode ficar
+  // desatualizado em relação ao estado persistido. Para gates críticos (como `orcamento_entregue`),
+  // preferimos sempre o estado mais recente do banco quando houver `session.id`.
+  try {
+    const sid = (session as any)?.id;
+    if (sid) {
+      const { data } = await supabase.from('bot_sessions').select('state').eq('id', sid).single();
+      const latest = (data as any)?.state;
+      if (latest && typeof latest === 'object') {
+        try {
+          (session as any).state = latest;
+        } catch {}
+      }
+    }
+  } catch {}
+
   // Caso especial: após orçamento de coleta_diagnostico, cliente pergunta se pode levar na empresa.
   // Precisa responder com script fixo (testes dependem disso) e manter CTA de agendamento.
   try {
@@ -244,6 +319,26 @@ export async function executeAIAgendamento(
       if (!okMsg) {
         msg = 'AGENDAMENTO_CONFIRMADO';
       }
+
+      // Persist scheduling confirmation so stage machine derives `scheduled`.
+      try {
+        if ((session as any)?.id) {
+          const stC = (session as any).state || {};
+          const newState = {
+            ...stC,
+            stage: 'scheduled',
+            schedule_confirmed: true,
+            last_schedule_confirmed_at: stC.last_schedule_confirmed_at || Date.now(),
+            pending_time_selection: false,
+            collecting_personal_data: false,
+          } as any;
+          await setSessionState((session as any).id, newState);
+          try {
+            (session as any).state = newState;
+          } catch {}
+        }
+      } catch {}
+      msg = formatAgendamentoExternalReturnIfNeeded(msg);
       return sanitizeAIText(msg);
     }
   } catch {}
@@ -278,6 +373,35 @@ export async function executeAIAgendamento(
 
   // Dados pessoais (apenas após aceite explícito)
   const accepted = hasExplicitAcceptance(body || '');
+
+  // Persist acceptance so subsequent turns don't require the user to repeat "aceito".
+  try {
+    if (accepted && (session as any)?.id) {
+      const stAcc = ((session as any)?.state || {}) as any;
+      if (!stAcc.accepted_service || !stAcc.collecting_personal_data) {
+        const newState = {
+          ...stAcc,
+          accepted_service: true,
+          collecting_personal_data: true,
+          stage: 'collecting_personal',
+          accepted_service_at: stAcc.accepted_service_at || Date.now(),
+        } as any;
+        await setSessionState((session as any).id, newState);
+        try {
+          (session as any).state = newState;
+        } catch {}
+      }
+    }
+  } catch {}
+
+  // GATE: exigir orçamento entregue antes de iniciar agendamento
+  // Evita oferecer horários quando ainda não houve orçamento.
+  try {
+    const hasQuoteDelivered = !!(session as any)?.state?.orcamento_entregue;
+    if (!hasQuoteDelivered) {
+      return sanitizeAIText('Antes de agendarmos, preciso te passar o orçamento.');
+    }
+  } catch {}
 
   // DETECTAR SELEÇÃO DE HORÁRIO (PRIORIDADE MÁXIMA)
   const isTimeSelection =
@@ -359,14 +483,12 @@ export async function executeAIAgendamento(
                   if ((session as any)?.id) {
                     await setSessionState((session as any).id, {
                       ...prevSt0,
-                      orcamento_entregue: prevSt0.orcamento_entregue || true,
                       last_quote: quote0,
                       last_quote_ts: Date.now(),
                     } as any);
                     try {
                       (session as any).state = {
                         ...prevSt0,
-                        orcamento_entregue: prevSt0.orcamento_entregue || true,
                         last_quote: quote0,
                         last_quote_ts: Date.now(),
                       } as any;
@@ -592,7 +714,14 @@ export async function executeAIAgendamento(
         try {
           if ((session as any)?.id) {
             const st = (session as any).state || {};
-            const newState = { ...st, pending_time_selection: false } as any;
+            const newState = {
+              ...st,
+              stage: 'scheduled',
+              schedule_confirmed: true,
+              last_schedule_confirmed_at: st.last_schedule_confirmed_at || Date.now(),
+              pending_time_selection: false,
+              collecting_personal_data: false,
+            } as any;
             await setSessionState((session as any).id, newState);
             try {
               (session as any).state = newState;
@@ -901,7 +1030,6 @@ export async function executeAIAgendamento(
             if ((session as any)?.id) {
               const newState1: any = {
                 ...prevSt,
-                orcamento_entregue: prevSt.orcamento_entregue || true,
                 last_quote: quote,
                 last_quote_ts: Date.now(),
               };

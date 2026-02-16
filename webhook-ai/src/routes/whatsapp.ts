@@ -23,7 +23,7 @@ whatsappRouter.get('/status', (_req, res) => {
 whatsappRouter.get('/qr', (_req, res) => {
   if (!requireEnabled(res)) return;
   const st = waClient.getStatus();
-  if (st.qr) return res.json({ qr: st.qr });
+  if (st.qr) return res.json({ qr: st.qr, qrUpdatedAt: st.qrUpdatedAt ?? null });
   return res.status(204).end();
 });
 // Exibe o QR como página HTML simples

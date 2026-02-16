@@ -25,7 +25,7 @@ export const AllowedActions = [
 
 export type AIRouterAction = (typeof AllowedActions)[number];
 
-export const AllowedMounts = ['embutido', 'bancada', 'industrial'] as const;
+export const AllowedMounts = ['embutido', 'bancada', 'industrial', 'piso', 'cooktop'] as const;
 
 export type AIRouterMount = (typeof AllowedMounts)[number];
 
@@ -39,6 +39,7 @@ const DadosExtrairSchema = z
     marca: z.string().min(1).optional(),
     problema: z.string().min(1).optional(),
     mount: MountSchema.optional(),
+    power_type: z.string().min(1).optional(),
     num_burners: z
       .union([z.string(), z.number()])
       .optional()

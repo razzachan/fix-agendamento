@@ -11,11 +11,12 @@ export type WAStatus = {
   connected: boolean;
   me?: { id: string; pushname?: string } | null;
   qr?: string | null; // dataURL
+  qrUpdatedAt?: number | null; // epoch ms
 };
 
 class WhatsAppClient extends EventEmitter {
   private client: any;
-  private status: WAStatus = { connected: false, me: null, qr: null };
+  private status: WAStatus = { connected: false, me: null, qr: null, qrUpdatedAt: null };
   private started = false;
   private messageHandlers: Array<
     (
@@ -99,7 +100,7 @@ class WhatsAppClient extends EventEmitter {
       this.overrideWebVersion = latest;
       try { await this.client.destroy(); } catch {}
       this.started = false;
-      this.status = { connected: false, me: null, qr: null };
+      this.status = { connected: false, me: null, qr: null, qrUpdatedAt: null };
       this.initClient();
       await this.client.initialize();
       this.started = true;
@@ -296,6 +297,20 @@ class WhatsAppClient extends EventEmitter {
     } catch {}
 
     const chosenWebVersion = this.overrideWebVersion || process.env.WA_WEB_VERSION || null;
+
+    const getIntEnv = (key: string, fallback: number) => {
+      const raw = String(process.env[key] ?? '').trim();
+      const value = raw ? Number(raw) : NaN;
+      return Number.isFinite(value) ? value : fallback;
+    };
+
+    // QR: aumentar tolerância para o usuário escanear pelo front.
+    // Defaults maiores em Railway para evitar "Max qrcode retries reached" rápido.
+    const qrMaxRetries = getIntEnv('WA_QR_MAX_RETRIES', isRailway ? 60 : 10);
+    const qrScanTimeoutMs = getIntEnv('WA_QR_SCAN_TIMEOUT_MS', isRailway ? 120000 : 30000);
+
+    console.log('[WA] QR config:', { qrMaxRetries, qrScanTimeoutMs });
+
     const baseConfig: any = {
       authStrategy: new LocalAuth({ clientId: 'fixbot-v2', dataPath }),
       puppeteer: {
@@ -307,7 +322,7 @@ class WhatsAppClient extends EventEmitter {
       },
       takeoverOnConflict: true,
       takeoverTimeoutMs: 0,
-      qrMaxRetries: 10,
+      qrMaxRetries,
       restartOnAuthFail: true,
     };
     if (chosenWebVersion) {
@@ -331,7 +346,7 @@ class WhatsAppClient extends EventEmitter {
         if (!this.status.connected) {
           this.tryReinitWithLatest('qr_timeout');
         }
-      }, 30000);
+      }, qrScanTimeoutMs);
     });
 
     // Reanexa listeners se já existiam (após reconexões)
@@ -361,6 +376,7 @@ class WhatsAppClient extends EventEmitter {
       try {
         const dataURL = await qrcode.toDataURL(qr);
         this.status.qr = dataURL;
+        this.status.qrUpdatedAt = Date.now();
         this.status.connected = false;
         this.status.me = null;
         console.log('[WA] ✅ QR recebido e convertido para DataURL');
@@ -409,6 +425,7 @@ class WhatsAppClient extends EventEmitter {
     this.client.on('ready', async () => {
       this.status.connected = true;
       this.status.qr = null;
+      this.status.qrUpdatedAt = null;
 
       try {
         // Tentar obter informações do usuário de várias formas
@@ -557,6 +574,7 @@ class WhatsAppClient extends EventEmitter {
 
     this.client.on('authenticated', () => {
       this.status.qr = null;
+      this.status.qrUpdatedAt = null;
       console.log('[WA] Autenticado');
       this.emit('authenticated');
 
@@ -720,6 +738,7 @@ class WhatsAppClient extends EventEmitter {
     this.client.on('disconnected', async (r: any) => {
       this.status.connected = false;
       this.status.qr = null;
+      this.status.qrUpdatedAt = null;
       console.warn('[WA] Desconectado', r);
       this.emit('disconnected');
       // Se foi LOGOUT, não tentar reconectar automaticamente (arquivos podem estar lockados no Windows)
@@ -771,7 +790,7 @@ class WhatsAppClient extends EventEmitter {
       await this.client.destroy();
     } catch {}
     this.started = false;
-    this.status = { connected: false, me: null, qr: null };
+    this.status = { connected: false, me: null, qr: null, qrUpdatedAt: null };
     this.initClient();
     await this.start();
   }
@@ -941,7 +960,7 @@ class WhatsAppClient extends EventEmitter {
     try {
       await this.client.destroy();
     } catch {}
-    this.status = { connected: false, me: null, qr: null };
+    this.status = { connected: false, me: null, qr: null, qrUpdatedAt: null };
     this.started = false;
     this.initClient();
     await this.client.initialize();
@@ -952,7 +971,7 @@ class WhatsAppClient extends EventEmitter {
     try {
       await this.client.destroy();
     } catch {}
-    this.status = { connected: false, me: null, qr: null };
+    this.status = { connected: false, me: null, qr: null, qrUpdatedAt: null };
     this.started = false;
   }
 
@@ -982,7 +1001,7 @@ class WhatsAppClient extends EventEmitter {
         }
       }
     }
-    this.status = { connected: false, me: null, qr: null };
+    this.status = { connected: false, me: null, qr: null, qrUpdatedAt: null };
     this.started = false;
     // não reinicia automaticamente; ficará desconectado até connect()
   }

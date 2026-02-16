@@ -16,6 +16,9 @@ export type InboundSignals = {
 
 export function normalizeInboundText(text: string): string {
   return String(text || '')
+    // Remove caracteres invisíveis/controle que quebram regex (ex.: \u0000 no meio de "instalação")
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .trim()

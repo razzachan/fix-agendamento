@@ -337,6 +337,66 @@ export function buildActionHandlers(
 
         // Fora de escopo/tópico
         try {
+          // Quando o cliente quer “conversar”/perguntar algo fora do funil,
+          // responda humanizadamente (OpenAI) e reconduza com 1 pergunta do funil.
+          // Importante: em testes, ou quando LLM_FAKE_JSON está sendo usado para forçar decisões,
+          // não chamar chatComplete aqui para não devolver JSON pro cliente.
+          const fake = String(process.env.LLM_FAKE_JSON || '').trim();
+          const fakeLooksLikeJson = !!fake && (fake.startsWith('{') || fake.startsWith('['));
+
+          const prev = (session as any)?.state?.dados_coletados || {};
+          const eq = (decision as any)?.dados_extrair?.equipamento || prev.equipamento;
+          const brand = (decision as any)?.dados_extrair?.marca || prev.marca;
+          const prob = (decision as any)?.dados_extrair?.problema || prev.problema || prev.descricao_problema;
+
+          const nextQuestion = !eq
+            ? 'Pra eu te ajudar direitinho: qual é o equipamento (fogão, cooktop, forno, micro-ondas etc.)?'
+            : !brand
+              ? `Qual é a marca do seu ${String(eq)}?`
+              : !prob
+                ? `E qual é o problema que está acontecendo com seu ${String(eq)}${brand ? ` ${String(brand)}` : ''}?`
+                : 'Perfeito — quer que eu te passe os valores e já veja datas pra agendar?';
+
+          if (!fakeLooksLikeJson && process.env.NODE_ENV !== 'test') {
+            try {
+              const bot = await getActiveBot();
+              const llm = (bot as any)?.llm || {};
+              const provider = (llm.provider || 'openai') as any;
+              const model =
+                provider === 'anthropic'
+                  ? llm.model || process.env.LLM_ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022'
+                  : llm.model || process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini';
+
+              const system =
+                buildSystemPrompt((bot as any)?.personality?.systemPrompt, undefined) +
+                '\n\n' +
+                'Instruções (conversa + recondução):\n' +
+                '- Responda a mensagem do usuário de forma humana e breve (1–3 frases).\n' +
+                '- Não invente valores, prazos, garantias ou políticas.\n' +
+                '- Não peça dados pessoais.\n' +
+                '- Em seguida, faça UMA pergunta para retomar o atendimento (funil).';
+
+              const response = await chatComplete(
+                { provider, model, temperature: llm.temperature ?? 0.7, maxTokens: 260 },
+                [
+                  { role: 'system', content: system },
+                  { role: 'user', content: String(body || '') },
+                ]
+              );
+
+              const base = String(response || '').trim();
+              if (!base) return nextQuestion;
+
+              // Se o modelo já reconduziu, não duplicar.
+              if (/qual\s+(e|é)\s+o\s+equipamento|qual\s+(e|é)\s+a\s+marca|qual\s+(e|é)\s+o\s+problema|me\s+diga\s+qual\s+(e|é)\s+o\s+equipamento/i.test(base)) {
+                return base;
+              }
+              return `${base}\n\n${nextQuestion}`;
+            } catch {
+              // fallback determinístico abaixo
+            }
+          }
+
           const { getTemplates, renderTemplate } = await import('../botConfig.js');
           const tpls = await getTemplates();
           const offTopic = tpls.find((t: any) => t.key === 'off_topic');

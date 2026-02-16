@@ -137,4 +137,30 @@ describe('Orchestrator: cenários avançados de fluxo', () => {
     expect(r1).toBeTruthy();
     expect(r2).toBeTruthy();
   });
+
+  it('"cooktop" como clarificação (mount) não deve resetar marca nem perguntar marca de novo', async () => {
+    const s = await getOrCreateSession('whatsapp', 'test:+5511922222222');
+    await setSessionState(s.id, {
+      ...(s.state || {}),
+      dados_coletados: { equipamento: 'fogão a gás', marca: 'Consul', problema: 'não acende' },
+      orcamento_entregue: false,
+    });
+
+    // Recarrega para não depender de referência antiga em memória
+    const sFresh = await getOrCreateSession('whatsapp', 'test:+5511922222222');
+
+    const out = await orchestrateInbound(
+      'test:+5511922222222',
+      'é um cooktop as 2 bocas da frente',
+      sFresh
+    );
+    const text = typeof out === 'string' ? out : (out as any)?.text || '';
+    expect((text || '').toLowerCase()).not.toContain('qual é a marca');
+    expect((text || '').toLowerCase()).not.toContain('marca do equipamento');
+
+    const s2 = await getOrCreateSession('whatsapp', 'test:+5511922222222');
+    const st = (s2 as any).state || {};
+    expect(String(st.dados_coletados?.marca || '').toLowerCase()).toContain('consul');
+    expect(String(st.dados_coletados?.mount || '').toLowerCase()).toContain('cooktop');
+  });
 });

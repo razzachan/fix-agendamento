@@ -478,6 +478,117 @@ app.get('/admin/conversations', async (req, res) => {
   }
 });
 
+// Admin: auditoria de configuração de preços (price_list) vs. service_types usados pelo orquestrador
+// GET /admin/pricing/audit
+app.get('/admin/pricing/audit', async (req, res) => {
+  try {
+    const adminKey = process.env.ADMIN_API_KEY;
+    const provided = String(req.headers['x-admin-key'] || '');
+    if (!adminKey || provided !== adminKey) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+      return res.status(500).json({ ok: false, error: 'missing_supabase_env' });
+    }
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const sb = createClient(url, key, { auth: { persistSession: false } });
+
+    const expectedServiceTypes = [
+      // genéricos
+      'domicilio',
+      'domicilio_coifa',
+      'coleta_diagnostico',
+      'coleta_conserto',
+      // fogão/cooktop (gas)
+      'domicilio_fogao_piso4_nacional',
+      'domicilio_fogao_piso4_premium',
+      'domicilio_fogao_piso4_inox_basico',
+      'domicilio_fogao_piso4_inox_premium',
+      'domicilio_fogao_piso5_nacional',
+      'domicilio_fogao_piso5_premium',
+      'domicilio_fogao_piso5_inox_basico',
+      'domicilio_fogao_piso5_inox_premium',
+      'domicilio_fogao_piso6_nacional',
+      'domicilio_fogao_cooktop4_nacional',
+      'domicilio_fogao_cooktop4_importado',
+      'domicilio_fogao_cooktop4_premium',
+      'domicilio_fogao_cooktop5_nacional',
+      'domicilio_fogao_cooktop5_importado',
+      'domicilio_fogao_cooktop5_premium',
+    ];
+
+    const { data: rows, error } = await sb
+      .from('price_list')
+      .select('id,service_type,region,urgency,base,min,max,priority');
+    if (error) {
+      return res.status(500).json({ ok: false, error: error.message || String(error) });
+    }
+
+    const norm = (v: any) => {
+      if (v === undefined || v === null) return null;
+      const s = String(v).trim();
+      return s.length ? s : null;
+    };
+
+    const byType = new Map<string, any[]>();
+    for (const r of rows || []) {
+      const st = String((r as any).service_type || '').trim();
+      if (!st) continue;
+      if (!byType.has(st)) byType.set(st, []);
+      byType.get(st)!.push(r);
+    }
+
+    const configuredTypes = Array.from(byType.keys()).sort();
+
+    const hasDefaultRule = (st: string) => {
+      const list = byType.get(st) || [];
+      return list.some((r) => norm((r as any).region) === null && norm((r as any).urgency) === null);
+    };
+
+    const missingTypes = expectedServiceTypes.filter((st) => !byType.has(st));
+    const missingDefaultRules = expectedServiceTypes
+      .filter((st) => byType.has(st))
+      .filter((st) => !hasDefaultRule(st));
+
+    const riskyOnlySpecificRules = expectedServiceTypes
+      .filter((st) => byType.has(st))
+      .filter((st) => {
+        const list = byType.get(st) || [];
+        // se não existe default e todas regras exigem algum campo específico
+        return list.length > 0 && !hasDefaultRule(st);
+      });
+
+    const unreferencedTypes = configuredTypes.filter((st) => !expectedServiceTypes.includes(st));
+
+    const expectedStats = expectedServiceTypes.map((st) => {
+      const list = byType.get(st) || [];
+      return {
+        service_type: st,
+        configured_rules: list.length,
+        has_default_rule: hasDefaultRule(st),
+      };
+    });
+
+    return res.json({
+      ok: true,
+      expected_count: expectedServiceTypes.length,
+      configured_distinct_service_types: configuredTypes.length,
+      missing_types: missingTypes,
+      missing_default_rules: missingDefaultRules,
+      risky_only_specific_rules: riskyOnlySpecificRules,
+      unreferenced_types_count: unreferencedTypes.length,
+      unreferenced_types_sample: unreferencedTypes.slice(0, 50),
+      expected_stats: expectedStats,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e?.message || String(e) });
+  }
+});
+
 
 app.post('/restart', async (_req, res) => {
   try {
@@ -640,7 +751,32 @@ app.post('/test-media', async (req, res) => {
         });
         const data = await resp.json().catch(() => null);
         if (resp.ok && data?.ok && ((data?.type && data.type !== 'indeterminado') || (data?.segment && data.segment !== 'indeterminado'))) {
-          classificationResult = { segment: data.segment, type: data.type, confidence: data.confidence, source: 'api' };
+          classificationResult = {
+            segment: data.segment,
+            type: data.type,
+            burners: data.burners ?? data?.attributes?.burners ?? data?.attributes?.num_burners,
+            confidence: data.confidence,
+            source: 'api',
+          };
+
+          // Se a API (CLIP) não souber as bocas, tenta inferir só as bocas via Vision.
+          if (!classificationResult.burners || classificationResult.burners === 'indeterminado') {
+            try {
+              const { chatComplete } = await import('./services/llmClient.js');
+              const imageData = `data:${mimetype};base64,${base64}`;
+              const prompt = 'Analise esta imagem de fogão e responda APENAS com um JSON no formato: {"type":"floor|cooktop|indeterminado","segment":"basico|inox|premium|indeterminado","burners":"4|5|6|indeterminado"}.';
+              const visionResponse = await chatComplete(
+                { provider: 'openai', model: process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini' },
+                [
+                  { role: 'system', content: 'Você identifica número de bocas em fogões/cooktops.' },
+                  { role: 'user', content: [ { type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageData } } ] as any }
+                ]
+              );
+              const cleaned = String(visionResponse || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+              const only = JSON.parse(cleaned || '{}');
+              if (only?.burners) classificationResult.burners = String(only.burners);
+            } catch {}
+          }
         }
       } catch {}
 
@@ -673,7 +809,24 @@ app.post('/test-media', async (req, res) => {
 
       if (classificationResult) {
         result.classification = classificationResult;
+        // Compat: expõe no top-level também (para scripts/smoke e integrações antigas)
+        result.source = classificationResult.source;
+        result.visual_type = classificationResult.type;
+        result.visual_segment = classificationResult.segment;
+        result.visual_burners = classificationResult.burners;
+        result.visual_confidence = classificationResult.confidence;
         try { const { logEvent } = await import('./services/analytics.js'); await logEvent({ type: 'media:image:classified', from, channel: 'whatsapp', data: classificationResult }); } catch {}
+
+        // Persistir na sessão para que o fluxo de orçamento use as pistas visuais.
+        try {
+          const st = (session.state || {}) as any;
+          st.visual_segment = classificationResult.segment || 'indeterminado';
+          st.visual_type = classificationResult.type || 'indeterminado';
+          st.visual_burners = classificationResult.burners || 'indeterminado';
+          st.visual_confidence = classificationResult.confidence;
+          st.visual_source = classificationResult.source;
+          await setSessionState(session.id, st);
+        } catch {}
       }
 
       // Detecção geral de equipamento via LLM (UX): equip + mount
@@ -771,6 +924,12 @@ app.post('/test-real-message', async (req, res) => {
 
 app.use((err: any, _req: any, res: any, _next: any) => {
   console.error('Unhandled error:', err);
+  try {
+    // body-parser invalid JSON -> return 400 instead of generic 500
+    if (err?.type === 'entity.parse.failed' || err?.statusCode === 400 || err?.status === 400) {
+      return res.status(400).json({ error: true, message: 'Invalid JSON body' });
+    }
+  } catch {}
   res.status(500).json({ error: true, message: 'Internal Server Error' });
 });
 

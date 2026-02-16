@@ -1,3 +1,11 @@
+import {
+  applyFunnelToDadosColetados,
+  getDefaultFunnelState,
+  isSameEquipmentFamily,
+  mergeFunnelState,
+  normalizeProblemFromDados,
+} from '../funnelState.js';
+
 export const ConversationStages = [
   'collecting_core',
   'quoted',
@@ -88,7 +96,61 @@ export function mergeStateWithStage(prevState: any, patchState: any): any {
   const prev = prevState && typeof prevState === 'object' ? prevState : {};
   const patch = patchState && typeof patchState === 'object' ? patchState : {};
 
-  const merged = { ...prev, ...patch };
+  const merged: any = { ...prev, ...patch };
+
+  // Importante: `dados_coletados` é um objeto acumulativo (marca/equipamento/problema/etc).
+  // Vários pontos do pipeline aplicam patches parciais (ex.: apenas `mount` ou `equipamento`).
+  // Um merge shallow apagaria campos já coletados e causaria loops (ex.: perguntar marca de novo).
+  try {
+    const prevDc = (prev as any).dados_coletados;
+    const patchDc = (patch as any).dados_coletados;
+    const prevIsObj = !!prevDc && typeof prevDc === 'object' && !Array.isArray(prevDc);
+    const patchIsObj = !!patchDc && typeof patchDc === 'object' && !Array.isArray(patchDc);
+    if (prevIsObj && patchIsObj) {
+      merged.dados_coletados = { ...prevDc, ...patchDc };
+    }
+  } catch {}
+
+  // Canonical funnel state: keep it updated whenever `dados_coletados` evolves.
+  try {
+    const dc = (merged as any).dados_coletados;
+    const shouldMaintainFunnel =
+      !!(prev as any).funnel ||
+      !!(patch as any).funnel ||
+      (!!dc &&
+        (dc.equipamento || dc.marca || dc.problema || dc.mount || dc.power_type || dc.num_burners));
+
+    if (shouldMaintainFunnel) {
+      const prevFunnelRaw = (prev as any).funnel;
+      const patchFunnelRaw = (patch as any).funnel;
+
+      let baseFunnel: any = prevFunnelRaw || getDefaultFunnelState();
+      try {
+        const prevEq = String(baseFunnel?.equipamento || '');
+        const nextEq = String(dc?.equipamento || '');
+        if (prevEq && nextEq && !isSameEquipmentFamily(prevEq, nextEq)) {
+          baseFunnel = getDefaultFunnelState();
+        }
+      } catch {}
+
+      const patchFromDados: any = {
+        equipamento: dc?.equipamento || undefined,
+        marca: dc?.marca || undefined,
+        problema: normalizeProblemFromDados(dc) || undefined,
+        mount: dc?.mount || undefined,
+        power_type: dc?.power_type || undefined,
+        num_burners: dc?.num_burners || undefined,
+      };
+
+      const nextFunnel = mergeFunnelState(baseFunnel, {
+        ...(patchFunnelRaw || {}),
+        ...patchFromDados,
+      } as any);
+
+      (merged as any).funnel = nextFunnel;
+      (merged as any).dados_coletados = applyFunnelToDadosColetados(dc || {}, nextFunnel);
+    }
+  } catch {}
 
   // Decide next stage:
   // - If patch explicitly provides a valid stage, respect it.

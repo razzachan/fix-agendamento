@@ -22,3 +22,7 @@ Este documento descreve como executar e o que os testes cobrem.
 - As variáveis de ambiente de teste são definidas em `vitest.setup.ts`.
 - O Supabase é mockável com `MOCK_SUPABASE=true`.
 
+## Runbook
+
+- Fluxo do funil/agendamento + smoke test em produção: `docs/bot-runbook.md`
+

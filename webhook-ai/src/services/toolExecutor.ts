@@ -111,6 +111,22 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
 
     // Guarda de segurança: só chamar buildQuote quando tivermos dados mínimos
     if (obj.tool === 'buildQuote') {
+      // Tentar completar campos a partir da sessão (evita repetir perguntas de marca/problema)
+      try {
+        const dadosSessao = (sessionState?.dados_coletados || {}) as any;
+        if (!input.equipment && dadosSessao.equipamento) input.equipment = String(dadosSessao.equipamento);
+        if (!input.brand && (dadosSessao.marca || dadosSessao.brand))
+          input.brand = String(dadosSessao.marca || dadosSessao.brand);
+        if (!input.description && !input.problem) {
+          const prob =
+            dadosSessao.problema ||
+            dadosSessao.descricao_problema ||
+            dadosSessao.description ||
+            dadosSessao.problem;
+          if (prob) input.description = String(prob);
+        }
+      } catch {}
+
       const eq = String(input.equipment || '').toLowerCase();
       const power = String(input.power_type || '').toLowerCase();
       const desc = String(input.description || '').toLowerCase();
@@ -202,8 +218,37 @@ export async function tryExecuteTool(text: string, context?: { channel?: string;
         return await getOrderStatus(input?.id || input);
       case 'aiScheduleStart': {
         const phone = normalizePeerToPhone(context?.peer) || input.telefone || input.phone;
+
+        const pickNameFromState = (st: any) => {
+          const dados = st?.dados_coletados || {};
+          return (
+            dados?.nome ||
+            dados?.cliente_nome ||
+            dados?.name ||
+            st?.customer_name ||
+            st?.client_name ||
+            ''
+          );
+        };
+
+        const sanitizeName = (name: any) => {
+          const raw = String(name || '').trim();
+          if (!raw) return '';
+          const hasLetters = /[a-zA-ZÀ-ÿ]/.test(raw);
+          const digits = raw.replace(/\D/g, '');
+          // Se parece telefone (só dígitos e 8+), não usar como nome.
+          if (!hasLetters && digits.length >= 8) return '';
+          return raw;
+        };
+
+        const candidateName =
+          sanitizeName(input.client_name) ||
+          sanitizeName(input.nome) ||
+          sanitizeName(pickNameFromState(sessionState)) ||
+          '';
+
         const payload = {
-          nome: input.client_name || input.nome || phone,
+          nome: candidateName || 'Cliente WhatsApp',
           endereco: input.address || input.endereco || '',
           equipamento: input.equipment || input.equipamento || '',
           problema: input.description || input.problema || '',

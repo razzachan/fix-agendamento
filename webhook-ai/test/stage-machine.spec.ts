@@ -22,4 +22,27 @@ describe('stageMachine', () => {
     const st2 = mergeStateWithStage(st, { pending_time_selection: true });
     expect(st2.stage).toBe('confirming_slot');
   });
+
+  it('mergeStateWithStage deep-merges dados_coletados', () => {
+    const prev = {
+      dados_coletados: { equipamento: 'cooktop', marca: 'consul', problema: 'não acende' },
+      orcamento_entregue: true,
+    };
+
+    const patched = mergeStateWithStage(prev, {
+      dados_coletados: { mount: 'cooktop' },
+    });
+
+    expect(patched.dados_coletados).toMatchObject({
+      equipamento: 'cooktop',
+      marca: 'consul',
+      problema: 'não acende',
+      mount: 'cooktop',
+    });
+
+    const patched2 = mergeStateWithStage(prev, {
+      dados_coletados: { marca: 'brastemp' },
+    });
+    expect(patched2.dados_coletados.marca).toBe('brastemp');
+  });
 });

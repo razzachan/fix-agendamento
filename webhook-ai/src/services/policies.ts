@@ -117,6 +117,7 @@ export function getPreferredServicesForEquipment(
 export function getServicePolicyHintsForPrompt(): string {
   return `Políticas de serviço (resumo):
 - Forno elétrico embutido → coleta_diagnostico
+- Micro-ondas embutido → coleta_diagnostico
 - Micro-ondas de bancada → coleta_conserto
 - Lava-louças / Lavadora / Secadora → coleta_diagnostico
 - Coifa / Fogão a gás / Cooktop → domicilio (visita)

@@ -16,6 +16,37 @@ describe('AI router decision schema', () => {
     expect(Array.isArray(d.blocos_relevantes)).toBe(true);
   });
 
+  it('accepts mount variants used in production (piso, cooktop)', () => {
+    const d1 = parseAIRoutingDecision({
+      intent: 'orcamento_equipamento',
+      blocos_relevantes: [],
+      dados_extrair: { equipamento: 'fogão a gás', mount: 'piso' },
+      acao_principal: 'gerar_orcamento',
+      resposta_sugerida: '',
+    });
+    expect(d1.dados_extrair.mount).toBe('piso');
+
+    const d2 = parseAIRoutingDecision({
+      intent: 'orcamento_equipamento',
+      blocos_relevantes: [],
+      dados_extrair: { equipamento: 'cooktop elétrico', mount: 'cooktop' },
+      acao_principal: 'gerar_orcamento',
+      resposta_sugerida: '',
+    });
+    expect(d2.dados_extrair.mount).toBe('cooktop');
+  });
+
+  it('accepts power_type as extracted entity', () => {
+    const d = parseAIRoutingDecision({
+      intent: 'orcamento_equipamento',
+      blocos_relevantes: [],
+      dados_extrair: { equipamento: 'fogão', power_type: 'gas' },
+      acao_principal: 'gerar_orcamento',
+      resposta_sugerida: '',
+    });
+    expect(d.dados_extrair.power_type).toBe('gas');
+  });
+
   it('rejects invalid intent', () => {
     expect(() =>
       parseAIRoutingDecision({

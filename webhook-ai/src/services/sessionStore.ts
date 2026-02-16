@@ -124,35 +124,41 @@ export async function setSessionState(session_id: string, state: any) {
     }
   };
 
-  try {
-    const { prev, version, exists } = await readCurrent();
-    const next = mergeStateWithStage(prev, state || {});
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const maxAttempts = 4;
 
-    // Em testes (MOCK_SUPABASE) alguns specs passam uma sessão "na mão" sem criar a row.
-    // Nesse caso, criamos uma row mínima para que o optimistic locking funcione e o estado persista.
-    if (!exists && isMockSupabase) {
-      const payload: any = { id: session_id, channel: 'whatsapp', peer_id: session_id, state: next };
-      if (typeof version === 'number') payload.state_version = version;
-      await supabase.from('bot_sessions').insert(payload).select().single();
-      return;
-    }
+  const bestEffortMergeWrite = async (reason: string) => {
+    try {
+      const { prev, version } = await readCurrent();
+      const next = mergeStateWithStage(prev, state || {});
 
-    if (typeof version === 'number') {
-      await attemptOptimisticUpdate(version, next);
-      return;
-    }
-    await supabase.from('bot_sessions').update({ state: next }).eq('id', session_id);
-  } catch (e: any) {
-    if (looksLikeMissingColumnError(e, 'state_version')) {
-      const next = mergeStateWithStage({}, state || {});
+      if (typeof version === 'number') {
+        await supabase
+          .from('bot_sessions')
+          .update({ state: next, state_version: version + 1 })
+          .eq('id', session_id);
+        logger.warn('[SESSION] best-effort state write (versioned)', { session_id, reason });
+        return;
+      }
+
       await supabase.from('bot_sessions').update({ state: next }).eq('id', session_id);
-      return;
+      logger.warn('[SESSION] best-effort state write (unversioned)', { session_id, reason });
+    } catch (e: any) {
+      logger.error('[SESSION] best-effort state write failed', {
+        session_id,
+        reason,
+        error: String(e?.message || e),
+      });
     }
-    if (e instanceof OptimisticLockError) {
-      // One retry with fresh version
+  };
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
       const { prev, version, exists } = await readCurrent();
       const next = mergeStateWithStage(prev, state || {});
 
+      // Em testes (MOCK_SUPABASE) alguns specs passam uma sessão "na mão" sem criar a row.
+      // Nesse caso, criamos uma row mínima para que o optimistic locking funcione e o estado persista.
       if (!exists && isMockSupabase) {
         const payload: any = { id: session_id, channel: 'whatsapp', peer_id: session_id, state: next };
         if (typeof version === 'number') payload.state_version = version;
@@ -166,10 +172,41 @@ export async function setSessionState(session_id: string, state: any) {
       }
       await supabase.from('bot_sessions').update({ state: next }).eq('id', session_id);
       return;
+    } catch (e: any) {
+      if (looksLikeMissingColumnError(e, 'state_version')) {
+        // Se a coluna não existir, re-ler o estado e aplicar merge sem versionamento.
+        const { prev } = await readCurrent();
+        const next = mergeStateWithStage(prev, state || {});
+        await supabase.from('bot_sessions').update({ state: next }).eq('id', session_id);
+        return;
+      }
+
+      if (e instanceof OptimisticLockError) {
+        // Muitos writes podem ocorrer por inbound (adapter + orchestrator + logs).
+        // Re-tentar algumas vezes com backoff curto evita perder atualizações como `dados_coletados.marca`.
+        if (attempt < maxAttempts - 1) {
+          logger.warn('[SESSION] state_version conflict; retrying', {
+            session_id,
+            attempt: attempt + 1,
+            maxAttempts,
+          });
+          await sleep(25 + attempt * 50);
+          continue;
+        }
+
+        // Após esgotar retries, tentar um merge-write sem condição de versionamento.
+        await bestEffortMergeWrite('optimistic_lock_exhausted');
+        return;
+      }
+
+      // Não sobrescrever estado a partir de {} em caso de erro: faz merge best-effort.
+      logger.error('[SESSION] setSessionState error; best-effort merge write', {
+        session_id,
+        error: String(e?.message || e),
+      });
+      await bestEffortMergeWrite('unexpected_error');
+      return;
     }
-    // Fallback: tenta salvar do jeito antigo
-    const next = mergeStateWithStage({}, state || {});
-    await supabase.from('bot_sessions').update({ state: next }).eq('id', session_id);
   }
 }
 
