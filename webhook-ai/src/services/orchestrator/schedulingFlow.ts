@@ -2,6 +2,7 @@ import { supabase } from '../supabase.js';
 import { setSessionState, type SessionRecord } from '../sessionStore.js';
 import { logger } from '../logger.js';
 import { classifyInbound, normalizeComparableText } from '../inboundClassifier.js';
+import { guessFunnelFields } from '../funnelGuesser.js';
 import { isPeerAllowedForTestMode, isTestModeEnabled } from '../testMode.js';
 
 function shouldMarkAppointmentsAsTest(peer?: string): boolean {
@@ -415,9 +416,47 @@ export async function executeAIAgendamento(
         const stQ = ((session as any)?.state || {}) as any;
         const dcQ = (stQ.dados_coletados || {}) as any;
 
-        const equipamentoQ = (dcQ.equipamento || (dados as any)?.equipamento || '').trim();
-        const marcaQ = (dcQ.marca || (dados as any)?.marca || '').trim();
-        const problemaQ = (dcQ.problema || (dados as any)?.problema || '').trim();
+        const nowGuess = guessFunnelFields(String(body || '')) as any;
+        const nowEquipRaw = String(nowGuess?.equipamento || '').trim();
+        const nowEquipNorm = normalizeComparableText(nowEquipRaw);
+        const prevEquipRaw = String(
+          (stQ?.last_quote?.equipment || stQ?.last_quote?.equipamento || stQ?.funnel?.equipamento || dcQ?.equipamento || '')
+        ).trim();
+        const prevEquipNorm = normalizeComparableText(prevEquipRaw);
+
+        const equipReintroduced = !!nowEquipNorm && !!prevEquipNorm && nowEquipNorm !== prevEquipNorm;
+        const mentionedBrandNow = !!String(nowGuess?.marca || '').trim();
+        const mentionedProblemNow = !!String(nowGuess?.problema || '').trim();
+
+        // Se o usuário reintroduz um equipamento diferente, não herdar marca/problema antigos
+        // (a merge do estado tende a reter campos antigos a menos que sejam sobrescritos).
+        if (equipReintroduced && (dcQ?.marca || dcQ?.problema)) {
+          try {
+            if ((session as any)?.id) {
+              const newStateClear: any = {
+                ...stQ,
+                dados_coletados: {
+                  ...dcQ,
+                  equipamento: nowEquipRaw || dcQ?.equipamento || null,
+                  marca: mentionedBrandNow ? (nowGuess?.marca || dcQ?.marca || null) : null,
+                  problema: mentionedProblemNow ? (nowGuess?.problema || dcQ?.problema || null) : null,
+                },
+              };
+              await setSessionState((session as any).id, newStateClear);
+              try {
+                (session as any).state = newStateClear;
+              } catch {}
+            }
+          } catch {}
+        }
+
+        const equipamentoQ = (nowEquipRaw || dcQ.equipamento || (dados as any)?.equipamento || '').trim();
+        const marcaQ = (
+          (equipReintroduced && !mentionedBrandNow ? '' : dcQ.marca || (dados as any)?.marca || '')
+        ).trim();
+        const problemaQ = (
+          (equipReintroduced && !mentionedProblemNow ? '' : dcQ.problema || (dados as any)?.problema || '')
+        ).trim();
 
         if (!equipamentoQ) {
           return 'Pra eu te passar o orçamento certinho: qual é o equipamento (ex.: coifa, fogão, cooktop, forno, micro-ondas)?';
@@ -490,7 +529,12 @@ export async function executeAIAgendamento(
                     ...stQ,
                     dados_coletados: mergedDados,
                     orcamento_entregue: true,
-                    last_quote: quote,
+                    last_quote: {
+                      ...(quote as any),
+                      equipment: equipamentoQ,
+                      brand: marcaQ || null,
+                      problem: problemaQ || null,
+                    },
                     last_quote_ts: Date.now(),
                   };
                   await setSessionState((session as any).id, newStateQ);
@@ -518,7 +562,12 @@ export async function executeAIAgendamento(
                 ...stQ,
                 dados_coletados: mergedDados,
                 orcamento_entregue: true,
-                last_quote: quote,
+                last_quote: {
+                  ...(quote as any),
+                  equipment: equipamentoQ,
+                  brand: marcaQ || null,
+                  problem: problemaQ || null,
+                },
                 last_quote_ts: Date.now(),
               };
               await setSessionState((session as any).id, newStateQ);
@@ -622,15 +671,26 @@ Deseja agendar? Se sim, pode responder "aceito".`
                 try {
                   const prevSt0 = (session as any)?.state || {};
                   if ((session as any)?.id) {
+                    const eq0 = (startInput0 as any).equipamento;
                     await setSessionState((session as any).id, {
                       ...prevSt0,
-                      last_quote: quote0,
+                      last_quote: {
+                        ...(quote0 as any),
+                        equipment: eq0,
+                        brand: (dc0 as any)?.marca || null,
+                        problem: (dc0 as any)?.problema || null,
+                      },
                       last_quote_ts: Date.now(),
                     } as any);
                     try {
                       (session as any).state = {
                         ...prevSt0,
-                        last_quote: quote0,
+                        last_quote: {
+                          ...(quote0 as any),
+                          equipment: eq0,
+                          brand: (dc0 as any)?.marca || null,
+                          problem: (dc0 as any)?.problema || null,
+                        },
                         last_quote_ts: Date.now(),
                       } as any;
                     } catch {}
@@ -1185,7 +1245,12 @@ Deseja agendar? Se sim, pode responder "aceito".`
             if ((session as any)?.id) {
               const newState1: any = {
                 ...prevSt,
-                last_quote: quote,
+                last_quote: {
+                  ...(quote as any),
+                  equipment: (startInput as any).equipamento,
+                  brand: (dc as any)?.marca || null,
+                  problem: (dc as any)?.problema || null,
+                },
                 last_quote_ts: Date.now(),
               };
               await setSessionState((session as any).id, newState1);

@@ -41,6 +41,77 @@ type AmbiguityPrompt = {
   options: Array<{ id: string; text: string }>;
 };
 
+type MultiTextReply = {
+  texts: string[];
+};
+
+type OrchestratorReply = string | AmbiguityPrompt | MultiTextReply | null;
+
+function formatCurrencyBRL(value: any): string {
+  const v = Number(value);
+  if (!Number.isFinite(v) || v <= 0) return '';
+  return `R$ ${v}`;
+}
+
+const DIAGNOSTICO_COLETA_FEE = 350;
+
+function buildDiscriminatedQuoteText(params: {
+  equipamento: string;
+  marca?: string | null;
+  problema?: string | null;
+  service_type: string;
+  quote: any;
+}): string {
+  const q: any = params.quote || {};
+  const equipamento =
+    String(params.equipamento || q.equipment || 'equipamento').trim() || 'equipamento';
+  const marca = String((params.marca ?? q.brand ?? q.marca ?? '') || '').trim();
+  const problema = String((params.problema ?? q.problem ?? q.problema ?? '') || '').trim();
+  const stype = String(params.service_type || '').toLowerCase();
+  const value = Number(q.value ?? q.total ?? q.price ?? q.min ?? q.max ?? 0);
+  const priceTxt = formatCurrencyBRL(value);
+
+  const headerParts: string[] = [];
+  headerParts.push(equipamento);
+  if (marca) headerParts.push(`Marca: ${marca}`);
+  if (problema) headerParts.push(`Problema: ${problema}`);
+
+  const header = headerParts.join(' | ');
+
+  if (/domic/.test(stype)) {
+    return `${header}\nAtendimento em domicílio (no local) — valor fixo final${priceTxt ? `: ${priceTxt}` : ''}.`;
+  }
+  if (/coleta/.test(stype) && /conserto/.test(stype)) {
+    return `${header}\nColeta + conserto — coletamos e entregamos em até 5 dias úteis — valor fixo final${priceTxt ? `: ${priceTxt}` : ''}.`;
+  }
+
+  // coleta_diagnostico (padrão)
+  const diagTxt = formatCurrencyBRL(DIAGNOSTICO_COLETA_FEE);
+  return `${header}\nColeta para diagnóstico — coletamos e entregamos em até 5 dias úteis — diagnóstico: ${diagTxt}. Se aprovar o conserto, esse valor desconta do total (abatemos 100%).`;
+}
+
+function isRoutingDiagEnabled(): boolean {
+  const v = String(process.env.ROUTING_DIAG || '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
+function maskPeerForLogs(peer: string | undefined | null): string {
+  const raw = String(peer || '').trim();
+  if (!raw) return '';
+  const digits = raw.replace(/\D+/g, '');
+  if (digits.length >= 4) return `***${digits.slice(-4)}`;
+  return raw.length > 10 ? `${raw.slice(0, 6)}…` : raw;
+}
+
+function routingDiag(event: string, data: Record<string, any>) {
+  if (!isRoutingDiagEnabled()) return;
+  try {
+    console.log('[ROUTING-DIAG]', event, JSON.stringify(data));
+  } catch {
+    console.log('[ROUTING-DIAG]', event);
+  }
+}
+
 async function logAIRoute(event: string, payload: any) {
   // Envia para tabela legada e também para analytics unificado
   try {
@@ -83,6 +154,7 @@ function detectPriorityIntent(text: string): string | null {
   if (/(\breagendar\b|\breagendamento\b|trocar horario|nova data|remarcar)/.test(b))
     return 'reagendamento';
   if (/(\bcancelar\b|\bcancelamento\b|desmarcar)/.test(b)) return 'cancelamento';
+  if (signals.wantsStatus) return 'status_ordem';
   if (/(\bstatus\b|acompanhar|andamento|numero da os|n\u00ba da os|numero da ordem)/.test(b))
     return 'status_ordem';
   // Evitar falso-positivo de instalação quando houver negação explícita
@@ -109,7 +181,6 @@ function hasExplicitAcceptance(text: string): boolean {
     'ok pode marcar',
     'aceito',
     'aceito o orçamento',
-    'aceito o orcamento',
     'fechado',
     'fechou',
     'pode vir',
@@ -362,12 +433,29 @@ async function notifyInternalHandoff(from: string, userText: string, session: an
   }
 }
 
+function looksLikeMultiEquipMessage(text: string): boolean {
+  const raw = String(text || '').trim();
+  if (!raw) return false;
+  const lower = raw.toLowerCase();
+  if (/(\b2\s*equip\b|\bdois\s+equip\b|\b2\s*itens\b|\bdois\s+itens\b|\bmulti\s*equip\b)/i.test(lower))
+    return true;
+  if (/(\bitem\s*1\b|\bitem\s*2\b|\bequipamento_2\b|\bmarca_2\b|\bproblema_2\b)/i.test(lower))
+    return true;
+  if (/\b1\)\b[\s\S]*\b2\)\b/i.test(lower)) return true;
+  try {
+    const g: any = guessFunnelFields(raw);
+    if (Array.isArray(g?.equipamentosEncontrados) && g.equipamentosEncontrados.length >= 2)
+      return true;
+  } catch {}
+  return false;
+}
+
 export async function orchestrateInbound(
   from: string,
   body: string,
   session?: SessionRecord
-): Promise<string | AmbiguityPrompt | null> {
-  // Early guard: paused/resume and explicit human handoff before any routing/logs
+): Promise<OrchestratorReply> {
+  // Early guard: paused/resume and explicit human handoff before any routing/flow
   try {
     const stEarly = ((session as any)?.state || {}) as any;
     const isHandoffPaused = !!(stEarly.handoff_paused || stEarly.bot_paused);
@@ -375,6 +463,7 @@ export async function orchestrateInbound(
       /\b(voltar\s+ao\s+bot|retomar\s+bot|continuar\s+com\s+o\s+bot|voltar\s+pro\s+bot)\b/i.test(
         String(body || '')
       );
+
     if (isHandoffPaused) {
       if (wantsUnpauseEarly) {
         const newState = {
@@ -418,12 +507,25 @@ export async function orchestrateInbound(
     }
   } catch {}
 
+  // **NOVO: Roteamento 100% por IA (ativado por variável de ambiente)**
+  // Mantemos o valor disponível desde o início para diagnóstico e fluxos com early-return.
+  const useAIRouter = (process.env.USE_AI_ROUTER ?? 'true').toLowerCase() === 'true';
+
+  const diagCtx = {
+    sessionId: String((session as any)?.id || ''),
+    peer: maskPeerForLogs(from),
+    channel: String((session as any)?.channel || ''),
+  };
+  routingDiag('inbound_start', { ...diagCtx, useAIRouter });
+
   // Fast-path: se já entregamos orçamento e o usuário pergunta preço/“quanto fica?”,
   // repetir o último orçamento imediatamente (sem depender do roteamento por IA).
   try {
     const msg = String(body || '').toLowerCase();
     const asksPrice = /\b(quanto|pre[cç]o|preco|valor|custa|or[cç]amento|orcamento)\b/i.test(msg);
-    if (asksPrice && session) {
+    // Se o texto descreve claramente 2 itens, NÃO repetir last_quote (1 item).
+    // Deixe o fluxo normal reprocessar e gerar orçamento discriminado.
+    if (asksPrice && session && !looksLikeMultiEquipMessage(body || '')) {
       let stFast = ((session as any)?.state || {}) as any;
       try {
         if ((session as any)?.id) {
@@ -433,6 +535,31 @@ export async function orchestrateInbound(
             .eq('id', (session as any).id)
             .single();
           if ((row as any)?.state) stFast = (row as any).state;
+        }
+      } catch {}
+
+      // Multi-quote fast-path (2 equipamentos)
+      try {
+        const arr = (stFast as any)?.last_quotes;
+        if (Array.isArray(arr) && arr.length >= 2) {
+          const q1: any = arr[0];
+          const q2: any = arr[1];
+          const dc = ((stFast as any)?.dados_coletados || {}) as any;
+          const t1 = buildDiscriminatedQuoteText({
+            equipamento: String(q1?.equipment || dc?.equipamento || 'equipamento'),
+            marca: String(dc?.marca || ''),
+            problema: String(dc?.problema || ''),
+            service_type: String(q1?.service_type || dc?.tipo_atendimento_1 || ''),
+            quote: q1,
+          });
+          const t2 = buildDiscriminatedQuoteText({
+            equipamento: String(q2?.equipment || dc?.equipamento_2 || 'equipamento'),
+            marca: String(dc?.marca_2 || ''),
+            problema: String(dc?.problema_2 || ''),
+            service_type: String(q2?.service_type || dc?.tipo_atendimento_2 || ''),
+            quote: q2,
+          });
+          return { texts: [t1, `${t2}\n\nQuer que eu já veja datas pra agendar?`] };
         }
       } catch {}
 
@@ -547,12 +674,24 @@ export async function orchestrateInbound(
 
     const prevFamilyExplicit = (prevFunnel?.equipment_family || equipmentFamilyOf(prevEquip)) as EquipmentFamily;
     const prevProblemText = String(prevFunnel?.problema || prevDados0?.problema || (st0 as any)?.last_problem_text || '');
+    const prevMountHint = String(prevFunnel?.mount || prevDados0?.mount || '');
+    const prevHasFogaoSignals =
+      !!(prevFunnel?.num_burners || prevDados0?.num_burners) ||
+      !!(prevFunnel?.power_type || prevDados0?.power_type) ||
+      /\b(piso|cooktop)\b/i.test(prevMountHint);
     const prevFamily = (prevFamilyExplicit !== 'unknown'
       ? prevFamilyExplicit
-      : inferFamilyFromProblemText(prevProblemText)) as EquipmentFamily;
+      : prevHasFogaoSignals
+        ? 'fogao'
+        : inferFamilyFromProblemText(prevProblemText)) as EquipmentFamily;
     const incomingFamily = equipmentFamilyOf(incomingEquip) as EquipmentFamily;
 
-    const explicitEquipInMessage = !!guess0?.equipamento;
+    const explicitEquipInMessage = !!(
+      (guess0 as any)?.equipamento ||
+      (Array.isArray((guess0 as any)?.equipamentosEncontrados) &&
+        (guess0 as any).equipamentosEncontrados.length > 0) ||
+      patch?.equipamento
+    );
     const hasPrevCore =
       !!prevFunnel?.marca ||
       !!prevFunnel?.problema ||
@@ -572,7 +711,12 @@ export async function orchestrateInbound(
       !st0.bot_paused &&
       !st0.handoff_paused &&
       ((prevFamily !== 'unknown' && prevFamily !== incomingFamily) ||
-        (prevFamily === 'unknown' && hasPrevCore && switchHint));
+        (prevFamily === 'unknown' &&
+          hasPrevCore &&
+          // Quando o equipamento anterior não foi persistido, mas já coletamos marca/problema,
+          // a próxima menção explícita de equipamento deve iniciar um novo tópico.
+          // (Ex.: smoke troca fogão → micro-ondas e a marca antiga não pode vazar.)
+          (switchHint || (!prevEquip && !!incomingEquip))));
 
     const nextFunnel = mergeFunnelState(shouldResetByTopic ? getDefaultFunnelState() : prevFunnel, patch);
 
@@ -592,7 +736,9 @@ export async function orchestrateInbound(
         num_burners: null,
         // limpar core antigo
         marca: null,
+        brand: null,
         problema: null,
+        problem: null,
         descricao_problema: null,
         description: null,
       };
@@ -655,10 +801,7 @@ export async function orchestrateInbound(
     try {
       const st = (session?.state || {}) as any;
       const offTopicCount = st.off_topic_count || 0;
-      const humanRequested =
-        /\b(humano|pessoa|atendente|operador|falar\s+com\s+algu[eé]m|transferir|escalar)\b/i.test(
-          userText
-        );
+      const humanRequested = classifyInbound(String(userText || '')).wantsHuman;
 
       if (humanRequested) {
         const newState = {
@@ -731,7 +874,7 @@ export async function orchestrateInbound(
 
       console.log(`[HUMANIZED-REDIRECT] Off-context (${offTopicCount}/3) → GPT + CTA para ${from}`);
 
-      const system = `${buildSystemPrompt(((await getActiveBot()) as any)?.personality?.systemPrompt, undefined)}\n\nVocê é um assistente da assistência técnica.\nRegras:\n- Se a mensagem fugir do contexto de assistência, responda com educação em 1–2 frases, sem prometer ações fora do escopo.\n- Em seguida, sempre reconduza com um CTA claro para o atendimento.\n- Não invente preços, prazos ou disponibilidade de serviços que não prestamos.\n- Não peça dados pessoais *dentro da resposta humanizada*; o CTA final (fora do texto da IA) pode pedir o próximo dado necessário do processo.\n- Seja breve e amigável.`;
+      const system = `${buildSystemPrompt(((await getActiveBot()) as any)?.personality?.systemPrompt, undefined)}\n\nVocê é um assistente da assistência técnica.\nRegras:\n- Se a mensagem fugir do contexto de assistência, responda com educação em 1–2 frases, sem prometer ações fora do escopo.\n- Em seguida, sempre reconduza com um CTA claro para o atendimento.\n- Não invente preços, prazos ou disponibilidade de serviços que não prestamos.\n- Não peça dados pessoais *dentro da resposta humanizada*; o CTA final (fora do texto da IA) pode pedir o próximo dado necessário do processo.\n- NUNCA ofereça ao cliente escolher entre “atendimento em domicílio” vs “coleta/retirada” (isso não é escolhível; depende do equipamento e das políticas).\n- Se o cliente perguntar sobre domicílio/coleta, responda sem pedir preferência e reconduza para coletar equipamento e problema.\n- Seja breve e amigável.`;
 
       const reply = await chatComplete(
         {
@@ -758,6 +901,40 @@ export async function orchestrateInbound(
       }
 
       const short = base.length > 420 ? base.slice(0, 420) + '…' : base;
+
+      // Guardrail (humanized redirect): nunca oferecer ao cliente escolher tipo de atendimento.
+      try {
+        const normOut = normalizeComparableText(String(short || ''));
+        const asksOption =
+          /qual\s+(opcao|opcao)\s+voce\s+prefere|qual\s+op[cç]ao\s+voc[eê]\s+prefere|qual\s+op[cç]ao\s+prefere|qual\s+vc\s+prefere|qual\s+você\s+prefere|qual\s+prefere/.test(
+            normOut
+          );
+        const mentionsDomicilio = /\bdomicilio\b|\bem\s+domicilio\b/.test(normOut);
+        const mentionsColeta = /\bcoleta\b|\bretirada\b/.test(normOut);
+        const offersChoice =
+          (asksOption && (mentionsDomicilio || mentionsColeta)) ||
+          (mentionsDomicilio && mentionsColeta);
+
+        if (offersChoice) {
+          const stFix = ((session as any)?.state || {}) as any;
+          const dcFix = (stFix.dados_coletados || {}) as any;
+          routingDiag('guardrail_service_choice', {
+            ...diagCtx,
+            branch: 'humanized',
+            hasEquip: !!dcFix.equipamento,
+            hasBrand: !!dcFix.marca,
+            hasProblem: !!(dcFix.problema || dcFix.descricao_problema),
+          });
+
+          const safeBase =
+            'Entendi! Pra eu te orientar certinho, eu preciso seguir o atendimento com algumas informações rápidas.';
+          const safeCta =
+            String(cta || '').trim() ||
+            'Pra eu te ajudar com o atendimento, me diga: qual é o equipamento e qual o problema?';
+          return `${safeBase}\n\n${safeCta}`;
+        }
+      } catch {}
+
       return /equipamento.*problema/i.test(short) || (cta && short.includes(String(cta).trim()))
         ? short
         : short + suffix;
@@ -808,6 +985,40 @@ export async function orchestrateInbound(
         } catch {}
       } catch {}
       return msg;
+    }
+  } catch {}
+
+  // Guardrail determinístico: quando o usuário já pede orçamento (especialmente multi-equip),
+  // não dependa do roteamento por IA (que pode oscilar para saudação/perguntas genéricas).
+  // Isso torna o fluxo estável e evita repetir `last_quote` de um item.
+  try {
+    const raw = String(body || '').trim();
+    const sig = classifyInbound(raw);
+    if (!sig.isGreetingOnly) {
+      const lower = raw.toLowerCase();
+      const asksBudget = /\b(or[cç]amento|orcamento|quanto|pre[cç]o|preco|valor|custa)\b/i.test(lower);
+      const multi = looksLikeMultiEquipMessage(raw);
+      let hasCoreSignal = false;
+      try {
+        const g: any = guessFunnelFields(raw);
+        hasCoreSignal = !!(g?.equipamento || g?.marca || g?.problema);
+      } catch {}
+
+      // Se o texto tem sinal claro de orçamento + dados de reparo, execute decisão determinística.
+      if ((asksBudget || multi) && (multi || hasCoreSignal) && raw.length >= 6) {
+        const forced = {
+          intent: 'orcamento',
+          acao_principal: 'gerar_orcamento',
+          dados_extrair: {},
+        } as any;
+        routingDiag('forced_deterministic_budget', {
+          ...diagCtx,
+          asksBudget,
+          multi,
+          hasCoreSignal,
+        });
+        return await orchestrateInboundWithDecision(from, body, forced as any, session);
+      }
     }
   } catch {}
 
@@ -2070,15 +2281,14 @@ export async function orchestrateInbound(
               let cta: string | undefined;
 
               if (st.pending_time_selection || hasSlots) {
-                cta = 'Qual opção de horário você prefere? (1, 2 ou 3)';
+                cta = 'Qual horário você prefere? (responda 1, 2 ou 3)';
               } else if (st.collecting_personal_data || st.accepted_service) {
                 if (!dc.nome) cta = 'Pra eu seguir com o agendamento, qual é seu nome completo?';
                 else if (!dc.endereco)
                   cta = 'Qual é o endereço completo (rua, número, bairro e CEP)?';
                 else if (!dc.email) cta = 'Qual é seu e-mail?';
-                else if (!dc.telefone) cta = 'Qual é seu telefone/WhatsApp com DDD?';
                 else if (!dc.cpf) cta = 'Por fim, qual é o CPF para a nota?';
-                else cta = 'Qual opção de horário você prefere? (1, 2 ou 3)';
+                else cta = 'Qual horário você prefere? (responda 1, 2 ou 3)';
               } else {
                 const hasEquip = !!dc.equipamento;
                 const hasBrand = !!dc.marca;
@@ -2100,23 +2310,33 @@ export async function orchestrateInbound(
     }
   } catch {}
 
-  // **NOVO: Roteamento 100% por IA (ativado por variável de ambiente)**
-  const useAIRouter = (process.env.USE_AI_ROUTER ?? 'true').toLowerCase() === 'true';
+  let aiRouterFailed = false;
 
   if (useAIRouter) {
     try {
       console.log('[AI-ROUTER] 🚀 Chamando aiBasedRouting...');
       const res = await aiBasedRouting(from, body, session);
       console.log('[AI-ROUTER] ✅ aiBasedRouting retornou:', res ? 'resultado' : 'null');
+      routingDiag('ai_router_return', { ...diagCtx, hasResult: !!res });
       await logAIRoute('ai_route_success', { from, body, res });
       return res;
     } catch (e) {
+      aiRouterFailed = true;
+      routingDiag('ai_router_error_fallback', {
+        ...diagCtx,
+        error: String((e as any)?.message || e),
+      });
       await logAIRoute('ai_route_error', { from, body, error: String(e) });
       console.error('[AI-ROUTER] ❌ Erro, usando fallback:', e);
       console.error('[AI-ROUTER] ❌ Stack trace:', (e as Error)?.stack);
       // Continua para o sistema legado
     }
   }
+
+  routingDiag('legacy_start', {
+    ...diagCtx,
+    reason: !useAIRouter ? 'USE_AI_ROUTER=false' : aiRouterFailed ? 'ai_router_error' : 'ai_router_null',
+  });
 
   // **SISTEMA LEGADO (mantido como fallback)**
   const bot = await getActiveBot();
@@ -2362,6 +2582,45 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
 
     // 🔧 CORREÇÃO: Se detectou novo equipamento diferente
     if (g.equipamento && dados.equipamento && g.equipamento !== dados.equipamento) {
+      // Ao trocar de equipamento, evite reaproveitar marca/problema antigos
+      // (a menos que tenham sido explicitamente informados na mensagem atual).
+      const bodyRaw = String(body || '');
+      const bodyLower = bodyRaw.toLowerCase();
+
+      const mentionedBrandNow = (() => {
+        try {
+          if (g.marca) return true;
+          const knownBrandRegex =
+            /\b(brastemp|consul|electrolux|eletrolux|lg|samsung|philco|midea|fischer|tramontina|mueller|dako|esmaltec|atlas|bosch|ge|panasonic|continental)\b/i;
+          if (knownBrandRegex.test(bodyRaw)) return true;
+
+          const stAll = (session as any)?.state || {};
+          const currentBrand = String(stAll?.dados_coletados?.marca || '').trim();
+          if (!currentBrand) return false;
+          const esc = currentBrand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const re = new RegExp(`\\b${esc}\\b`, 'i');
+          return re.test(bodyRaw);
+        } catch {
+          return false;
+        }
+      })();
+
+      const mentionedProblemNow = (() => {
+        try {
+          if (g.problema) return true;
+          const stAll = (session as any)?.state || {};
+          const currentProblem = String(stAll?.dados_coletados?.problema || '').trim();
+          if (!currentProblem) return false;
+          const esc = currentProblem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const re = new RegExp(`\\b${esc}\\b`, 'i');
+          return re.test(bodyRaw);
+        } catch {
+          return false;
+        }
+      })();
+
+      const mentionedMountNow = /(embutid|bancada)/i.test(bodyLower);
+
       // Derivar alvo mais específico a partir do texto (ex.: "fogão elétrico", "fogão a gás")
       const b = (body || '').toLowerCase();
       let targetEquip = g.equipamento;
@@ -2382,7 +2641,11 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
         // Em testes, aplicar troca imediatamente e resetar orçamento
         const stAll = (session as any)?.state || {};
         const newDados: any = { ...stAll.dados_coletados, equipamento: targetEquip };
-        delete newDados.problema;
+        if (!mentionedProblemNow) delete newDados.problema;
+        if (!mentionedBrandNow) delete newDados.marca;
+        if (!mentionedMountNow) delete newDados.mount;
+        // Campos específicos que não devem vazar entre equipamentos
+        delete newDados.num_burners;
         const newState: any = {
           ...stAll,
           dados_coletados: newDados,
@@ -2415,7 +2678,10 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
         if (isExplicitSwitch) {
           const stAll = (session as any)?.state || {};
           const newDados: any = { ...stAll.dados_coletados, equipamento: targetEquip };
-          delete newDados.problema;
+          if (!mentionedProblemNow) delete newDados.problema;
+          if (!mentionedBrandNow) delete newDados.marca;
+          if (!mentionedMountNow) delete newDados.mount;
+          delete newDados.num_burners;
           const newState: any = {
             ...stAll,
             dados_coletados: newDados,
@@ -2854,6 +3120,81 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
         text =
           'Consigo te ajudar sim. Antes de eu pedir dados pessoais, eu preciso primeiro entender o equipamento e o defeito para calcular o orçamento.\n\nQual é a marca e o que exatamente está acontecendo?';
       }
+    }
+  } catch {}
+
+  // Guardrail (legado): nunca oferecer ao cliente escolher tipo de atendimento.
+  // Mesmo no fallback (chatComplete), aplicamos uma regra determinística.
+  try {
+    const normOut = normalizeComparableText(String(text || ''));
+    const asksOption = /qual\s+(opcao|opcao)\s+voce\s+prefere|qual\s+op[cç]ao\s+voc[eê]\s+prefere|qual\s+op[cç]ao\s+prefere|qual\s+vc\s+prefere|qual\s+você\s+prefere|qual\s+prefere/.test(
+      normOut
+    );
+    const mentionsDomicilio = /\bdomicilio\b|\bem domicilio\b/.test(normOut);
+    const mentionsColeta = /\bcoleta\b/.test(normOut);
+    const offersChoice =
+      (asksOption && (mentionsDomicilio || mentionsColeta)) || (mentionsDomicilio && mentionsColeta);
+
+    if (offersChoice) {
+      const stFix = ((session as any)?.state || {}) as any;
+      const dcFix = (stFix.dados_coletados || {}) as any;
+      const equipamento = String(dcFix.equipamento || '').trim();
+      const marca = String(dcFix.marca || '').trim();
+      const problema = String(dcFix.problema || dcFix.descricao_problema || '').trim();
+
+      const policies = await fetchServicePolicies().catch(() => []);
+      const preferred = getPreferredServicesForEquipment(policies as any, equipamento);
+      const chosen = String((preferred && preferred[0]) || '').trim();
+
+      routingDiag('guardrail_service_choice', {
+        ...diagCtx,
+        branch: 'legacy',
+        chosen,
+        hasEquip: !!equipamento,
+        hasBrand: !!marca,
+        hasProblem: !!problema,
+      });
+
+      const modeText =
+        chosen === 'domicilio'
+          ? 'Esse equipamento atendemos em domicílio (visita técnica no local).'
+          : chosen === 'coleta_conserto'
+            ? 'Esse equipamento atendemos por coleta + conserto na oficina.'
+            : chosen === 'coleta_diagnostico'
+              ? 'Esse equipamento atendemos por coleta diagnóstico na oficina.'
+              : '';
+
+      const nextQuestion = !equipamento
+        ? 'Pra eu te ajudar direitinho: qual é o equipamento (fogão, cooktop, forno, micro-ondas etc.)?'
+        : !marca
+          ? `Qual é a marca do seu ${equipamento}?`
+          : !problema
+            ? `E qual é o problema que está acontecendo com seu ${equipamento}${marca ? ` ${marca}` : ''}?`
+            : 'Perfeito — quer que eu já veja datas pra agendar?';
+
+      // Persistir tipo_atendimento_1 inferido para as próximas etapas do funil.
+      try {
+        if (
+          chosen &&
+          (chosen === 'domicilio' || chosen === 'coleta_diagnostico' || chosen === 'coleta_conserto')
+        ) {
+          const mergedDc = { ...dcFix, tipo_atendimento_1: dcFix.tipo_atendimento_1 || chosen };
+          if ((session as any)?.id) {
+            await setSessionState((session as any).id, { ...stFix, dados_coletados: mergedDc });
+            try {
+              (session as any).state = { ...stFix, dados_coletados: mergedDc };
+            } catch {}
+          }
+        }
+      } catch {}
+
+      const offerMsg =
+        chosen && (chosen === 'domicilio' || chosen === 'coleta_diagnostico' || chosen === 'coleta_conserto')
+          ? getOfferMessageForServiceType(policies as any, chosen as any)
+          : null;
+
+      const head = offerMsg ? offerMsg : modeText;
+      text = head ? `${head}\n\n${nextQuestion}` : nextQuestion;
     }
   } catch {}
 
@@ -3685,6 +4026,34 @@ Além disso, ao chamar buildQuote, preencha o input com o máximo de contexto di
   return (text || '').trim() || null;
 }
 
+// Admin/debug helper: execute a provided routing decision deterministically (no LLM).
+// Useful for production spot-checks behind an admin-only endpoint.
+export async function orchestrateInboundWithDecision(
+  from: string,
+  body: string,
+  decision: AIRouterDecision,
+  session?: SessionRecord
+): Promise<OrchestratorReply> {
+  // Mirror the real orchestrator behavior: ensure decision extraction is merged into
+  // session.state.dados_coletados before executing the decision.
+  try {
+    const st = ((session as any)?.state || {}) as any;
+    const dc = ((st as any)?.dados_coletados || {}) as any;
+    const de = ((decision as any)?.dados_extrair || {}) as any;
+    if (session) {
+      (session as any).state = {
+        ...st,
+        dados_coletados: {
+          ...dc,
+          ...de,
+        },
+      };
+    }
+  } catch {}
+
+  return executeAIDecision(decision, from, body, session, []);
+}
+
 // Helper: extrai possíveis causas de blocos de conhecimento relevantes
 async function getPossibleCauses(session?: SessionRecord, lastMessage?: string): Promise<string[]> {
   try {
@@ -3747,7 +4116,7 @@ async function aiBasedRouting(
   from: string,
   body: string,
   session?: SessionRecord
-): Promise<string | null> {
+): Promise<OrchestratorReply> {
   try {
     console.log('[AI-ROUTER] 🎯 Analisando mensagem:', body.slice(0, 100));
 
@@ -4253,6 +4622,11 @@ NOMENCLATURA: Nas respostas, sempre use "forno comercial" ao invés de "forno de
 
   const prompt = `Você é um assistente especialista em roteamento de conversas para uma assistência técnica de eletrodomésticos. Retorne SOMENTE JSON puro (sem comentários, sem texto fora do JSON), obedecendo exatamente o schema.
 
+REGRA CRÍTICA (tipo de atendimento NÃO é escolhível):
+- O tipo de atendimento (domicílio vs coleta_diagnostico vs coleta_conserto) é determinado exclusivamente pelo equipamento e pelas políticas.
+- NUNCA ofereça ao cliente escolher “domicílio ou coleta” / “qual opção prefere”.
+- Se o equipamento estiver ausente ou ambíguo (ex.: micro-ondas sem dizer embutido/bancada; fogão sem dizer gás/elétrico/indução), faça UMA pergunta objetiva para esclarecer.
+
 MENSAGEM_DO_CLIENTE: ${JSON.stringify(message)}
 DADOS_SESSAO_ATUAL: ${JSON.stringify(sessionData || {}, null, 2)}
 SINAIS_CLASSIFICADOR: ${JSON.stringify(
@@ -4287,7 +4661,7 @@ Retorne:
 {
   "intent": oneof["saudacao_inicial","orcamento_equipamento","agendamento_servico","status_ordem","reagendamento","cancelamento","pos_atendimento","instalacao","multi_equipamento","outros"],
   "blocos_relevantes": array<number, max=3>,
-  "dados_extrair": {"equipamento"?: string, "marca"?: string, "problema"?: string, "mount"?: oneof["embutido","bancada","industrial"], "num_burners"?: string},
+  "dados_extrair": {"equipamento"?: string, "marca"?: string, "problema"?: string, "mount"?: oneof["embutido","bancada","industrial"], "num_burners"?: string, "tipo_atendimento_1"?: oneof["domicilio","coleta_diagnostico","coleta_conserto"], "equipamento_2"?: string, "marca_2"?: string, "problema_2"?: string, "mount_2"?: oneof["embutido","bancada","industrial"], "tipo_atendimento_2"?: oneof["domicilio","coleta_diagnostico","coleta_conserto"]},
   "acao_principal": oneof["coletar_dados","gerar_orcamento","agendar_servico","responder_informacao","transferir_humano"],
   "resposta_sugerida": "Resposta natural e empática (máximo 600 chars). Use 'forno comercial' ao invés de 'forno de padaria'"
 }`;
@@ -4336,6 +4710,71 @@ Retorne:
       }
     } catch {}
 
+    // Pós-processamento: não aceitar `problema` alucinado em mensagens que não descrevem defeito.
+    // Ex.: "é a gás", "piso 4 bocas", ou apenas a marca ("Brastemp").
+    try {
+      const de: any = (decision as any)?.dados_extrair || {};
+      const extractedProblem = String(de?.problema || '').trim();
+      const sessionProblem =
+        String((sessionData as any)?.problema || '').trim() ||
+        String((sessionData as any)?.descricao_problema || '').trim() ||
+        String((sessionData as any)?.description || '').trim() ||
+        '';
+
+      if (extractedProblem && !sessionProblem) {
+        const msgNorm = String(message || '')
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .toLowerCase()
+          .trim();
+
+        const symptomHints =
+          /\b(nao|não)\b|\b(liga|acende|esquenta|aquece|gira|fa[ií]sca|barulho|vaza|vazando|cheiro|amarela|fraca|trava|travado|quebrou|parou)\b/i;
+
+        const looksLikeBrandOnly =
+          !!msgNorm &&
+          msgNorm.length <= 40 &&
+          !symptomHints.test(msgNorm) &&
+          /^[a-z\s]{2,}$/.test(msgNorm) &&
+          !/\b(fogao|cooktop|micro|microondas|forno|coifa|geladeira|lavadora|lava|secadora|adega)\b/i.test(
+            msgNorm
+          );
+
+        const looksLikeMountOrBurnersOnly =
+          !!msgNorm &&
+          msgNorm.length <= 60 &&
+          !symptomHints.test(msgNorm) &&
+          (/(\b(piso|cooktop)\b)/.test(msgNorm) ||
+            (/(\b4\b|\b5\b|\b6\b)/.test(msgNorm) && /\bbocas?\b/.test(msgNorm)));
+
+        const looksLikePowerTypeOnly =
+          !!msgNorm &&
+          msgNorm.length <= 30 &&
+          !symptomHints.test(msgNorm) &&
+          /\b(gas|g[aá]s|eletrico|el[eé]trico|inducao|indu[cç][aã]o)\b/.test(msgNorm) &&
+          !/\b(fogao|cooktop|micro|microondas|forno|coifa|geladeira|lavadora|lava|secadora|adega)\b/i.test(
+            msgNorm
+          );
+
+        let guessedProblem = '';
+        try {
+          const g = guessFunnelFields(String(message || '')) as any;
+          guessedProblem = String(g?.problema || '').trim();
+        } catch {}
+
+        const shouldDropProblem =
+          !guessedProblem &&
+          (inboundSignals.isGreetingOnly ||
+            looksLikeBrandOnly ||
+            looksLikeMountOrBurnersOnly ||
+            looksLikePowerTypeOnly);
+
+        if (shouldDropProblem) {
+          delete (decision as any).dados_extrair.problema;
+        }
+      }
+    } catch {}
+
     // Pós-processamento: Normalizar nomenclatura de equipamentos na resposta_sugerida
     if (decision.resposta_sugerida && typeof decision.resposta_sugerida === 'string') {
       decision.resposta_sugerida = decision.resposta_sugerida
@@ -4361,9 +4800,17 @@ async function executeAIDecision(
   body: string,
   session?: SessionRecord,
   allBlocks?: any[]
-): Promise<string | null> {
+): Promise<OrchestratorReply> {
   try {
     console.log('[AI-ROUTER] ⚡ Executando decisão:', decision.acao_principal);
+
+    routingDiag('ai_router_decision', {
+      sessionId: String((session as any)?.id || ''),
+      peer: maskPeerForLogs(from),
+      channel: String((session as any)?.channel || ''),
+      intent: String((decision as any)?.intent || ''),
+      acao_principal: String((decision as any)?.acao_principal || ''),
+    });
 
     const signals = classifyInbound(String(body || ''));
     const st = ((session as any)?.state || {}) as any;
@@ -4433,39 +4880,162 @@ async function executeAIDecision(
       getActiveBot,
     });
 
-    let out: string | null = await actionHandlers[decision.acao_principal]();
+    let out: any = await actionHandlers[decision.acao_principal]();
+
+    // Guardrail: nunca oferecer ao cliente escolher tipo de atendimento.
+    // O tipo de atendimento é decidido por políticas baseadas no equipamento.
+    try {
+      const normOut = normalizeComparableText(String(out || ''));
+      const asksOption = /qual\s+(opcao|opcao)\s+voce\s+prefere|qual\s+op[cç]ao\s+voc[eê]\s+prefere|qual\s+op[cç]ao\s+prefere|qual\s+vc\s+prefere|qual\s+você\s+prefere|qual\s+prefere/.test(
+        normOut
+      );
+      const mentionsDomicilio = /\bdomicilio\b|\bem domicilio\b/.test(normOut);
+      const mentionsColeta = /\bcoleta\b/.test(normOut);
+      const offersChoice = (asksOption && (mentionsDomicilio || mentionsColeta)) || (mentionsDomicilio && mentionsColeta);
+
+      if (offersChoice) {
+        const diagCtx = {
+          sessionId: String((session as any)?.id || ''),
+          peer: maskPeerForLogs(from),
+          channel: String((session as any)?.channel || ''),
+        };
+        const stFix = ((session as any)?.state || {}) as any;
+        const dcFix = (stFix.dados_coletados || {}) as any;
+        const equipamento =
+          String(dcFix.equipamento || (decision as any)?.dados_extrair?.equipamento || '').trim();
+        const marca = String(dcFix.marca || (decision as any)?.dados_extrair?.marca || '').trim();
+        const problema = String(dcFix.problema || dcFix.descricao_problema || (decision as any)?.dados_extrair?.problema || '').trim();
+
+        const policies = await fetchServicePolicies().catch(() => []);
+        const preferred = getPreferredServicesForEquipment(policies as any, equipamento);
+        const chosen = String((preferred && preferred[0]) || '').trim();
+
+        routingDiag('guardrail_service_choice', {
+          ...diagCtx,
+          branch: 'ai-router',
+          chosen,
+          hasEquip: !!equipamento,
+          hasBrand: !!marca,
+          hasProblem: !!problema,
+        });
+
+        const modeText =
+          chosen === 'domicilio'
+            ? 'Esse equipamento atendemos em domicílio (visita técnica no local).'
+            : chosen === 'coleta_conserto'
+              ? 'Esse equipamento atendemos por coleta + conserto na oficina.'
+              : chosen === 'coleta_diagnostico'
+                ? 'Esse equipamento atendemos por coleta diagnóstico na oficina.'
+                : '';
+
+        const nextQuestion = !equipamento
+          ? 'Pra eu te ajudar direitinho: qual é o equipamento (fogão, cooktop, forno, micro-ondas etc.)?'
+          : !marca
+            ? `Qual é a marca do seu ${equipamento}?`
+            : !problema
+              ? `E qual é o problema que está acontecendo com seu ${equipamento}${marca ? ` ${marca}` : ''}?`
+              : 'Perfeito — quer que eu já veja datas pra agendar?';
+
+        // Persistir tipo_atendimento_1 inferido para as próximas etapas do funil.
+        try {
+          if (chosen && (chosen === 'domicilio' || chosen === 'coleta_diagnostico' || chosen === 'coleta_conserto')) {
+            const mergedDc = { ...dcFix, tipo_atendimento_1: dcFix.tipo_atendimento_1 || chosen };
+            if ((session as any)?.id) {
+              await setSessionState((session as any).id, { ...stFix, dados_coletados: mergedDc });
+              try {
+                (session as any).state = { ...stFix, dados_coletados: mergedDc };
+              } catch {}
+            }
+          }
+        } catch {}
+
+        const offerMsg =
+          chosen && (chosen === 'domicilio' || chosen === 'coleta_diagnostico' || chosen === 'coleta_conserto')
+            ? getOfferMessageForServiceType(policies as any, chosen as any)
+            : null;
+
+        const head = offerMsg ? offerMsg : modeText;
+        out = head ? `${head}\n\n${nextQuestion}` : nextQuestion;
+      }
+    } catch {}
 
     // Guardrail anti-loop: nunca pedir "marca" se já temos marca coletada.
     // Isso evita cenários onde a IA sugere a pergunta errada e o funil volta.
     try {
       const stFix = ((session as any)?.state || {}) as any;
       const dcFix = (stFix.dados_coletados || {}) as any;
-      const hasBrandFix = !!dcFix.marca;
       const asksBrandFix = /qual\s+é\s+a\s+marca/i.test(String(out || ''));
-      if (hasBrandFix && asksBrandFix) {
-        const eqFix = String(dcFix.equipamento || '').trim();
-        const eqNorm = eqFix
-          .normalize('NFD')
-          .replace(/\p{Diacritic}/gu, '')
-          .toLowerCase();
-        const probFix = String(dcFix.problema || dcFix.descricao_problema || '').trim();
-        const mountFix = String(dcFix.mount || '').trim();
-        const burnersFix = String(dcFix.num_burners || '').trim();
+      if (asksBrandFix) {
+        let skipBrandOverride = false;
+        // Se o usuário mencionou um equipamento nesta mensagem (ex.: "tenho um micro-ondas"),
+        // não suprimir a pergunta de marca mesmo que exista uma marca no estado.
+        // Isso evita herdar marca de outro equipamento ao trocar de contexto.
+        try {
+          const gNow = guessFunnelFields(String(body || '')) as any;
+          const mentionsEquipNow = !!String(gNow?.equipamento || '').trim();
+          const mentionsBrandNow = !!String(gNow?.marca || '').trim();
+          if (mentionsEquipNow && !mentionsBrandNow) skipBrandOverride = true;
+        } catch {}
 
-        if (!probFix) {
-          out = eqFix
-            ? `Perfeito. Qual é o problema que está acontecendo com seu ${eqFix}?`
-            : 'Perfeito. Pode me descrever rapidamente o defeito que está acontecendo?';
-        } else if ((/fogao/.test(eqNorm) || /cook ?top/.test(eqNorm)) && (!mountFix || !burnersFix)) {
-          out = 'Perfeito. É fogão de piso ou cooktop? Quantas bocas são e quais apresentam o defeito?';
+        if (skipBrandOverride) {
+          // Mantém `out` como está.
         } else {
-          out = 'Perfeito — quer que eu te passe os valores e já veja datas pra agendar?';
+        const eqFix = String(dcFix.equipamento || '').trim();
+        const brandForEquipment = String(dcFix.marca_for_equipment || '').trim();
+        // Só considere que "já temos marca" se ela pertence ao equipamento atual.
+        // Caso contrário (troca de equipamento), permitir perguntar a marca novamente.
+        let hasBrandFix = false;
+        try {
+          hasBrandFix =
+            !!dcFix.marca &&
+            !!brandForEquipment &&
+            (brandForEquipment === eqFix || isSameEquipmentFamily(brandForEquipment, eqFix));
+        } catch {
+          hasBrandFix = !!dcFix.marca && !!brandForEquipment && brandForEquipment === eqFix;
+        }
+
+        if (hasBrandFix) {
+          const eqNorm = eqFix
+            .normalize('NFD')
+            .replace(/\p{Diacritic}/gu, '')
+            .toLowerCase();
+          const probFix = String(dcFix.problema || dcFix.descricao_problema || '').trim();
+          const mountFix = String(dcFix.mount || '').trim();
+          const burnersFix = String(dcFix.num_burners || '').trim();
+
+          if (!probFix) {
+            out = eqFix
+              ? `Perfeito. Qual é o problema que está acontecendo com seu ${eqFix}?`
+              : 'Perfeito. Pode me descrever rapidamente o defeito que está acontecendo?';
+          } else if ((/fogao/.test(eqNorm) || /cook ?top/.test(eqNorm)) && (!mountFix || !burnersFix)) {
+            out = 'Perfeito. É fogão de piso ou cooktop? Quantas bocas são e quais apresentam o defeito?';
+          } else {
+            // CTA determinístico com dica de política (cobre casos como lavadora/coleta diagnóstico)
+            let serviceHint = '';
+            try {
+              const policies = await fetchServicePolicies().catch(() => []);
+              const preferred = getPreferredServicesForEquipment(policies as any, eqFix);
+              const chosen = String((preferred && preferred[0]) || '').trim();
+              serviceHint =
+                chosen === 'coleta_diagnostico'
+                  ? 'coleta diagnóstico'
+                  : chosen === 'coleta_conserto'
+                    ? 'coleta + conserto'
+                    : chosen === 'domicilio'
+                      ? 'visita técnica no local'
+                      : '';
+            } catch {}
+            out = serviceHint
+              ? `Perfeito — na ${serviceHint}, quer que eu te passe os valores e já veja datas pra agendar?`
+              : 'Perfeito — quer que eu te passe os valores (incluindo coleta diagnóstico quando aplicável) e já veja datas pra agendar?';
+          }
+        }
         }
       }
     } catch {}
 
     // Sanitizar pedidos de dados pessoais antes do aceite explícito
-    if (out) {
+    if (out && typeof out === 'string') {
       const st2 = ((session as any)?.state || {}) as any;
       const dc = (st2.dados_coletados || {}) as any;
       const allPersonal = !!(dc.nome && dc.endereco && dc.email && dc.cpf);
@@ -4502,17 +5072,30 @@ async function executeAIDecision(
       }
     }
 
-    return sanitizeAIText(out || '');
+    // Suportar respostas multi-parte (ex.: 2 equipamentos)
+    try {
+      if (out && typeof out === 'object' && Array.isArray((out as any).texts)) {
+        const sanitizeState = (session as any)?.state;
+        const texts = (out as any).texts
+          .map((t: any) => sanitizeAIText(String(t || ''), sanitizeState))
+          .filter(Boolean)
+          .slice(0, 2);
+        return { texts };
+      }
+    } catch {}
+
+    return sanitizeAIText(String(out || ''), (session as any)?.state);
   } catch (e) {
     console.error('[AI-ROUTER] ❌ Erro ao executar decisão:', e);
     return sanitizeAIText(
-      decision.resposta_sugerida || 'Desculpe, houve um problema. Pode repetir sua solicitação?'
+      decision.resposta_sugerida || 'Desculpe, houve um problema. Pode repetir sua solicitação?',
+      (session as any)?.state
     );
   }
 }
 
 // Remove prefaces/artefatos da IA
-function sanitizeAIText(text: string): string {
+function sanitizeAIText(text: string, state?: any): string {
   let t = (text || '')
     .replace(/^\s*[-*_]{3,}\s*$/gm, '') // --- linhas
     .replace(/aqui\s+est[áa]\s+uma\s+resposta[^:]*:?\s*/gi, '')
@@ -4522,14 +5105,11 @@ function sanitizeAIText(text: string): string {
     .replace(/_/g, ' ')
     .trim();
   try {
-    // Se a sessão não tem marca coletada, evite que a resposta "natural" invente marcas
-    const state: any = (global as any)?.current_session_state_for_sanitizer || null;
-
-    // TTL e troca de equipamento no caminho do AI Orçamento
-    // TTL/estado: ignorado aqui por ausência de contexto seguro no sanitizer
-
-    const hasBrand = !!state?.dados_coletados?.marca;
-    if (!hasBrand) {
+    // Se (e somente se) temos um estado explícito e ele não tem marca coletada,
+    // evite que a resposta "natural" invente marcas.
+    const hasBrand = !!state?.dados_coletados?.marca || !!state?.dados_coletados?.marca_2;
+    const looksLikeDeterministicHeader = /\bmarca\s*:/i.test(t);
+    if (state && !hasBrand && !looksLikeDeterministicHeader) {
       t = t.replace(
         /\b(Brastemp|Consul|Electrolux|Fischer|Suggar|Tramontina|Mueller|Samsung|LG|Philco|Midea|Bosch|GE)\b/gi,
         ''
@@ -4543,17 +5123,85 @@ function sanitizeAIText(text: string): string {
   return t;
 }
 
+function extractTwoEquipmentsHeuristically(message: string):
+  | {
+      item1?: { equipamento?: string; marca?: string; problema?: string };
+      item2?: { equipamento?: string; marca?: string; problema?: string; mount?: string };
+    }
+  | null {
+  const raw = String(message || '').trim();
+  if (!raw) return null;
+
+  // Procura por pelo menos 2 menções de equipamento com regex (ordem no texto).
+  // Objetivo: aumentar a confiabilidade do fluxo multi-equip, não fazer NLP perfeita.
+  const eqRe =
+    /\b(fog[aã]o|cook\s*-?\s*top|micro\s*-?\s*ondas|forno|lava\s*-?\s*lou[cç]as?|lavadora|m[aá]quina\s+de\s+lavar|lava\s*e\s*seca|secadora|coifa|depurador|exaustor|adega|geladeira|freezer|refrigerador)\b/gi;
+
+  const matches: Array<{ idx: number }> = [];
+  try {
+    let m: RegExpExecArray | null;
+    while ((m = eqRe.exec(raw))) {
+      matches.push({ idx: m.index });
+      if (matches.length >= 2) break;
+    }
+  } catch {}
+
+  if (matches.length < 2) return null;
+
+  const secondIdx = matches[1].idx;
+  const seg1 = raw.slice(0, Math.max(0, secondIdx));
+  const seg2 = raw.slice(Math.max(0, secondIdx));
+
+  const g1 = guessFunnelFields(seg1);
+  const g2 = guessFunnelFields(seg2);
+
+  const item1 = {
+    equipamento: g1?.equipamento,
+    marca: g1?.marca,
+    problema: g1?.problema,
+  };
+  const item2 = {
+    equipamento: g2?.equipamento,
+    marca: g2?.marca,
+    problema: g2?.problema,
+    mount: /\b(bancada|embutid[oa])\b/i.test(seg2)
+      ? /\bembutid[oa]\b/i.test(seg2)
+        ? 'embutido'
+        : 'bancada'
+      : undefined,
+  };
+
+  // Evitar duplicar o mesmo item.
+  const eq1n = normalizeComparableText(String(item1.equipamento || ''));
+  const eq2n = normalizeComparableText(String(item2.equipamento || ''));
+  if (!eq1n || !eq2n || eq1n === eq2n) return null;
+
+  return { item1, item2 };
+}
+
 // **FUNÇÕES DE EXECUÇÃO ESPECÍFICAS**
 
 async function executeAIOrçamento(
   decision: any,
   session?: SessionRecord,
   body?: string
-): Promise<string> {
+): Promise<string | MultiTextReply> {
   try {
     // Mesclar com o que já está persistido na sessão
     const persisted = ((session as any)?.state?.dados_coletados || {}) as any;
-    let dados: any = { ...persisted, ...(decision.dados_extrair || {}) };
+    const initialMerged: any = { ...persisted, ...(decision.dados_extrair || {}) };
+    let dados: any = { ...initialMerged };
+
+    // Se a marca coletada pertencia a outro equipamento, não reaproveitar.
+    // Isso evita herdar marca antiga (ex.: Brastemp do fogão) ao trocar para micro-ondas.
+    try {
+      const brandEq = normalizeComparableText(String(persisted.marca_for_equipment || ''));
+      const nowEq = normalizeComparableText(String(dados.equipamento || ''));
+      if (brandEq && nowEq && brandEq !== nowEq) {
+        dados.marca = null;
+        dados.marca_for_equipment = null;
+      }
+    } catch {}
 
     // Se o equipamento mudou em relação ao persistido, não reutilizar marca/problema do equipamento anterior
     try {
@@ -4566,8 +5214,42 @@ async function executeAIOrçamento(
         (prevEq.includes('micro') && newEq.includes('micro')) ||
         (isCoifa(prevEq) && isCoifa(newEq));
       if (newEq && prevEq && newEq !== prevEq && !sameFamily) {
-        if (!decision.dados_extrair?.marca) delete dados.marca;
-        if (!decision.dados_extrair?.problema) delete dados.problema;
+        // IMPORTANTE: na troca de família, só reaproveite marca/problema se vieram na mensagem atual.
+        // A IA às vezes replica marca/problema do contexto anterior (ex.: fogão Brastemp) ao iniciar um micro-ondas.
+        const g = body ? guessFunnelFields(String(body || '')) : ({} as any);
+        const brandFromMsg = String(g?.marca || '').trim();
+        const probFromMsg = String(g?.problema || '').trim();
+
+        // CRÍTICO: use null (não delete) para que o merge/persistência não reintroduza valores antigos.
+        if (!brandFromMsg) (dados as any).marca = null;
+        if (!probFromMsg) {
+          (dados as any).problema = null;
+          (dados as any).descricao_problema = null;
+        }
+
+        // Persistir o “clear” imediatamente para evitar que outros guardrails
+        // (ex.: anti-loop de marca) tratem a marca antiga como válida.
+        try {
+          if ((session as any)?.id) {
+            const st0 = ((session as any)?.state || {}) as any;
+            const dc0 = (st0.dados_coletados || {}) as any;
+            const patchDc: any = { ...(decision?.dados_extrair || {}) };
+            if (!brandFromMsg) {
+              patchDc.marca = null;
+              patchDc.marca_for_equipment = null;
+            }
+            if (!probFromMsg) {
+              patchDc.problema = null;
+              patchDc.descricao_problema = null;
+            }
+            const mergedDc = { ...dc0, ...patchDc };
+            const nextState = { ...st0, dados_coletados: mergedDc } as any;
+            await setSessionState((session as any).id, nextState);
+            try {
+              (session as any).state = nextState;
+            } catch {}
+          }
+        } catch {}
       }
     } catch {}
 
@@ -4599,11 +5281,15 @@ async function executeAIOrçamento(
         if (expectingBrand && expectingProblem) {
           if (!dados.marca && !looksLikeNonBrand(txt) && !looksLikeProblemText(txt)) {
             dados.marca = txt;
+            dados.marca_for_equipment =
+              String(dados.equipamento || persisted.equipamento || '').trim() || null;
           } else if (!dados.problema && looksLikeProblemText(txt)) {
             dados.problema = txt;
           }
         } else if (expectingBrand && !looksLikeNonBrand(txt) && !looksLikeProblemText(txt)) {
           dados.marca = txt;
+          dados.marca_for_equipment =
+            String(dados.equipamento || persisted.equipamento || '').trim() || null;
         } else if (expectingProblem && looksLikeProblemText(txt)) {
           dados.problema = txt;
         }
@@ -4624,6 +5310,83 @@ async function executeAIOrçamento(
               dados_coletados: merged,
             };
           } catch {}
+        }
+      }
+    } catch {}
+
+    // Heurística determinística (multi-equip): se o cliente descreveu 2 equipamentos
+    // na mesma mensagem, preencher *_2 mesmo quando o roteador/LLM colapsa para 1 item.
+    try {
+      const alreadyHasTwo =
+        !!(dados as any).equipamento_2 ||
+        !!(dados as any).marca_2 ||
+        !!(dados as any).problema_2 ||
+        !!(persisted as any).equipamento_2 ||
+        !!(persisted as any).marca_2 ||
+        !!(persisted as any).problema_2;
+
+      const msg = String(body || '').trim();
+      if (!alreadyHasTwo && msg) {
+        const parsed = extractTwoEquipmentsHeuristically(msg);
+        if (parsed?.item1 || parsed?.item2) {
+          const patch: any = {};
+
+          // Se o cliente explicitou “Item 1 / Item 2” (ou padrão similar), isso normalmente
+          // significa que devemos sobrescrever o item 1 mesmo que haja contexto antigo na sessão.
+          // Ex.: o cliente já tinha um orçamento de 1 item e agora pede orçamento de 2 itens.
+          const explicitTwoItems =
+            /\b(item\s*1|item\s*2|equipamento_2|marca_2|problema_2|2\s*itens|dois\s+itens|2\s*equip|dois\s+equip)\b/i.test(
+              msg
+            ) || /\b1\)\b[\s\S]*\b2\)\b/i.test(msg);
+
+          const eq1 = parsed?.item1?.equipamento;
+          const eq2 = parsed?.item2?.equipamento;
+          const brand1 = parsed?.item1?.marca;
+          const brand2 = parsed?.item2?.marca;
+          const prob1 = parsed?.item1?.problema;
+          const prob2 = parsed?.item2?.problema;
+
+          const curEqN = normalizeComparableText(String(dados.equipamento || ''));
+          const eq1N = normalizeComparableText(String(eq1 || ''));
+          const eq2N = normalizeComparableText(String(eq2 || ''));
+          const swappedEq = !!(curEqN && eq2N && eq1N && curEqN === eq2N && curEqN !== eq1N);
+
+          const curBrandN = normalizeComparableText(String(dados.marca || ''));
+          const brand1N = normalizeComparableText(String(brand1 || ''));
+          const brand2N = normalizeComparableText(String(brand2 || ''));
+          const swappedBrand = !!(
+            curBrandN && brand2N && brand1N && curBrandN === brand2N && curBrandN !== brand1N
+          );
+
+          const curProbN = normalizeComparableText(String(dados.problema || ''));
+          const prob1N = normalizeComparableText(String(prob1 || ''));
+          const prob2N = normalizeComparableText(String(prob2 || ''));
+          const swappedProb = !!(curProbN && prob2N && prob1N && curProbN === prob2N && curProbN !== prob1N);
+
+          if (eq1 && (!dados.equipamento || swappedEq || explicitTwoItems)) patch.equipamento = eq1;
+          if (!(dados as any).equipamento_2 && eq2) patch.equipamento_2 = eq2;
+
+          if (brand1 && (!dados.marca || swappedBrand || explicitTwoItems)) patch.marca = brand1;
+          if (!(dados as any).marca_2 && brand2) patch.marca_2 = brand2;
+
+          if (prob1 && (!dados.problema || swappedProb || explicitTwoItems)) patch.problema = prob1;
+          if (!(dados as any).problema_2 && prob2) patch.problema_2 = prob2;
+
+          if (!(dados as any).mount_2 && parsed?.item2?.mount) patch.mount_2 = parsed.item2.mount;
+
+          if (Object.keys(patch).length > 0) {
+            dados = { ...dados, ...patch };
+
+            // Persistir para que as próximas etapas (ex.: agendamento multi-item) herdem o 2º item.
+            if ((session as any)?.id) {
+              const st0 = ((session as any)?.state || {}) as any;
+              const mergedDc = { ...(st0.dados_coletados || {}), ...patch };
+              await setSessionState((session as any).id, { ...st0, dados_coletados: mergedDc });
+              try {
+                (session as any).state = { ...st0, dados_coletados: mergedDc };
+              } catch {}
+            }
+          }
         }
       }
     } catch {}
@@ -5048,6 +5811,55 @@ async function executeAIOrçamento(
       }
     }
 
+    // Guarda geral: se o equipamento atual mudou para outra família, não reutilize marca/problema antigos.
+    // (Ex.: após orçar um fogão, usuário começa a falar de micro-ondas no mesmo peer.)
+    try {
+      const prevEqFromQuote = String(
+        (session as any)?.state?.last_quote?.equipment ||
+          (session as any)?.state?.last_quote?.equipamento ||
+          ''
+      );
+      const prevEqStore = String(
+        prevEqFromQuote ||
+          (session as any)?.state?.funnel?.equipamento ||
+          (session as any)?.state?.dados_coletados?.equipamento ||
+          ''
+      ).toLowerCase();
+      const newEqStore = String(equipment || dados.equipamento || '').toLowerCase();
+
+      const isFogFam = (s: string) => /fog[aã]o|cook ?top/.test(s);
+      const isMicroFam = (s: string) => /micro/.test(s);
+      const isCoifaFam = (s: string) => /coifa|depurador|exaustor/.test(s);
+      const isFornoFam = (s: string) => /\bforno\b/.test(s);
+
+      const sameFamily =
+        (isFogFam(prevEqStore) && isFogFam(newEqStore)) ||
+        (isMicroFam(prevEqStore) && isMicroFam(newEqStore)) ||
+        (isCoifaFam(prevEqStore) && isCoifaFam(newEqStore)) ||
+        (isFornoFam(prevEqStore) && isFornoFam(newEqStore));
+
+      if (prevEqStore && newEqStore && prevEqStore !== newEqStore && !sameFamily) {
+        let brandInMsg = false;
+        let probInMsg = false;
+        try {
+          const g = guessFunnelFields(String(body || '')) as any;
+          brandInMsg = !!String(g?.marca || '').trim();
+          probInMsg = !!String(g?.problema || '').trim();
+        } catch {}
+
+        if (!brandInMsg) {
+          delete (dados as any).marca;
+          delete (dados as any).brand;
+        }
+        if (!probInMsg && !decision?.dados_extrair?.problema) {
+          delete (dados as any).problema;
+          delete (dados as any).problem;
+          delete (dados as any).descricao_problema;
+          delete (dados as any).description;
+        }
+      }
+    } catch {}
+
     // Gate: exigir MARCA e PROBLEMA antes de orçar
     if (!dados.marca || !problema) {
       const prevState = (session as any)?.state || {};
@@ -5077,7 +5889,7 @@ async function executeAIOrçamento(
         else if (/forno/.test(lower) && isBancada) policyHint = 'coleta + conserto';
         else if (/coifa|depurador|exaustor/.test(lower)) policyHint = 'visita diagnóstica no local';
         else if (/fog[aã]o/.test(lower) && /g[aá]s/.test(lower)) policyHint = '';
-        else if (lower) policyHint = 'coletamos, diagnosticamos';
+        else if (lower) policyHint = 'coleta diagnóstico (coletamos, diagnosticamos)';
       } catch {}
       const ackParts: string[] = [];
       if (equipAck) ackParts.push(`entendi: ${equipAck}`);
@@ -5087,8 +5899,16 @@ async function executeAIOrçamento(
       // Guard extra: se detectarmos troca de equipamento entre famílias e a mensagem não forneceu nova marca/problema,
       // interrompe antes do orçamento e pergunta a marca para evitar reutilizar dados do equipamento anterior.
       try {
+        const prevEqFromQuote2 = String(
+          (session as any)?.state?.last_quote?.equipment ||
+            (session as any)?.state?.last_quote?.equipamento ||
+            ''
+        );
         const prevEqGuard = String(
-          (session as any)?.state?.dados_coletados?.equipamento || ''
+          prevEqFromQuote2 ||
+            (session as any)?.state?.funnel?.equipamento ||
+            (session as any)?.state?.dados_coletados?.equipamento ||
+            ''
         ).toLowerCase();
         const gGuard = guessFunnelFields(String(body || ''));
         const eqNowGuard = String(
@@ -5108,6 +5928,22 @@ async function executeAIOrçamento(
       if (!dados.marca && !problema)
         return `${ack}Antes do orçamento: qual é a marca do equipamento e qual é o problema específico?`;
       if (!dados.marca) return `${ack}Qual é a marca do equipamento?`;
+
+      // Se o usuário mencionou explicitamente o equipamento agora, mas não mencionou marca,
+      // não assuma que a marca existente no estado pertence a este novo equipamento.
+      try {
+        const gNow = guessFunnelFields(String(body || '')) as any;
+        const mentionsEquipNow = !!String(gNow?.equipamento || '').trim();
+        const mentionsBrandNow = !!String(gNow?.marca || '').trim();
+        const txt = String(body || '').toLowerCase();
+        const looksLikeEquipmentIntro =
+          /\b(tenho|meu|minha|é|eh|sera|ser[aá]|possuo|aqui)\b/i.test(txt) && mentionsEquipNow;
+
+        if (looksLikeEquipmentIntro && !mentionsBrandNow) {
+          return `${ack}Qual é a marca do equipamento?`;
+        }
+      } catch {}
+
       return `${ack}Pode me descrever o problema específico que está acontecendo?`;
     }
 
@@ -5137,6 +5973,159 @@ async function executeAIOrçamento(
       try {
         (quote as any).equipment =
           (quote as any).equipment || equipment || dados.equipamento || null;
+      } catch {}
+
+      // Multi-equipamento: quando houver dados completos do segundo equipamento,
+      // gerar orçamento discriminado por item e retornar em 2 mensagens.
+      try {
+        const equipment2 = String(
+          (dados as any).equipamento_2 ||
+            (dados as any).equipamento2 ||
+            (initialMerged as any).equipamento_2 ||
+            (initialMerged as any).equipamento2 ||
+            (persisted as any).equipamento_2 ||
+            ''
+        ).trim();
+        const brand2 = String(
+          (dados as any).marca_2 ||
+            (dados as any).marca2 ||
+            (initialMerged as any).marca_2 ||
+            (initialMerged as any).marca2 ||
+            (persisted as any).marca_2 ||
+            ''
+        ).trim();
+        const problem2 = String(
+          (dados as any).problema_2 ||
+            (dados as any).problema2 ||
+            (initialMerged as any).problema_2 ||
+            (initialMerged as any).problema2 ||
+            (persisted as any).problema_2 ||
+            ''
+        ).trim();
+        const mount2 = String(
+          (dados as any).mount_2 ||
+            (dados as any).mount2 ||
+            (initialMerged as any).mount_2 ||
+            (initialMerged as any).mount2 ||
+            (persisted as any).mount_2 ||
+            ''
+        ).trim();
+
+        if (equipment2) {
+          // Se o usuário mencionou 2º equipamento mas faltam dados, perguntar focado (sem avançar para agendamento).
+          if (!brand2 && !problem2) {
+            return `Perfeito. Sobre o seu ${equipment2}: qual é a marca e qual é o problema específico?`;
+          }
+          if (!brand2) {
+            return `Perfeito. Sobre o seu ${equipment2}: qual é a marca?`;
+          }
+          if (!problem2) {
+            return `Perfeito. Sobre o seu ${equipment2}: o que exatamente está acontecendo?`;
+          }
+
+          // Inferir tipo de atendimento do 2º equipamento por política (sem oferecer escolha)
+          let service_type_2 = 'coleta_diagnostico';
+          try {
+            const policies = await fetchServicePolicies();
+            const preferred = getPreferredServicesForEquipment(policies, equipment2);
+            if (Array.isArray(preferred) && preferred[0]) service_type_2 = String(preferred[0]);
+
+            // Se a política não conseguiu decidir (ambíguo), pedir mount.
+            if ((!preferred || preferred.length === 0) && /micro|forno/i.test(equipment2)) {
+              const hasMountInfo2 = Boolean(mount2) || /embutid|bancada/i.test(equipment2);
+              if (!hasMountInfo2) {
+                return `Só mais um detalhe sobre o ${equipment2}: ele é embutido ou de bancada?`;
+              }
+            }
+          } catch {}
+
+          const quote2 = await buildQuote({
+            service_type: service_type_2,
+            equipment: equipment2,
+            brand: brand2,
+            problem: problem2,
+            mount: mount2 || null,
+          } as any);
+
+          if (quote2) {
+            try {
+              (quote2 as any).equipment = (quote2 as any).equipment || equipment2;
+              (quote2 as any).service_type = (quote2 as any).service_type || service_type_2;
+            } catch {}
+
+            // Persistir ambos para follow-ups e para o agendamento multi-item
+            try {
+              if (session) {
+                const prevSt = ((session as any)?.state || {}) as any;
+                const prevDc = (prevSt.dados_coletados || {}) as any;
+                const mergedDc: any = {
+                  ...prevDc,
+                  ...dados,
+                  tipo_atendimento_1: String(service_type || prevDc.tipo_atendimento_1 || ''),
+                  equipamento_2: equipment2,
+                  marca_2: brand2,
+                  problema_2: problem2,
+                  mount_2: mount2 || null,
+                  tipo_atendimento_2: String(service_type_2 || prevDc.tipo_atendimento_2 || ''),
+                };
+
+                const nextSt: any = {
+                  ...prevSt,
+                  dados_coletados: mergedDc,
+                  orcamento_entregue: true,
+                  last_quote: quote,
+                  last_quotes: [quote, quote2],
+                  last_quote_ts: Date.now(),
+                };
+                try {
+                  (session as any).state = nextSt;
+                } catch {}
+                if ((session as any)?.id) {
+                  await setSessionState((session as any).id, nextSt);
+                }
+              }
+            } catch {}
+
+            const t1 = buildDiscriminatedQuoteText({
+              equipamento: String((quote as any)?.equipment || equipment || dados.equipamento || 'equipamento'),
+              marca: String(dados.marca || ''),
+              problema: String(problema || ''),
+              service_type: String((quote as any)?.service_type || service_type || ''),
+              quote,
+            });
+            const t2 = buildDiscriminatedQuoteText({
+              equipamento: String((quote2 as any)?.equipment || equipment2),
+              marca: brand2,
+              problema: problem2,
+              service_type: String((quote2 as any)?.service_type || service_type_2 || ''),
+              quote: quote2,
+            });
+
+            // Normalizar nomenclatura e sanitizar
+            const sanitizeState = {
+              dados_coletados: {
+                ...(persisted || {}),
+                ...(initialMerged || {}),
+                ...(dados || {}),
+                marca: String(dados?.marca || (persisted as any)?.marca || '').trim() || null,
+                marca_2: String(brand2 || '').trim() || null,
+              },
+            } as any;
+
+            const n = (s: string) =>
+              sanitizeAIText(
+                String(s || '')
+                  .replace(/forno de padaria/gi, 'forno comercial')
+                  .replace(/forno da padaria/gi, 'forno comercial')
+                ,
+                sanitizeState
+              );
+
+            return {
+              texts: [n(t1), n(`${t2}\n\nQuer que eu já veja datas pra agendar?`)],
+            } as any;
+          }
+        }
       } catch {}
 
       // Persistir orçamento entregue e o último orçamento para permitir follow-ups
@@ -5367,7 +6356,7 @@ async function executeAIAgendamentoLegacy(
       if (!okMsg) {
         msg = 'AGENDAMENTO_CONFIRMADO';
       }
-      return sanitizeAIText(msg);
+      return sanitizeAIText(msg, (session as any)?.state);
     }
   } catch {}
 
@@ -5575,7 +6564,7 @@ async function executeAIAgendamentoLegacy(
               } catch {}
             }
           } catch {}
-          return sanitizeAIText(msg0);
+          return sanitizeAIText(msg0, (session as any)?.state);
         }
       } catch {}
 
@@ -5718,7 +6707,7 @@ async function executeAIAgendamentoLegacy(
             } catch {}
           }
         } catch {}
-        return sanitizeAIText(msg);
+        return sanitizeAIText(msg, (session as any)?.state);
       }
     } catch (e) {
       console.log('[DEBUG] Erro na seleção de horário:', e);
@@ -6065,7 +7054,7 @@ async function executeAIAgendamentoLegacy(
         ? (res as any).message
         : decision.resposta_sugerida || 'Tenho estas opções de horário. Qual prefere?';
     // Resposta segura ao usuário; parsing/estado acontece abaixo sem bloquear o envio
-    const safeMsg = sanitizeAIText(msg);
+    const safeMsg = sanitizeAIText(msg, (session as any)?.state);
 
     const showsOptions = /(?:op(?:ç|c)[aã]o\s*)?[123](?:\s*[-.)]|\s*$)/i.test(msg);
     const isProcessing = /agendamento em andamento|está sendo processado/i.test(msg);
@@ -6073,7 +7062,7 @@ async function executeAIAgendamentoLegacy(
 
     // Se o middleware sinalizar processamento, confirme pragmaticamente para não travar o fluxo
     if (isProcessing) {
-      return sanitizeAIText('AGENDAMENTO_CONFIRMADO');
+      return sanitizeAIText('AGENDAMENTO_CONFIRMADO', (session as any)?.state);
     }
 
     try {

@@ -1,6 +1,11 @@
 import type { AIRouterAction, AIRouterDecision } from './aiRouterDecisionSchema.js';
 import type { ChatMessage, ChatOptions } from '../llmClient.js';
 import type { SessionRecord } from '../sessionStore.js';
+import { guessFunnelFields } from '../funnelGuesser.js';
+import { isSameEquipmentFamily } from '../funnelState.js';
+import { getPreferredServicesForEquipment } from '../policies.js';
+
+export type MultiTextReply = { texts: string[] };
 
 export type InstallContext = {
   negatedInstall: boolean;
@@ -21,7 +26,11 @@ export type ActionHandlerContext = {
   detectPriorityIntent: (text: string) => string | null;
   hasExplicitAcceptance: (text: string) => boolean;
 
-  executeAIOrcamento: (decision: AIRouterDecision, session?: SessionRecord, body?: string) => Promise<string>;
+  executeAIOrcamento: (
+    decision: AIRouterDecision,
+    session?: SessionRecord,
+    body?: string
+  ) => Promise<string | MultiTextReply>;
   executeAIInformacao: (decision: AIRouterDecision, allBlocks?: any[]) => Promise<string>;
   executeAIAgendamento: (
     decision: any,
@@ -39,7 +48,7 @@ export type ActionHandlerContext = {
 
 export function buildActionHandlers(
   ctx: ActionHandlerContext
-): Record<AIRouterAction, () => Promise<string | null>> {
+): Record<AIRouterAction, () => Promise<string | MultiTextReply | null>> {
   const {
     decision,
     from,
@@ -57,6 +66,20 @@ export function buildActionHandlers(
     chatComplete,
     getActiveBot,
   } = ctx;
+
+  function looksLikeMultiEquipMessage(text: string): boolean {
+    const raw = String(text || '').trim();
+    if (!raw) return false;
+    const lower = raw.toLowerCase();
+    if (/\b(2\s*equip|dois\s+equip|2\s*itens|dois\s+itens|multi\s*equip)\b/i.test(lower)) return true;
+    if (/\bitem\s*1\b|\bitem\s*2\b|\bequipamento_2\b|\bmarca_2\b|\bproblema_2\b/i.test(lower)) return true;
+    if (/\b1\)\b[\s\S]*\b2\)\b/i.test(lower)) return true;
+    try {
+      const g: any = guessFunnelFields(raw);
+      if (Array.isArray(g?.equipamentosEncontrados) && g.equipamentosEncontrados.length >= 2) return true;
+    } catch {}
+    return false;
+  }
 
   return {
     gerar_orcamento: async () => {
@@ -146,6 +169,38 @@ export function buildActionHandlers(
       // SAUDAÇÕES: Usar GPT humanizado para responder naturalmente
       if (decision.intent === 'saudacao_inicial') {
         console.log('[DEBUG] SAUDAÇÃO DETECTADA - Usando GPT humanizado');
+
+        // Guardrail: o roteador por IA às vezes classifica incorretamente mensagens ricas
+        // (ex.: pedido de orçamento com 2 itens) como saudação inicial.
+        // Nesses casos, NÃO chame GPT de saudação; execute o fluxo de orçamento determinístico.
+        try {
+          const raw = String(body || '').trim();
+          const lower = raw.toLowerCase();
+          const asksBudget = /\b(or[cç]amento|orcamento|quanto|pre[cç]o|preco|valor|custa)\b/i.test(lower);
+          let hasCoreSignal = false;
+          try {
+            const g: any = guessFunnelFields(raw);
+            hasCoreSignal = !!(g?.equipamento || g?.marca || g?.problema);
+          } catch {}
+
+          if ((asksBudget || hasCoreSignal || looksLikeMultiEquipMessage(raw)) && raw.length >= 6) {
+            const forced: any = {
+              ...decision,
+              intent: 'orcamento',
+              acao_principal: 'gerar_orcamento',
+              dados_extrair: (decision as any)?.dados_extrair || {},
+            };
+            await logAIRoute('ai_route_effective', {
+              from,
+              body,
+              original: decision,
+              effective: { intent: 'orcamento', acao_principal: 'gerar_orcamento', forced_from: 'saudacao_inicial' },
+              reply: '[forced_executeAIOrcamento]',
+            });
+            return await executeAIOrcamento(forced, session, body);
+          }
+        } catch {}
+
         try {
           // Em modo de teste, evitar saudação genérica e ir direto ao objetivo do fluxo
           try {
@@ -299,10 +354,42 @@ export function buildActionHandlers(
 
       // Guardião de ordem + prompts determinísticos
       try {
-        const prev = (session as any)?.state?.dados_coletados || {};
-        const eq = (decision as any)?.dados_extrair?.equipamento || prev.equipamento;
-        const brand = (decision as any)?.dados_extrair?.marca || prev.marca;
-        const prob = (decision as any)?.dados_extrair?.problema || prev.problema;
+        const stOuter = ((session as any)?.state || {}) as any;
+        const prev = (stOuter as any)?.dados_coletados || {};
+        const de = ((decision as any)?.dados_extrair || {}) as any;
+        let nowGuess: any = {};
+        try {
+          nowGuess = guessFunnelFields(String(body || '')) as any;
+        } catch {}
+
+        const lastQuoteRaw = (stOuter.last_quote || stOuter.lastQuote || stOuter.quote) as any;
+        const prevEqFromQuote = String(lastQuoteRaw?.equipment || lastQuoteRaw?.equipamento || '').trim();
+        const prevEq = prevEqFromQuote || String(prev.equipamento || '').trim();
+        const nowEqDeclared = String(de.equipamento || nowGuess?.equipamento || '').trim();
+        const eq = nowEqDeclared || String(prev.equipamento || '').trim() || prevEq;
+
+        const equipSwitched =
+          !!prevEq &&
+          !!nowEqDeclared &&
+          !isSameEquipmentFamily(String(nowEqDeclared), String(prevEq));
+
+        // Critico: quando o usuário reintroduz/troca de equipamento, NÃO herdar marca/problema antigos
+        // para evitar perguntas fora de ordem (ex.: micro-ondas pedindo problema antes da marca).
+        const brand = equipSwitched
+          ? String(de.marca || nowGuess?.marca || '').trim() || undefined
+          : String(de.marca || prev.marca || nowGuess?.marca || '').trim() || undefined;
+        const prob = equipSwitched
+          ? String(de.problema || nowGuess?.problema || '').trim() || undefined
+          : String(de.problema || prev.problema || nowGuess?.problema || '').trim() || undefined;
+
+        // Se a mensagem atual descreve 2 itens, não repetir orçamento antigo nem pedir follow-ups
+        // para apenas um item; deixe o executor de orçamento reprocessar a mensagem inteira.
+        try {
+          if (looksLikeMultiEquipMessage(body || '')) {
+            return await executeAIOrcamento(decision, session, body);
+          }
+        } catch {}
+
         if (eq && prob && !hasExplicitAcceptance(body || '')) {
           return await executeAIOrcamento(decision, session, body);
         }
@@ -341,6 +428,50 @@ export function buildActionHandlers(
           const st = ((session as any)?.state || {}) as any;
           const msg = String(body || '').toLowerCase();
           const asksPrice = /\b(quanto|pre[cç]o|preco|valor|custa|or[cç]amento|orcamento)\b/i.test(msg);
+
+          // Se o cliente descreveu 2 itens (mesmo pedindo “quanto fica/orçamento”), reprocessar
+          // ao invés de repetir um orçamento antigo de 1 item.
+          try {
+            if (asksPrice && looksLikeMultiEquipMessage(body || '')) {
+              return await executeAIOrcamento(decision, session, body);
+            }
+          } catch {}
+
+          // Multi-equip: repetir em 2 blocos quando houver last_quotes
+          try {
+            const arr = st.last_quotes;
+            if (asksPrice && Array.isArray(arr) && arr.length >= 2) {
+              const q1: any = arr[0];
+              const q2: any = arr[1];
+              const dc = (st.dados_coletados || {}) as any;
+
+              const fmt = (q: any, idx: 1 | 2) => {
+                const equipment =
+                  String(q?.equipment || (idx === 1 ? dc.equipamento : dc.equipamento_2) || '').trim() ||
+                  'equipamento';
+                const stype = String(q?.service_type || (idx === 1 ? dc.tipo_atendimento_1 : dc.tipo_atendimento_2) || '').toLowerCase();
+                const value = Number(q?.value ?? q?.total ?? q?.price ?? 0);
+
+                if (/coleta/.test(stype) && /diagn/.test(stype)) {
+                  return `Para o seu ${equipment} — coleta para diagnóstico: diagnóstico R$ 350 (desconta do conserto se aprovar; abatemos 100%).`;
+                }
+                const policy = /coleta/.test(stype) && /conserto/.test(stype)
+                  ? 'coleta + conserto'
+                  : /domic/.test(stype)
+                    ? 'visita técnica no local'
+                    : '';
+                const policyTxt = policy ? ` — ${policy}` : '';
+                return Number.isFinite(value) && value > 0
+                  ? `Para o seu ${equipment}${policyTxt}: valor do atendimento R$ ${value}.`
+                  : `Para o seu ${equipment}${policyTxt}: posso te passar o valor certinho se me confirmar marca e o defeito.`;
+              };
+
+              const t1 = fmt(q1, 1);
+              const t2 = fmt(q2, 2);
+              return `${t1}\n\n${t2}\n\nQuer que eu já veja datas pra agendar?`;
+            }
+          } catch {}
+
           const quoteRaw = st.last_quote || st.lastQuote || st.quote;
           const quoteText = (() => {
             if (typeof quoteRaw === 'string') return quoteRaw.trim();
@@ -357,7 +488,7 @@ export function buildActionHandlers(
               : /coleta/.test(stype) && /conserto/.test(stype)
                 ? 'coleta + conserto'
                 : /coleta/.test(stype) && /diagn/.test(stype)
-                  ? 'coletamos, diagnosticamos'
+                  ? 'diagnóstico R$ 350 (desconta do conserto se aprovar; abatemos 100%)'
                   : /domic/.test(stype)
                     ? 'visita técnica no local'
                     : '';
@@ -383,7 +514,47 @@ export function buildActionHandlers(
           const prev = (session as any)?.state?.dados_coletados || {};
           const eq = (decision as any)?.dados_extrair?.equipamento || prev.equipamento;
           const brand = (decision as any)?.dados_extrair?.marca || prev.marca;
-          const prob = (decision as any)?.dados_extrair?.problema || prev.problema || prev.descricao_problema;
+          const probRaw =
+            (decision as any)?.dados_extrair?.problema || prev.problema || prev.descricao_problema;
+
+          const looksLikeProblemText = (s: string) =>
+            /(n[aã]o|nao|parou|vaza|vazando|quebrou|defeito|falha|n[aã]o liga|nao liga|n[aã]o esquenta|nao esquenta|faz(endo)? barulho|cheiro|chama|porta|gira|fa[ií]sca|faisca)/i.test(
+              String(s || '')
+            );
+
+          // Evitar tratar coisas como "gás"/"4 bocas" como se fosse "problema".
+          const prob = probRaw && looksLikeProblemText(String(probRaw)) ? probRaw : null;
+
+          const serviceHint = (() => {
+            const equipment = String(eq || '').trim();
+            if (!equipment) return '';
+            // Fallback simples e determinístico (evita depender de policies em paths de exceção)
+            const lower = equipment.toLowerCase();
+            const fallback = (() => {
+              if (
+                lower.includes('lavadora') ||
+                lower.includes('maquina de lavar') ||
+                lower.includes('máquina de lavar') ||
+                (lower.includes('maquina') && lower.includes('lavar')) ||
+                (lower.includes('máquina') && lower.includes('lavar'))
+              )
+                return 'coleta diagnóstico';
+              if (lower.includes('secadora')) return 'coleta diagnóstico';
+              if (lower.includes('geladeira') || lower.includes('refrigerador') || lower.includes('freezer'))
+                return 'coleta diagnóstico';
+              return '';
+            })();
+
+            try {
+              const preferred = getPreferredServicesForEquipment([], equipment);
+              if (preferred.includes('coleta_diagnostico')) return 'coleta diagnóstico';
+              if (preferred.includes('coleta_conserto')) return 'coleta + conserto';
+              if (preferred.includes('em_domicilio')) return 'visita técnica no local';
+              return fallback;
+            } catch {
+              return fallback;
+            }
+          })();
 
           const nextQuestion = !eq
             ? 'Pra eu te ajudar direitinho: qual é o equipamento (fogão, cooktop, forno, micro-ondas etc.)?'
@@ -391,7 +562,40 @@ export function buildActionHandlers(
               ? `Qual é a marca do seu ${String(eq)}?`
               : !prob
                 ? `E qual é o problema que está acontecendo com seu ${String(eq)}${brand ? ` ${String(brand)}` : ''}?`
-                : 'Perfeito — quer que eu te passe os valores e já veja datas pra agendar?';
+                : String(eq).toLowerCase().includes('lavadora')
+                  ? 'Perfeito — na coleta diagnóstico, quer que eu te passe os valores e já veja datas pra agendar?'
+                  : serviceHint
+                    ? `Perfeito — na ${serviceHint}, quer que eu te passe os valores e já veja datas pra agendar?`
+                    : 'Perfeito — quer que eu te passe os valores (incluindo coleta diagnóstico quando aplicável) e já veja datas pra agendar?';
+
+          // Se o usuário respondeu com aceite (ex.: "sim") nesse momento de recondução,
+          // não repetir a mesma pergunta — avance para o orçamento/agendamento.
+          try {
+            const accepted = hasExplicitAcceptance(body || '');
+            if (accepted) {
+              const st = ((session as any)?.state || {}) as any;
+              const hasQuoteDelivered = !!st.orcamento_entregue;
+              const hasQuoteObj = !!(st.last_quote || st.lastQuote || st.quote);
+              if (hasQuoteDelivered || hasQuoteObj) {
+                return await executeAIAgendamento(
+                  { intent: 'agendamento_servico', acao_principal: 'coletar_dados', dados_extrair: {} },
+                  session,
+                  body,
+                  from
+                );
+              }
+
+              // Forçar execução do orçamento para gerar `last_quote`/`orcamento_entregue`.
+              const forced: any = {
+                intent: 'orcamento_equipamento',
+                acao_principal: 'gerar_orcamento',
+                blocos_relevantes: (decision as any)?.blocos_relevantes || [],
+                dados_extrair: { ...(decision as any)?.dados_extrair },
+                resposta_sugerida: (decision as any)?.resposta_sugerida || '',
+              };
+              return await executeAIOrcamento(forced, session, body);
+            }
+          } catch {}
 
           if (!fakeLooksLikeJson && process.env.NODE_ENV !== 'test') {
             try {
@@ -468,7 +672,7 @@ export function buildActionHandlers(
             : /coleta/.test(stype) && /conserto/.test(stype)
               ? 'coleta + conserto'
               : /coleta/.test(stype) && /diagn/.test(stype)
-                ? 'coletamos, diagnosticamos'
+                  ? 'coleta diagnóstico (coletamos, diagnosticamos)'
                 : /domic/.test(stype)
                   ? 'visita técnica no local'
                   : '';
