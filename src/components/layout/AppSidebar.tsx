@@ -182,6 +182,7 @@ const AppSidebar: React.FC = () => {
     { to: '/finance', icon: DollarSign, label: 'Financeiro' },
     { to: '/reports', icon: BarChart3, label: 'Relatórios' },
     { to: '/analytics', icon: BarChart3, label: 'Analytics' },
+    { to: '/crm', icon: LayoutDashboard, label: 'CRM' },
     { to: '/ai', icon: Brain, label: 'IA' },
     { to: '/bot', icon: Bot, label: 'Assistente IA' },
     { to: '/admin/whatsapp', icon: MessageCircle, label: 'WhatsApp' },

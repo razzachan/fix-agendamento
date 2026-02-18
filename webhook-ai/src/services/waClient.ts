@@ -11,12 +11,14 @@ export type WAStatus = {
   connected: boolean;
   me?: { id: string; pushname?: string } | null;
   qr?: string | null; // dataURL
+  qrUpdatedAt?: number | null; // epoch ms
 };
 
 class WhatsAppClient extends EventEmitter {
   private client: any;
-  private status: WAStatus = { connected: false, me: null, qr: null };
+  private status: WAStatus = { connected: false, me: null, qr: null, qrUpdatedAt: null };
   private started = false;
+  private reconnecting: Promise<void> | null = null;
   private messageHandlers: Array<
     (
       from: string,
@@ -39,17 +41,50 @@ class WhatsAppClient extends EventEmitter {
   private async fetchLatestWebVersion(): Promise<string | null> {
     try {
       const https = await import('https');
-      const url = 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/last.json';
+      const url = 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/versions.json';
       const data: string = await new Promise((resolve, reject) => {
         https.get(url, (res) => {
+          const { statusCode } = res;
+          if (statusCode && statusCode >= 400) {
+            res.resume();
+            reject(new Error(`HTTP ${statusCode} ao buscar versions.json`));
+            return;
+          }
           let body = '';
           res.on('data', (c) => (body += c.toString()));
           res.on('end', () => resolve(body));
         }).on('error', reject);
       });
       const json = JSON.parse(data);
-      const v = json?.['desktop'] || json?.['whatsapp'] || json?.['web'] || null;
-      return typeof v === 'string' && v.includes('.') ? v : null;
+
+      const pickFirstString = (...values: any[]) => {
+        for (const v of values) {
+          if (typeof v === 'string' && v.includes('.')) return v;
+        }
+        return null;
+      };
+
+      // Preferir estável sempre que possível.
+      // O arquivo versions.json pode variar de formato; tentamos alguns campos comuns.
+      const stable = pickFirstString(
+        json?.currentVersion,
+        json?.currentStable,
+        json?.stable,
+        json?.current?.stable,
+        json?.current?.version,
+        json?.version
+      );
+      const beta = pickFirstString(
+        json?.currentBeta,
+        json?.beta,
+        json?.current?.beta
+      );
+      const alpha = pickFirstString(
+        json?.currentAlpha,
+        json?.alpha,
+        json?.current?.alpha
+      );
+      return stable || beta || alpha;
     } catch (e) {
       console.warn('[WA] fetchLatestWebVersion falhou', (e as any)?.message || e);
       return null;
@@ -66,7 +101,7 @@ class WhatsAppClient extends EventEmitter {
       this.overrideWebVersion = latest;
       try { await this.client.destroy(); } catch {}
       this.started = false;
-      this.status = { connected: false, me: null, qr: null };
+      this.status = { connected: false, me: null, qr: null, qrUpdatedAt: null };
       this.initClient();
       await this.client.initialize();
       this.started = true;
@@ -245,12 +280,14 @@ class WhatsAppClient extends EventEmitter {
       '--disable-renderer-backgrounding',
       '--disable-features=TranslateUI',
       '--disable-ipc-flooding-protection',
-      '--single-process',
     ];
 
     const args = isRailway ? [...baseArgs, ...railwayArgs] : baseArgs;
     // Forçar um dataPath estável para o cache de sessão (evita reconnect infinito)
-    const defaultData = path.join(os.homedir(), '.wwebjs_auth', 'fixbot-v2');
+    // Railway: se houver Volume montado em /data, esse default permite persistir auth entre deploys.
+    const defaultData = isRailway
+      ? '/data/wwebjs_auth/fixbot-v2'
+      : path.join(os.homedir(), '.wwebjs_auth', 'fixbot-v2');
     const chromeUserData = path.join(os.homedir(), '.wwebjs_chrome');
     const dataPath = process.env.WA_DATA_PATH || defaultData;
     try {
@@ -261,6 +298,20 @@ class WhatsAppClient extends EventEmitter {
     } catch {}
 
     const chosenWebVersion = this.overrideWebVersion || process.env.WA_WEB_VERSION || null;
+
+    const getIntEnv = (key: string, fallback: number) => {
+      const raw = String(process.env[key] ?? '').trim();
+      const value = raw ? Number(raw) : NaN;
+      return Number.isFinite(value) ? value : fallback;
+    };
+
+    // QR: aumentar tolerância para o usuário escanear pelo front.
+    // Defaults maiores em Railway para evitar "Max qrcode retries reached" rápido.
+    const qrMaxRetries = getIntEnv('WA_QR_MAX_RETRIES', isRailway ? 60 : 10);
+    const qrScanTimeoutMs = getIntEnv('WA_QR_SCAN_TIMEOUT_MS', isRailway ? 120000 : 30000);
+
+    console.log('[WA] QR config:', { qrMaxRetries, qrScanTimeoutMs });
+
     const baseConfig: any = {
       authStrategy: new LocalAuth({ clientId: 'fixbot-v2', dataPath }),
       puppeteer: {
@@ -272,7 +323,7 @@ class WhatsAppClient extends EventEmitter {
       },
       takeoverOnConflict: true,
       takeoverTimeoutMs: 0,
-      qrMaxRetries: 10,
+      qrMaxRetries,
       restartOnAuthFail: true,
     };
     if (chosenWebVersion) {
@@ -296,7 +347,7 @@ class WhatsAppClient extends EventEmitter {
         if (!this.status.connected) {
           this.tryReinitWithLatest('qr_timeout');
         }
-      }, 30000);
+      }, qrScanTimeoutMs);
     });
 
     // Reanexa listeners se já existiam (após reconexões)
@@ -326,6 +377,7 @@ class WhatsAppClient extends EventEmitter {
       try {
         const dataURL = await qrcode.toDataURL(qr);
         this.status.qr = dataURL;
+        this.status.qrUpdatedAt = Date.now();
         this.status.connected = false;
         this.status.me = null;
         console.log('[WA] ✅ QR recebido e convertido para DataURL');
@@ -374,6 +426,7 @@ class WhatsAppClient extends EventEmitter {
     this.client.on('ready', async () => {
       this.status.connected = true;
       this.status.qr = null;
+      this.status.qrUpdatedAt = null;
 
       try {
         // Tentar obter informações do usuário de várias formas
@@ -522,6 +575,7 @@ class WhatsAppClient extends EventEmitter {
 
     this.client.on('authenticated', () => {
       this.status.qr = null;
+      this.status.qrUpdatedAt = null;
       console.log('[WA] Autenticado');
       this.emit('authenticated');
 
@@ -685,6 +739,7 @@ class WhatsAppClient extends EventEmitter {
     this.client.on('disconnected', async (r: any) => {
       this.status.connected = false;
       this.status.qr = null;
+      this.status.qrUpdatedAt = null;
       console.warn('[WA] Desconectado', r);
       this.emit('disconnected');
       // Se foi LOGOUT, não tentar reconectar automaticamente (arquivos podem estar lockados no Windows)
@@ -736,7 +791,7 @@ class WhatsAppClient extends EventEmitter {
       await this.client.destroy();
     } catch {}
     this.started = false;
-    this.status = { connected: false, me: null, qr: null };
+    this.status = { connected: false, me: null, qr: null, qrUpdatedAt: null };
     this.initClient();
     await this.start();
   }
@@ -870,14 +925,73 @@ class WhatsAppClient extends EventEmitter {
   }
 
   public async sendText(to: string, text: string) {
-    return this.client.sendMessage(to, text);
+    try {
+      return await this.client.sendMessage(to, text);
+    } catch (e: any) {
+      const message = String(e?.message || e);
+
+      const isWaRuntimeMismatch =
+        message.includes('markedUnread') ||
+        message.includes('getChat') ||
+        message.includes('Evaluation failed') ||
+        message.includes('Cannot read properties of undefined');
+
+      const isPuppeteerPageGone =
+        message.includes("Cannot read properties of null (reading 'evaluate')") ||
+        message.includes("Cannot read properties of null (reading \"evaluate\")") ||
+        message.includes('Execution context was destroyed') ||
+        message.includes('Target closed') ||
+        message.includes('Protocol error');
+
+      // Em produção (Railway), já vimos falha de compatibilidade do WA Web:
+      // "Cannot read properties of undefined (reading 'markedUnread')".
+      // Nesses casos, forçar restart com webVersion atualizada e repetir 1x.
+      if (isWaRuntimeMismatch) {
+        console.warn(
+          '[WA] sendText falhou (runtime WA). Forçando restart com webVersion mais recente e retry 1x...',
+          { to, err: message.slice(0, 200) }
+        );
+        const latest = await this.fetchLatestWebVersion();
+        if (latest) {
+          this.overrideWebVersion = latest;
+        }
+        await this.connect(true);
+        await new Promise((res) => setTimeout(res, 5000));
+        return await this.client.sendMessage(to, text);
+      }
+
+      // Erro comum em produção quando o navegador do whatsapp-web.js cai e a página Puppeteer some.
+      // Nesse caso, tentamos um reconnect idempotente + retry 1x.
+      if (isPuppeteerPageGone) {
+        console.warn('[WA] sendText falhou (Puppeteer/page). Tentando reconnect + retry 1x...', {
+          to,
+          err: message.slice(0, 200),
+        });
+
+        if (!this.reconnecting) {
+          this.reconnecting = (async () => {
+            try {
+              await this.connect(true);
+              await new Promise((res) => setTimeout(res, 5000));
+            } finally {
+              this.reconnecting = null;
+            }
+          })();
+        }
+
+        await this.reconnecting;
+        return await this.client.sendMessage(to, text);
+      }
+
+      throw e;
+    }
   }
 
   public async reset() {
     try {
       await this.client.destroy();
     } catch {}
-    this.status = { connected: false, me: null, qr: null };
+    this.status = { connected: false, me: null, qr: null, qrUpdatedAt: null };
     this.started = false;
     this.initClient();
     await this.client.initialize();
@@ -888,7 +1002,7 @@ class WhatsAppClient extends EventEmitter {
     try {
       await this.client.destroy();
     } catch {}
-    this.status = { connected: false, me: null, qr: null };
+    this.status = { connected: false, me: null, qr: null, qrUpdatedAt: null };
     this.started = false;
   }
 
@@ -918,7 +1032,7 @@ class WhatsAppClient extends EventEmitter {
         }
       }
     }
-    this.status = { connected: false, me: null, qr: null };
+    this.status = { connected: false, me: null, qr: null, qrUpdatedAt: null };
     this.started = false;
     // não reinicia automaticamente; ficará desconectado até connect()
   }

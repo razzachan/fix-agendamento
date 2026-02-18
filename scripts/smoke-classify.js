@@ -16,7 +16,8 @@ async function main(){
 
   const body = { imageBase64: dataUrl };
   const url = 'http://localhost:3000/api/vision/classify-stove';
-  const token = process.env.BOT_TOKEN || 'fixfogoes-vision-2025';
+  const token = process.env.BOT_TOKEN;
+  if (!token) throw new Error('Missing BOT_TOKEN in environment');
 
   try {
     const resp = await fetch(url, {

@@ -129,7 +129,10 @@ async function adaptedFetch(endpoint: string, options: any) {
 }
 const MIDDLEWARE_URL = process.env.MIDDLEWARE_URL || 'http://127.0.0.1:8000';
 const QUOTE_OFFLINE_FALLBACK =
-  process.env.QUOTE_OFFLINE_FALLBACK === 'true' || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'production';
+  // Só ativar fallback offline determinístico quando explicitamente pedido ou em testes.
+  // Em produção o normal é consultar a API (que usa a tabela price_list) e só cair em fail-soft
+  // local se a API estiver indisponível.
+  process.env.QUOTE_OFFLINE_FALLBACK === 'true' || process.env.NODE_ENV === 'test';
 
 function computeLocalQuote(payload: any) {
   // Fallback determinístico com valores corretos por tipo de serviço e equipamento
@@ -300,6 +303,12 @@ export async function buildQuote(input: BuildQuoteInput) {
     payload.class_level = String(input['class_level']).toLowerCase();
   }
 
+  // Em ambiente de teste, não chamar rede. Isso deixa os testes E2E 100% determinísticos
+  // e evita ruído de logs/stack traces (ECONNREFUSED/fetch failed).
+  if (process.env.NODE_ENV === 'test') {
+    return computeLocalQuote(payload);
+  }
+
   const primary = API_URL;
   const fallback = 'http://127.0.0.1:3001';
   async function postQuote(base: string) {
@@ -324,11 +333,9 @@ export async function buildQuote(input: BuildQuoteInput) {
         return await postQuote(fallback);
       } catch {}
     }
-    // Em ambiente de teste, permitir fallback offline determinístico
-    if (QUOTE_OFFLINE_FALLBACK) {
-      return null as any;
-    }
-    throw e;
+    // Não interromper a conversa: retornar null e deixar o fluxo abaixo decidir
+    // entre retry/fallback local (fail-soft) conforme disponibilidade.
+    return null as any;
   });
   if (!resp || !resp.ok) {
     if (!resp && !primary.includes('127.0.0.1') && !primary.includes('localhost')) {
@@ -361,6 +368,7 @@ export async function getAvailability(params: {
   region?: string | null;
   service_type?: string | null;
   duration?: number;
+  technician_id?: string | null;
 }) {
   if (process.env.NODE_ENV === 'test') {
     return {
@@ -380,6 +388,7 @@ export async function getAvailability(params: {
       duration: params.duration ?? 60,
       region: params.region ?? undefined,
       service_type: params.service_type ?? undefined,
+      technician_id: params.technician_id ?? undefined,
     });
   } else {
     // Fallback legado (GET querystring)
@@ -412,6 +421,7 @@ export async function createAppointment(input: {
   equipment_type?: string;
   email?: string;
   cpf?: string;
+  is_test?: boolean;
 }) {
   if (process.env.NODE_ENV === 'test') {
     return { ok: true, id: 'test-appointment', input } as any;
@@ -423,6 +433,7 @@ export async function createAppointment(input: {
       client_name: input.client_name,
       start_time: input.start_time,
       end_time: input.end_time,
+      is_test: !!input.is_test,
       address: input.address ?? undefined,
       address_complement: input.address_complement ?? undefined,
       description: input.description ?? undefined,
@@ -512,6 +523,37 @@ export async function aiScheduleStart(input: {
     return { message: 'Tenho estas opções de horário: 1) 09:00 2) 10:30 3) 14:00' };
   }
 
+  // Preferir Fix API como fonte de verdade quando token estiver configurado.
+  if (FIX_BOT_TOKEN) {
+    try {
+      const data: any = await callFixBotTool('/api/bot/tools/smartSuggestions', {
+        address: input.endereco || '',
+        equipment_type: input.equipamento || null,
+        urgent: !!input.urgente,
+      });
+
+      const suggestionsRaw = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      const horarios_oferecidos = suggestionsRaw.slice(0, 3).map((s: any, idx: number) => ({
+        ...s,
+        idx: String(idx + 1),
+      }));
+
+      const message = horarios_oferecidos.length
+        ? `Tenho estes horários disponíveis:\n${horarios_oferecidos
+            .map((s: any) => `${s.idx}) ${s.text || `${s.date || ''} ${s.window || ''}`.trim()}`)
+            .join('\n')}\n\nQual você prefere? (responda 1, 2 ou 3)`
+        : 'Não encontrei horários disponíveis nos próximos dias. Quer sugerir uma data/horário específico?';
+
+      return {
+        ok: true,
+        message,
+        horarios_oferecidos,
+      } as any;
+    } catch (e: any) {
+      console.warn('[toolsRuntime] aiScheduleStart: Fix API smartSuggestions failed, falling back to middleware', e?.message || e);
+    }
+  }
+
   const mapTipo = (v?: string) => {
     if (!v) return undefined as any;
     const s = String(v).toLowerCase();
@@ -579,10 +621,80 @@ export async function aiScheduleStart(input: {
   return data;
 }
 
-export async function aiScheduleConfirm(input: { telefone: string; opcao_escolhida: string; horario_escolhido?: string; context?: { nome?: string; endereco?: string; equipamento?: string; problema?: string; urgente?: boolean; cpf?: string; email?: string; complemento?: string; tipo_atendimento_1?: string; tipo_atendimento_2?: string; tipo_atendimento_3?: string; } }) {
+export async function aiScheduleConfirm(input: {
+  telefone: string;
+  opcao_escolhida: string;
+  horario_escolhido?: string;
+  context?: {
+    nome?: string;
+    endereco?: string;
+    equipamento?: string;
+    problema?: string;
+    urgente?: boolean;
+    cpf?: string;
+    email?: string;
+    complemento?: string;
+    tipo_atendimento_1?: string;
+    tipo_atendimento_2?: string;
+    tipo_atendimento_3?: string;
+    is_test?: boolean;
+  };
+}) {
   // Test-mode: return deterministic confirmation
   if (process.env.NODE_ENV === 'test') {
     return { message: 'Agendamento confirmado!' };
+  }
+
+  // Preferir Fix API como fonte de verdade quando houver token + sugestões no contexto.
+  if (FIX_BOT_TOKEN) {
+    try {
+      const ctx: any = input.context || {};
+      const suggestions: any[] = Array.isArray(ctx?.horarios_oferecidos)
+        ? ctx.horarios_oferecidos
+        : Array.isArray(ctx?.suggestions)
+          ? ctx.suggestions
+          : [];
+
+      const opt = String(input.opcao_escolhida || '').trim();
+      const idx = Math.max(1, parseInt(opt || '0', 10));
+      const chosen =
+        suggestions.find((s) => String(s?.idx || s?.opcao || s?.choice || '') === opt) ||
+        suggestions[idx - 1] ||
+        null;
+
+      const start_time = String(chosen?.from || chosen?.start_time || input.horario_escolhido || '').trim();
+      const end_time = String(chosen?.to || chosen?.end_time || '').trim();
+
+      if (start_time && end_time) {
+        const clientName = String(ctx?.nome || input.telefone || 'Cliente').trim();
+        const address = String(ctx?.endereco || '').trim();
+        const equipment = String(ctx?.equipamento || '').trim();
+        const problem = String(ctx?.problema || '').trim();
+        const descriptionParts = [equipment && `Equipamento: ${equipment}`, problem && `Problema: ${problem}`].filter(Boolean);
+        const description = descriptionParts.join(' | ') || undefined;
+
+        const booked: any = await callFixBotTool('/api/bot/tools/createAppointment', {
+          client_name: clientName,
+          start_time,
+          end_time,
+          is_test: !!ctx?.is_test,
+          address: address || undefined,
+          address_complement: ctx?.complemento || undefined,
+          description,
+          phone: input.telefone,
+          equipment_type: equipment || undefined,
+          cpf: ctx?.cpf || undefined,
+          email: ctx?.email || undefined,
+        });
+
+        const osNumber = booked?.serviceOrder?.order_number || booked?.serviceOrder?.id || booked?.event?.id || '';
+        const techName = booked?.technician?.name || booked?.technician?.id || '';
+        const msg = `AGENDAMENTO_CONFIRMADO|OS:${osNumber}|CLIENTE:${clientName}|HORARIO:${start_time}|TECNICO:${techName}|VALOR:|EQUIPAMENTOS:${equipment}|QTD_EQUIPAMENTOS:1`;
+        return { ...booked, message: msg } as any;
+      }
+    } catch (e: any) {
+      console.warn('[toolsRuntime] aiScheduleConfirm: Fix API booking failed, falling back to middleware', e?.message || e);
+    }
   }
   // Helper para garantir cache da ETAPA 1 antes de confirmar, quando necessário
   const ensureStartIfNeeded = async () => {

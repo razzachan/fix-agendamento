@@ -56,7 +56,7 @@ describe('Orchestrator: cenários avançados de fluxo', () => {
       orcamento_entregue: true,
     });
     // usuário muda para fogão elétrico
-    const out1 = await orchestrateInbound(FROM, 'na verdade é fogão elétrico', session);
+    const out1 = await orchestrateInbound(FROM, 'na verdade é fogao eletrico', session);
     expect(out1).toBeTruthy();
 
     // recarrega sessão; a flag pode ter sido resetada internamente — não dependemos dela aqui
@@ -106,6 +106,19 @@ describe('Orchestrator: cenários avançados de fluxo', () => {
     expect(t3.toLowerCase()).toMatch(/indu|qual é a marca|marca do equipamento|antes de orçarmos|antes de orcarmos/);
   });
 
+  it('preserva "fogão a gás" quando IA retorna "fogão" genérico', async () => {
+    const s = await getOrCreateSession('wa', 'test:+5511933333333');
+    process.env.LLM_FAKE_JSON = JSON.stringify({
+      intent: 'orcamento_equipamento',
+      acao_principal: 'coletar_dados',
+      dados_extrair: { equipamento: 'fogão' },
+      resposta_sugerida: 'Certo! Qual a marca e o problema?'
+    });
+    await orchestrateInbound('test:+5511933333333', 'meu fogão a gás brastemp não acende', s);
+    const eq = String(s?.state?.dados_coletados?.equipamento || '').toLowerCase();
+    expect(eq).toMatch(/fog(ão|ao)\s+a\s+g[aá]s/);
+  });
+
   it('proteção anti-loop persiste ao longo de múltiplas mensagens', async () => {
     const s = await getOrCreateSession('wa', 'test:+5511944444444');
     await setSessionState(s.id, {
@@ -123,5 +136,31 @@ describe('Orchestrator: cenários avançados de fluxo', () => {
     const r2 = await orchestrateInbound('test:+5511944444444', 'quero agendar', s);
     expect(r1).toBeTruthy();
     expect(r2).toBeTruthy();
+  });
+
+  it('"cooktop" como clarificação (mount) não deve resetar marca nem perguntar marca de novo', async () => {
+    const s = await getOrCreateSession('whatsapp', 'test:+5511922222222');
+    await setSessionState(s.id, {
+      ...(s.state || {}),
+      dados_coletados: { equipamento: 'fogão a gás', marca: 'Consul', problema: 'não acende' },
+      orcamento_entregue: false,
+    });
+
+    // Recarrega para não depender de referência antiga em memória
+    const sFresh = await getOrCreateSession('whatsapp', 'test:+5511922222222');
+
+    const out = await orchestrateInbound(
+      'test:+5511922222222',
+      'é um cooktop as 2 bocas da frente',
+      sFresh
+    );
+    const text = typeof out === 'string' ? out : (out as any)?.text || '';
+    expect((text || '').toLowerCase()).not.toContain('qual é a marca');
+    expect((text || '').toLowerCase()).not.toContain('marca do equipamento');
+
+    const s2 = await getOrCreateSession('whatsapp', 'test:+5511922222222');
+    const st = (s2 as any).state || {};
+    expect(String(st.dados_coletados?.marca || '').toLowerCase()).toContain('consul');
+    expect(String(st.dados_coletados?.mount || '').toLowerCase()).toContain('cooktop');
   });
 });

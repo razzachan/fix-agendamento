@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { botAuth } from '../middleware/botAuth.js';
+import { requireBotOrAdmin } from '../middleware/botOrAdmin.js';
 import { supabase } from '../config/supabase.js';
 import { GetAvailabilitySchema, CreateAppointmentSchema, CancelAppointmentSchema } from '../validation/botToolsSchemas.js';
 
@@ -10,14 +10,78 @@ const router = express.Router();
 const limiter = rateLimit({ windowMs: 60 * 1000, max: 60 });
 router.use(limiter);
 
-// All routes here require bot auth token
-router.use(botAuth);
+// All routes here require bot token OR admin user
+router.use(requireBotOrAdmin);
+
+// GET /api/bot/tools/listAppointments
+router.get('/listAppointments', async (req, res) => {
+  try {
+    const {
+      date_from,
+      date_to,
+      status,
+      limit,
+    } = req.query || {};
+
+    const parsedLimit = Math.min(Math.max(parseInt(limit ?? '50', 10) || 50, 1), 200);
+
+    const today = new Date();
+    const ymd = today.toISOString().slice(0, 10);
+    const fromYmd = String(date_from || ymd);
+    const toYmd = String(date_to || fromYmd);
+
+    const fromIso = `${fromYmd}T00:00:00`;
+    const toIso = `${toYmd}T23:59:59`;
+
+    let q = supabase
+      .from('calendar_events')
+      .select('id,start_time,end_time,client_name,client_phone,equipment_type,description,status,technician_id,technician_name,service_order_id,logistics_group,is_test')
+      .gte('start_time', fromIso)
+      .lte('start_time', toIso)
+      .order('start_time', { ascending: true })
+      .limit(parsedLimit);
+
+    if (status) {
+      q = q.eq('status', String(status));
+    }
+
+    // Filtro defensivo de testes com fallback se coluna não existir
+    let data;
+    try {
+      const resp = await q.eq('is_test', false);
+      if (resp.error) throw resp.error;
+      data = resp.data || [];
+    } catch {
+      const resp2 = await q;
+      if (resp2.error) throw resp2.error;
+      data = resp2.data || [];
+    }
+
+    const appointments = (data || []).map((e) => ({
+      id: e.id,
+      start_time: e.start_time,
+      end_time: e.end_time,
+      client_name: e.client_name,
+      phone: e.client_phone || null,
+      equipment_type: e.equipment_type || null,
+      description: e.description || null,
+      status: e.status,
+      technician: e.technician_id || e.technician_name ? { id: e.technician_id || null, name: e.technician_name || null } : undefined,
+      service_order_id: e.service_order_id || null,
+    }));
+
+    return res.json({ ok: true, appointments });
+  } catch (e) {
+    console.error('[botTools/listAppointments] error', e);
+    return res.status(500).json({ ok: false, error: 'list_failed', message: e?.message });
+  }
+});
 
 router.post('/getAvailability', async (req, res) => {
   try {
     const parsed = GetAvailabilitySchema.safeParse(req.body||{});
     if (!parsed.success) return res.status(400).json({ ok:false, error:'invalid_payload', details: parsed.error.format() });
-    const { date, region=null, service_type=null, duration=60 } = parsed.data;
+    const { date, region=null, service_type=null, duration=60, technician_id=null } = parsed.data;
 
     // working hours
     const { data: wh } = await supabase.from('working_hours').select('*').eq('weekday', new Date(date).getDay());
@@ -45,22 +109,26 @@ router.post('/getAvailability', async (req, res) => {
     // events (ignore tests) com fallback se coluna is_test não existir
     let events = [];
     try {
-      const resp = await supabase
+      let q = supabase
         .from('calendar_events')
         .select('*')
         .gte('start_time', `${date}T00:00:00`)
         .lte('start_time', `${date}T23:59:59`)
         .eq('is_test', false)
         .order('start_time');
+      if (technician_id) q = q.eq('technician_id', String(technician_id));
+      const resp = await q;
       if (resp.error) throw resp.error;
       events = resp.data || [];
     } catch (err) {
-      const resp2 = await supabase
+      let q2 = supabase
         .from('calendar_events')
         .select('*')
         .gte('start_time', `${date}T00:00:00`)
         .lte('start_time', `${date}T23:59:59`)
         .order('start_time');
+      if (technician_id) q2 = q2.eq('technician_id', String(technician_id));
+      const resp2 = await q2;
       events = resp2.data || [];
     }
 
@@ -76,7 +144,7 @@ router.post('/createAppointment', async (req, res) => {
   try {
     const parsed = CreateAppointmentSchema.safeParse(req.body||{});
     if (!parsed.success) return res.status(400).json({ ok:false, error:'invalid_payload', details: parsed.error.format() });
-    const { client_name, start_time, end_time, address='', address_complement='', zip_code='', email='', cpf='', description='', equipment_type=null, phone=null, attendance_preference='', region=null } = parsed.data;
+    const { client_name, start_time, end_time, is_test=false, address='', address_complement='', zip_code='', email='', cpf='', description='', equipment_type=null, phone=null, attendance_preference='', region=null } = parsed.data;
 
     // Classificar tipo de atendimento (em_domicilio | coleta_diagnostico | coleta_conserto)
     const { classifyAttendance } = await import('../services/attendanceClassifier.js');
@@ -91,8 +159,17 @@ router.post('/createAppointment', async (req, res) => {
     // Escolher técnico com base em equipamento/skill e região/grupo (se disponível)
     let chosenTech = null;
     try {
-      const { nextTechnician } = await import('../services/assignmentService.js');
-      chosenTech = await nextTechnician({ region: null, group, skills: equipment_type ? [equipment_type] : [] });
+      const { nextAvailableTechnicianForSlot, nextTechnician } = await import('../services/assignmentService.js');
+      chosenTech = await nextAvailableTechnicianForSlot({
+        region: null,
+        group,
+        skills: equipment_type ? [equipment_type] : [],
+        start_time,
+        end_time,
+      });
+      if (!chosenTech) {
+        chosenTech = await nextTechnician({ region: null, group, skills: equipment_type ? [equipment_type] : [] });
+      }
     } catch (e) {
       console.warn('[botTools/createAppointment] assignment fallback', e?.message);
     }
@@ -109,7 +186,7 @@ router.post('/createAppointment', async (req, res) => {
       description,
       equipment_type,
       status:'scheduled',
-      is_test: false,
+      is_test: !!is_test,
       source: 'bot',
       service_attendance_type: attendanceType,
       client_email: email || null,
@@ -146,6 +223,10 @@ router.post('/createAppointment', async (req, res) => {
     // Criar/vincular ordem de serviço a partir do evento
     let serviceOrder = null;
     try {
+      // Em smoke test, não criar OS para não poluir produção
+      if (is_test) {
+        serviceOrder = null;
+      } else {
       const payload = {
         client_name,
         client_phone: phone || null,
@@ -161,6 +242,7 @@ router.post('/createAppointment', async (req, res) => {
       if (!soErr) {
         serviceOrder = so;
         await supabase.from('calendar_events').update({ service_order_id: so.id }).eq('id', data.id);
+      }
       }
     } catch {}
 
@@ -377,7 +459,29 @@ router.post('/cancelAppointment', async (req, res) => {
     const parsed = CancelAppointmentSchema.safeParse(req.body||{});
     if (!parsed.success) return res.status(400).json({ ok:false, error:'invalid_payload', details: parsed.error.format() });
     const { id, reason='' } = parsed.data;
-    const { data, error } = await supabase.from('calendar_events').update({ status:'canceled', notes: reason }).eq('id', id).select().single();
+    let data, error;
+    try {
+      ({ data, error } = await supabase
+        .from('calendar_events')
+        .update({ status: 'canceled', notes: reason })
+        .eq('id', id)
+        .select()
+        .single());
+      if (error) throw error;
+    } catch (e) {
+      // Fallback: algumas bases não têm coluna "notes"
+      const msg = ((e?.message || '') + ' ' + (e?.hint || '') + ' ' + (e?.details || '')).toLowerCase();
+      if (msg.includes("notes") && msg.includes('column')) {
+        ({ data, error } = await supabase
+          .from('calendar_events')
+          .update({ status: 'canceled' })
+          .eq('id', id)
+          .select()
+          .single());
+      } else {
+        throw e;
+      }
+    }
     if (error) throw error;
     return res.json({ ok:true, event: data });
   } catch (e) {

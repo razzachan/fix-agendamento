@@ -23,7 +23,7 @@ whatsappRouter.get('/status', (_req, res) => {
 whatsappRouter.get('/qr', (_req, res) => {
   if (!requireEnabled(res)) return;
   const st = waClient.getStatus();
-  if (st.qr) return res.json({ qr: st.qr });
+  if (st.qr) return res.json({ qr: st.qr, qrUpdatedAt: st.qrUpdatedAt ?? null });
   return res.status(204).end();
 });
 // Exibe o QR como página HTML simples
@@ -114,17 +114,6 @@ whatsappRouter.get('/send', async (req, res) => {
     assertSendAllowedInTestMode(jid);
     await waClient.sendText(jid, String(body));
     res.json({ ok: true, to: jid });
-  } catch (e: any) {
-    res.status(500).json({ error: true, message: e?.message || String(e) });
-  }
-});
-
-// Reset WhatsApp para forçar novo QR
-whatsappRouter.post('/reset', async (_req, res) => {
-  try {
-    if (!requireEnabled(res)) return;
-    await waClient.reset();
-    res.json({ success: true, message: 'WhatsApp resetado, novo QR será gerado' });
   } catch (e: any) {
     res.status(500).json({ error: true, message: e?.message || String(e) });
   }

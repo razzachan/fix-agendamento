@@ -5,6 +5,10 @@ import { spawnSync } from 'node:child_process'
 process.env.WEBHOOK_BASE = process.env.WEBHOOK_BASE || 'http://localhost:3211'
 process.env.WEBHOOK_URL = process.env.WEBHOOK_URL || 'http://localhost:3211'
 
+// IMPORTANT: force a fresh peer per run to avoid reusing persisted Supabase session state
+// (which can make the gates flaky when TEST_FROM is set in the shell environment).
+process.env.TEST_FROM = `55000000${Math.floor(1000 + Math.random() * 8999)}@c.us`
+
 function run(cmd, args = []){
   console.log(`\n> ${cmd} ${args.join(' ')}`)
   const res = spawnSync(cmd, args, { stdio: 'inherit', env: process.env })

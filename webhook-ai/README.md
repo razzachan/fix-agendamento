@@ -55,6 +55,10 @@ Se nenhum admin for encontrado, registra `event: "human_handoff"` com os dados d
 - Executar a suíte: `npm --prefix webhook-ai run test`
 - Os testes cobrem orçamento, agendamento, off-topic e handoff humano.
 
+## Runbook
+
+- Funil/agendamento + smoke test em produção: `docs/bot-runbook.md`
+
 
 
 ## Scripts de health admin
